@@ -21,6 +21,7 @@ func TestToAPIError(t *testing.T) {
 		{fmt.Errorf("terminal.attach: %w", &hc.Error{Code: -32000, Message: "no terminal t9", Data: hc.ErrorData{Kind: "not_found", Hint: "list terminals first"}}),
 			404, "not_found", "no terminal t9", "list terminals first"},
 		{&hc.Error{Code: -32602, Message: "cols must be positive"}, 400, "invalid_params", "cols must be positive", ""},
+		{&hc.Error{Code: -32000, Message: "no machine rohan", Data: hc.ErrorData{Kind: "machine_unknown"}}, 404, "machine_unknown", "no machine rohan", ""},
 		{&hc.Error{Code: -32000, Message: "still running", Data: hc.ErrorData{Kind: "live"}}, 409, "live", "still running", ""},
 		{&hc.Error{Code: -32000, Message: "restarting", Data: hc.ErrorData{Kind: "unavailable"}}, 503, "unavailable", "restarting", ""},
 		{&hc.Error{Code: -32000, Message: "a kind Mori does not know", Data: hc.ErrorData{Kind: "quota"}}, 500, "quota", "a kind Mori does not know", ""},

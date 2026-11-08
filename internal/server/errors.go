@@ -27,7 +27,7 @@ func errorf(status int, kind, format string, args ...any) *apiError {
 // statusFor maps an error kind to its HTTP status.
 func statusFor(kind string) int {
 	switch kind {
-	case "not_found":
+	case "not_found", "machine_unknown":
 		return http.StatusNotFound
 	case "invalid_params":
 		return http.StatusBadRequest

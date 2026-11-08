@@ -7,19 +7,26 @@ import (
 	"strings"
 
 	"github.com/kwonikhyeon/mori/internal/auth"
+	"github.com/kwonikhyeon/mori/internal/core"
+	"github.com/kwonikhyeon/mori/internal/hc"
 	"github.com/kwonikhyeon/mori/internal/store"
 )
 
-// Deps are the parts the server is assembled from. Auth and Store are
-// required.
+// Deps are the parts the server is assembled from. Auth, Store and Core
+// are required.
 type Deps struct {
 	Version   string
 	HostName  string
 	Auth      *auth.Auth
 	Store     *store.Store
+	Core      *core.Manager
 	PublicURL func() string // where devices reach this server, for pairing links
 	UI        http.Handler
 	Logger    *slog.Logger
+
+	// Resolve tells which folder and worktree a terminal belongs to. The
+	// default trusts the folder label alone.
+	Resolve func(hc.Terminal) (folderID, worktree string)
 }
 
 // Server routes requests. Build it with New and serve Handler().
@@ -31,8 +38,8 @@ type Server struct {
 }
 
 func New(d Deps) *Server {
-	if d.Auth == nil || d.Store == nil {
-		panic("server: Deps.Auth and Deps.Store are required")
+	if d.Auth == nil || d.Store == nil || d.Core == nil {
+		panic("server: Deps.Auth, Deps.Store and Deps.Core are required")
 	}
 	if d.PublicURL == nil {
 		d.PublicURL = func() string { return "" }
@@ -42,6 +49,9 @@ func New(d Deps) *Server {
 	}
 	if d.UI == nil {
 		d.UI = http.NotFoundHandler()
+	}
+	if d.Resolve == nil {
+		d.Resolve = func(t hc.Terminal) (string, string) { return t.Labels[core.LabelFolder], "" }
 	}
 	s := &Server{d: d, log: d.Logger, mux: http.NewServeMux(), hub: newHub()}
 	d.Auth.OnRevoke(s.hub.closeDevice)
@@ -62,6 +72,22 @@ func (s *Server) routes() {
 	api.HandleFunc("GET /api/devices", s.handleDevices)
 	api.HandleFunc("DELETE /api/devices/{id}", s.handleRevokeDevice)
 	api.HandleFunc("POST /api/pair-codes", s.handlePairCode)
+	api.HandleFunc("GET /api/overview", s.handleOverview)
+	api.HandleFunc("GET /api/terminals", s.handleListTerminals)
+	api.HandleFunc("POST /api/terminals", s.handleCreateTerminal)
+	api.HandleFunc("GET /api/terminals/{t}", s.handleGetTerminal)
+	api.HandleFunc("PATCH /api/terminals/{t}", s.handlePatchTerminal)
+	api.HandleFunc("DELETE /api/terminals/{t}", s.handleRemoveTerminal)
+	api.HandleFunc("POST /api/terminals/{t}/send", s.handleSend)
+	api.HandleFunc("POST /api/terminals/{t}/keys", s.handleKeys)
+	api.HandleFunc("POST /api/terminals/{t}/interrupt", s.handleInterrupt)
+	api.HandleFunc("POST /api/terminals/{t}/kill", s.handleKill)
+	api.HandleFunc("POST /api/terminals/{t}/files", s.handleUpload)
+	api.HandleFunc("GET /api/terminals/{t}/text", s.handleText)
+	api.HandleFunc("GET /api/presets", s.handleGetPresets)
+	api.HandleFunc("PUT /api/presets", s.handlePutPresets)
+	api.HandleFunc("GET /api/hosts", s.handleGetHosts)
+	api.HandleFunc("PUT /api/hosts", s.handlePutHosts)
 	api.HandleFunc("GET /ws/events", s.handleEventsWS)
 	notFound := func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, errorf(http.StatusNotFound, "not_found", "없는 API입니다: %s %s", r.Method, r.URL.Path))

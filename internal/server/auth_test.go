@@ -17,6 +17,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/kwonikhyeon/mori/internal/auth"
+	"github.com/kwonikhyeon/mori/internal/core"
 	"github.com/kwonikhyeon/mori/internal/store"
 )
 
@@ -36,7 +37,9 @@ func newTestEnv(t *testing.T, opts ...func(*Deps)) *testEnv {
 		t.Fatal(err)
 	}
 	a := auth.New(st, auth.Options{})
-	d := Deps{Version: "test", HostName: "testhost", Store: st, Auth: a, UI: http.NotFoundHandler(), Logger: slog.New(slog.DiscardHandler)}
+	discard := slog.New(slog.DiscardHandler)
+	d := Deps{Version: "test", HostName: "testhost", Store: st, Auth: a, UI: http.NotFoundHandler(), Logger: discard,
+		Core: core.New(core.Options{Logger: discard})} // never started: the core is down
 	for _, o := range opts {
 		o(&d)
 	}

@@ -11,12 +11,15 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/kwonikhyeon/mori/internal/admin"
 	"github.com/kwonikhyeon/mori/internal/auth"
+	"github.com/kwonikhyeon/mori/internal/core"
+	"github.com/kwonikhyeon/mori/internal/hc"
 	"github.com/kwonikhyeon/mori/internal/paths"
 	"github.com/kwonikhyeon/mori/internal/server"
 	"github.com/kwonikhyeon/mori/internal/store"
@@ -33,8 +36,17 @@ func runServe(args []string) error {
 	listen := fs.String("listen", defaultListen, "수신 주소. 루프백만 허용합니다")
 	publicFlag := fs.String("public-url", "", "기기가 이 서버에 닿는 주소, 페어링 링크에 씁니다 (기본: Tailscale 이름으로 https://<이름>)")
 	logPath := fs.String("log", "", "로그 파일 (기본: 표준 오류)")
+	hcPath := fs.String("hc", "", "hc 실행 파일 (기본: PATH, 다음 ~/.local/bin/hc)")
+	hcSession := fs.String("hc-session", "", "herdr-core 세션 (기본: HC_SESSION, 없으면 hc의 기본 세션)")
 	if err := parseFlags(fs, args); err != nil {
 		return err
+	}
+	if *hcPath != "" { // without the flag hc is looked up on every connect, since an update may move it
+		p, err := hc.Locate(*hcPath)
+		if err != nil {
+			return fmt.Errorf("--hc %q: %w", *hcPath, err)
+		}
+		*hcPath = p
 	}
 	if err := checkLoopback(*listen); err != nil {
 		return err
@@ -74,11 +86,15 @@ func runServe(args []string) error {
 	}
 	addr := ln.Addr().String()
 	pub := publicURL(*publicFlag, addr, tailscale.DNSName)
+	// hc connect may not start the core on Windows (spec §15), so there the
+	// manager runs hc server start once when the first connect fails.
+	cm := core.New(core.Options{HC: *hcPath, Session: *hcSession, StartServer: runtime.GOOS == "windows", Logger: logger})
 	srv := server.New(server.Deps{
 		Version:   version.Version,
 		HostName:  hostName(tailscale.DNSName),
 		Auth:      au,
 		Store:     st,
+		Core:      cm,
 		PublicURL: pub,
 		UI:        webui.Handler(),
 		Logger:    logger,
@@ -96,26 +112,35 @@ func runServe(args []string) error {
 	defer shutdown()
 	served := make(chan error, 1)
 	go func() { served <- hs.Serve(ln) }()
+	coreDone := make(chan struct{})
+	go func() { cm.Run(ctx); close(coreDone) }()
 	go admin.Serve(ctx, adminLn, adminHandler{auth: au, publicURL: pub, shutdown: shutdown, status: func() any {
 		return map[string]any{
 			"version": version.Version, "pid": os.Getpid(), "listen": addr, "home": home,
-			"public_url": pub(), "devices": len(au.Devices()),
+			"public_url": pub(), "devices": len(au.Devices()), "core": cm.Status(),
 		}
 	}})
 	logger.Info("listening", "addr", addr, "public_url", pub(), "home", home, "version", version.Version)
 
+	var serveErr error
 	select {
-	case err := <-served:
-		return err
+	case serveErr = <-served:
 	case <-ctx.Done():
+		logger.Info("shutting down")
 	}
-	logger.Info("shutting down")
+	shutdown()
 	sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := hs.Shutdown(sctx); err != nil && !errors.Is(err, context.DeadlineExceeded) {
-		return err
+	if serveErr == nil {
+		if err := hs.Shutdown(sctx); !errors.Is(err, context.DeadlineExceeded) {
+			serveErr = err
+		}
 	}
-	return nil
+	select {
+	case <-coreDone: // hc connect has ended; the core and its sessions live on
+	case <-sctx.Done():
+	}
+	return serveErr
 }
 
 // checkLoopback refuses addresses other machines could reach. Remote access

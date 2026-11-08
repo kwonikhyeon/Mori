@@ -201,6 +201,7 @@ func (m *Manager) up(c *hc.Conn, snap hc.Snapshot) {
 	m.setStatusLocked(Status{Connected: true, Version: h.Version, Name: h.Core.Name})
 	changes := m.replaceLocked(snap)
 	m.mu.Unlock()
+	m.log.Info("core connected", "version", h.Version, "name", h.Core.Name, "terminals", len(snap.Terminals))
 	if !first { // what changed while we were away
 		m.notify(changes)
 	}

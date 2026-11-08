@@ -83,6 +83,17 @@ herdr 제품군에는 두 계열이 있다.
   | `keep: false` 셸에 SIGKILL | `exited`, signal 9, `finished` | `finished` |
   | `keep: true` 셸에 SIGKILL | `signaled`, signal 9, `lost` | `state: "live"`, `pid: null`. 그동안 attach는 `unavailable`("t1 is lost, waiting for its new shell")로 거절된다. 약 2.5초 뒤 같은 주소로 `restarted`가 왔다. 새 argv는 원래의 `/bin/sh`가 아니라 로그인 셸(`/bin/zsh -l`)이고 폴더는 그대로다 |
 
+아래는 단계 5에서 격리 코어로 확인한 것이다(2026-11-09). Mori의 REST API는 이 동작에 기댄다(§7.1).
+
+- **끝난 터미널:** `events.subscribe`의 스냅숏과 `terminal.list {all: true}`에 모두 들어 있다. 그래서 캐시는 끝난 터미널도 안다.
+- **결과 형식:** `terminal.run`은 Terminal 레코드에 `output`과 `wait`를 더해 준다. `get`·`kill`·`label`은 Terminal 레코드, `rm`은 `{removed}`, `send`는 `{started, status, turn, wait}`, `keys`는 `{status, turn}`, `read`는 `{text, complete, how}`, `put`은 `{path, bytes}`다. `kill`의 레코드는 `state: "finished"`, `reason: "killed"`, `finished_ms`를 담는다.
+- **거절:** 살아 있는 터미널의 `terminal.rm`은 kind `live`("t1 is still running", hint "kill it first: hc kill t1"), 끝난 터미널의 `terminal.send`는 kind `finished`, 없는 터미널의 `terminal.get`은 `not_found`, 모르는 키의 `terminal.keys`는 `invalid_params`("unknown key \"nosuchkey\" (try enter, esc, up, ctrl+c, alt+x, f5, a)")다.
+- **라벨 지우기:** `terminal.label`에 빈 값(`{"mori.title": ""}`)을 주면 그 라벨이 지워진다. 돌려준 레코드에도 없다.
+- **`terminal.put`:** 한 번에 8,388,608바이트(8 MiB)까지 받고, 1바이트라도 넘으면 `invalid_params`("at most 8 MB per put")다. 파일은 `<XDG_STATE_HOME>/herdr-core/<session>/files/<terminal>/<name>`에 놓인다. 같은 이름이 있으면 `name-2.ext`가 되고, 이름의 공백은 `_`가 된다(`my notes.txt` → `my_notes.txt`).
+- **`terminal.interrupt`:** 쉬고 있는 셸에는 `{outcome: "unknown", key: "ctrl+c"}`를 준다. `timeout`은 초 단위 실수이고 기본값은 10이다.
+- **`terminal.read`:** `lines`는 화면 위 기록의 줄 수다. 0이면 화면만 읽는다.
+- **터미널 인자:** `t7`, 터미널 이름, `machine/t7`을 모두 받는다.
+
 ### 2.4 현재 환경 (2026-11-09)
 
 - 호스트: `macmini`(macOS arm64, 개발 머신), `ikhyeon-desktop`·`ikhyeon-labtop`(Windows). 클라이언트에는 iPhone이 있다.
@@ -126,6 +137,19 @@ herdr 제품군에는 두 계열이 있다.
 | 32 | 상태 디렉터리 하나에 서버 하나 | `serve`는 무엇보다 먼저 관리 소켓을 연다. 그 소켓에서 다른 서버가 응답하면 시작하지 않는다. 응답이 없으면 죽은 서버가 남긴 파일로 보고 지운다 | 따로 잠금 파일(flock) · 확인하지 않음 | 두 서버가 같은 `state.json`을 쓰면 서로의 변경을 덮는다. flock은 Windows에서 따로 만들어야 하고, 죽은 서버가 남긴 잠금도 풀어야 한다. 관리 소켓은 어차피 열고, 죽은 서버의 소켓은 연결을 받지 않는다 |
 | 33 | 호스트 이름 | Tailscale 머신 이름(MagicDNS 이름의 첫 라벨). 없으면 OS 호스트 이름의 첫 라벨을 소문자로 | OS 호스트 이름만 | macOS의 호스트 이름은 컴퓨터 이름("…의 Mac mini")에서 만들어져 tailnet의 이름과 다르다. 호스트 목록(결정 2)에는 사용자가 tailnet에서 붙인 이름이 보여야 한다 |
 | 34 | 철회와 열린 WS | `server.New`가 `Auth.OnRevoke`에 WS 허브를 잇는다. WS는 수락한 뒤 허브에 등록하고, 등록한 다음 기기가 아직 있는지 다시 본다 | `serve`에서 잇기 · 수락과 철회를 한 잠금으로 묶기 | 쿠키를 확인한 뒤 허브에 등록하기 전에 철회되면 그 WS는 열린 채 남는다. 등록한 뒤에 다시 보면 철회와 재확인 중 하나가 반드시 닫는다. 한 잠금으로 묶으려면 auth가 서버의 WS를 알아야 한다. `New`에서 이으면 테스트 서버도 똑같이 동작한다 |
+| 35 | 서버의 코어 | `server.Deps.Core`는 필수다. 테스트는 시작하지 않은 관리자를 넣어 코어가 없는 서버를 만든다 | Core를 선택으로 두고 nil 검사 | 코어가 없는 동안의 서버는 실제로 있는 상태이고, 테스트가 그 경로(503 `core_unavailable`)를 그대로 지난다. nil 검사는 실제로는 없는 상태를 하나 더 만든다 |
+| 36 | 파일 올리기 한도 | 8 MiB(hc `terminal.put`의 한도, §2.3). Mori가 base64로 바꾸기 전에 재고, 넘으면 413 `too_large` | 413 `invalid_params` · 한도 검사를 hc에 맡김 | `invalid_params`는 400이다(§7.4). hc에 맡기면 11 MB쯤 되는 base64를 다 보낸 뒤에야 영어 메시지로 거절된다 |
+| 37 | 세션 만들기 확인 | `terminal.run` 전에 확인한다. `folder_id`와 `preset`은 등록된 것이어야 하고, `worktree`는 절대 경로(정리해서 쓴다), 시작 폴더는 있는 디렉터리, 제목은 100자까지다. 어기면 400 `invalid_params`와 무엇이 틀렸는지 말하는 메시지 | 확인을 코어에 맡김 | 폴더와 프리셋은 Mori만 안다. 시작 폴더가 없을 때 코어가 어떻게 할지에 기대지 않는다 |
+| 38 | 작업을 받는 프리셋 | `task: true`인 프리셋은 `argv`가 있어야 한다(`PUT /api/presets`가 거절한다). 작업은 argv의 마지막 인자로만 붙는다 | argv가 빈 프리셋(셸)이면 작업을 입력으로 보냄 | 셸에 보내면 작업 문장이 명령으로 실행된다 |
+| 39 | 제목 | 줄바꿈을 포함한 공백 묶음은 공백 하나로 바꾸고 100자까지 받는다. 작업에서 만든 제목은 40자에서 자른다. PATCH에 빈 제목을 주면 `mori.title` 라벨을 지워 프로그램 제목이 다시 보인다. 프리셋·호스트 이름도 같은 규칙이다 | 받은 그대로 저장 | 이름은 목록 한 줄에 들어가야 한다. 줄바꿈이 든 라벨은 목록을 깨뜨린다 |
+| 40 | 작업 인자 | 앞뒤 공백을 자르고, 공백뿐이면 붙이지 않는다. `-`로 시작하면 앞에 공백 하나를 붙인다 | `--`를 끼움 · 그대로 넘김 | 그대로 넘기면 프로그램이 작업을 옵션으로 읽는다(`--dangerously-skip-permissions …`). `--`를 받지 않는 프로그램도 있다. 앞의 공백은 프롬프트에 해가 없다 |
+| 41 | 중단 대기 | `interrupt`의 `timeout`(초)은 0보다 클 때만 넘기고 60에서 자른다. 없으면 hc 기본값(10초)이다 | 받은 그대로 넘김 | 요청 하나가 HTTP 연결을 오래 붙잡지 않게 한다 |
+| 42 | 프리셋 저장 | `PUT /api/presets`는 목록 전체를 바꾼다. 빈 목록, 틀린 id(`a-z0-9_-` 1~32자), 겹친 id, 빈 이름, argv의 빈 항목은 거절한다. 응답은 저장한 목록 그대로다 | 저장 뒤 다시 읽어 응답 · 프리셋 하나씩 고치는 API | 다시 읽으면 그 사이 다른 요청의 변경이 응답에 섞인다. 프리셋이 없으면 세션을 만들 수 없다. 목록이 작아서 통째로 바꾸는 편이 단순하다 |
+| 43 | 호스트 링크 | `http`·`https` 절대 URL만 받는다. 호스트가 있어야 하고 사용자 정보(`user@`)는 안 된다. 끝의 `/`는 뗀다. 빈 목록은 된다 | 아무 문자열 | UI가 이 값을 링크로 연다. `javascript:` URL이 들어가면 누른 기기에서 스크립트가 돈다 |
+| 44 | 터미널 읽기 | 목록과 overview는 캐시로 답한다. 코어가 없어도 200이다(마지막으로 안 목록, 처음엔 `[]`). 한 터미널은 캐시에 없으면 `terminal.get`을 부른다 | 캐시만 봄 · 코어가 없으면 503 | 코어가 잠깐 없어도 화면은 마지막 목록을 보여 줘야 한다. 방금 만든 터미널의 `created` 이벤트는 아직 안 왔을 수 있고, 코어는 이름으로도 찾는다 |
+| 45 | hc 결과 전달 | send·keys·interrupt·read·put의 결과는 hc가 준 그대로 돌려준다. 터미널 레코드를 주는 run·get·label·kill은 `folder_id` 등을 더한 레코드로 바꾼다 | 모두 Mori 형식으로 다시 씀 | 이 결과들에는 Mori가 더할 것이 없다. hc가 필드를 늘려도 Mori를 고치지 않는다 |
+| 46 | hc 찾기 | `--hc`를 주면 시작할 때 한 번 찾고, 없으면 연결할 때마다 찾는다(PATH, 다음 `~/.local/bin/hc`). `--hc-session`으로 코어 세션을 고른다. Windows에서는 첫 연결이 실패하면 `hc server start`를 한 번 부른다 | 시작할 때만 찾음 | hc 업데이트가 실행 파일을 옮겨도 Mori를 다시 띄우지 않고 이어 붙는다. Windows의 `hc connect`가 코어를 띄우는지는 아직 모른다(§15) |
+| 47 | 종료 순서 | 신호를 받으면 관리 소켓과 코어 관리자를 멈추고 HTTP 서버를 닫은 뒤 `hc connect`가 끝나기를 기다린다. 모두 합쳐 5초까지다. 코어와 세션은 그대로 산다 | 관리자를 기다리지 않고 끝냄 | 관리자가 `hc connect`의 stdin을 닫고 그 프로세스가 끝나는 것을 보게 한다. 기다리지 않으면 프로세스가 먼저 끝나 그 정리가 중간에 끊긴다 |
 
 ## 4. 구조
 
@@ -188,8 +212,8 @@ herdr 제품군에는 두 계열이 있다.
 
 ### 6.3 세션 만들기
 1. UI가 `POST /api/terminals {folder_id, worktree?, preset, task?, title?, cols, rows}`를 보낸다.
-2. Mori가 `terminal.run`을 호출한다. 넘기는 값은 `cwd`(폴더 또는 워크트리), `argv`(프리셋 argv, 프리셋이 작업을 받으면 끝에 task), `labels {mori: "1", mori.folder, mori.preset, mori.title}`, `keep: true`, `no_parent: true`, `size {cols, rows}`, `env {TERM: xterm-256color, COLORTERM: truecolor, TERM_PROGRAM: mori}`이다.
-3. 응답으로 터미널 주소(`t7`)를 돌려준다. 캐시는 `created` 이벤트로 갱신되어 모든 브라우저에 퍼진다.
+2. Mori가 폴더·프리셋·시작 폴더·제목을 확인하고(결정 37) `terminal.run`을 호출한다. 넘기는 값은 `cwd`(폴더 또는 워크트리), `argv`(프리셋 argv, 프리셋이 작업을 받으면 끝에 task. 결정 38, 40), `labels {mori: "1", mori.folder, mori.preset, mori.title}`, `keep: true`, `no_parent: true`, `size {cols, rows}`(10~1000, 기본 80×24), `env {TERM: xterm-256color, COLORTERM: truecolor, TERM_PROGRAM: mori}`이다. `mori.title`은 `title`, 없으면 작업의 앞 40자, 그것도 없으면 프리셋 이름이다(결정 39).
+3. 응답은 201과 터미널 레코드(§7.1)다. 캐시는 `created` 이벤트로 갱신되어 모든 브라우저에 퍼진다.
 4. 기본 프리셋은 세 가지다. 사용자가 고치거나 더할 수 있다.
 
    | id | 이름 | argv | task 받음 |
@@ -259,12 +283,14 @@ herdr 제품군에는 두 계열이 있다.
 | `POST /api/terminals/{t}/send` | `{text, force?}` → `terminal.send` |
 | `POST /api/terminals/{t}/keys` | `{keys: ["esc", …]}` → `terminal.keys` |
 | `POST /api/terminals/{t}/interrupt` · `/kill` | 현재 턴 중단 · 프로그램 종료 |
-| `POST /api/terminals/{t}/files` | multipart 파일 하나(8 MB까지) → `terminal.put`, 놓인 경로를 돌려준다 |
+| `POST /api/terminals/{t}/files` | multipart `file` 항목 하나(8 MiB까지, 넘으면 413. 결정 36) → `terminal.put`, `{path, bytes}`를 돌려준다 |
 | `GET /api/terminals/{t}/text?lines=0` | 화면 텍스트(`terminal.read`) |
 | `GET/PUT /api/presets` · `GET/PUT /api/hosts` | 프리셋 · 호스트 링크 목록 |
 | `GET /api/push/key` · `POST/DELETE /api/push/subscriptions` · `POST /api/push/test` | VAPID 공개 키 · 구독 `{subscription, kinds}` · 시험 알림 |
 
 `{t}`는 터미널 주소다. 다른 머신의 터미널이면 `machine/t7`처럼 `/`가 들어가므로 URL에서는 `%2F`로 쓴다.
+
+터미널 목록과 overview는 코어가 없어도 캐시로 답한다(결정 44). send·keys·interrupt·text·files는 hc의 결과를 그대로 돌려주고(결정 45, 형식은 §2.3), 만들기·한 터미널·제목 변경·kill은 아래의 터미널 레코드를 돌려준다. `PUT /api/presets`와 `PUT /api/hosts`는 목록 전체를 바꾸고 저장한 목록을 돌려준다(결정 42, 43).
 
 터미널 레코드는 hc의 `Terminal` 필드에 `folder_id`, `worktree`, `display_title`, `preset`을 더한 것이다. `title`은 프로그램이 정한 제목(hc) 그대로다. 보여 줄 이름은 `display_title`이다. 순서는 `mori.title` 라벨 → 프로그램 제목 → 포그라운드 프로그램 이름 → argv[0]의 파일 이름 → "셸"이다.
 
@@ -288,9 +314,9 @@ herdr 제품군에는 두 계열이 있다.
 
 | HTTP 상태 | kind |
 |---|---|
-| 404 | `not_found` |
+| 404 | `not_found`, `machine_unknown` |
 | 400 | `invalid_params` |
-| 409 | `blocked`, `finished`, `live`, `name_taken`, `conflict` |
+| 409 | `blocked`, `finished`, `live`, `name_taken`, `conflict`, `already_added` |
 | 503 | `unavailable`, `core_unavailable` |
 | 500 | 나머지 |
 

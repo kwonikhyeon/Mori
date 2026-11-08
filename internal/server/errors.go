@@ -1,12 +1,16 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os/exec"
+	"strings"
 
 	"github.com/kwonikhyeon/mori/internal/core"
+	"github.com/kwonikhyeon/mori/internal/gitx"
 	"github.com/kwonikhyeon/mori/internal/hc"
 )
 
@@ -76,6 +80,12 @@ func toAPIError(err error) *apiError {
 	if errors.Is(err, core.ErrUnavailable) {
 		return &apiError{Status: http.StatusServiceUnavailable, Kind: "core_unavailable", Message: err.Error()}
 	}
+	if ne := (*gitx.NameError)(nil); errors.As(err, &ne) {
+		return errorf(http.StatusBadRequest, "invalid_params", "브랜치나 커밋 이름으로 쓸 수 없습니다: %q", ne.Name)
+	}
+	if ge := (*gitx.Error)(nil); errors.As(err, &ge) {
+		return &apiError{Status: http.StatusUnprocessableEntity, Kind: "git_failed", Message: gitMessage(ge)}
+	}
 	if kind := hc.KindOf(err); kind != "" {
 		msg := err.Error()
 		if e := (*hc.Error)(nil); errors.As(err, &e) && e.Message != "" {
@@ -84,6 +94,32 @@ func toAPIError(err error) *apiError {
 		return &apiError{Status: statusFor(kind), Kind: kind, Message: msg, Hint: hc.HintOf(err)}
 	}
 	return &apiError{Status: http.StatusInternalServerError, Kind: "internal", Message: err.Error()}
+}
+
+// maxGitMessage is how much of what git said the API passes on.
+const maxGitMessage = 400
+
+// gitMessage is what the API says of a failed git call: the start of what
+// git said, or why git said nothing.
+func gitMessage(e *gitx.Error) string {
+	switch {
+	case errors.Is(e.Err, context.DeadlineExceeded):
+		return "git 명령이 시간 안에 끝나지 않았습니다"
+	case errors.Is(e.Err, exec.ErrNotFound):
+		return "git을 찾을 수 없습니다. 이 호스트에 git을 설치하세요"
+	}
+	s := strings.TrimSpace(e.Stderr)
+	if s == "" {
+		return "git 명령이 실패했습니다: " + e.Err.Error()
+	}
+	n := 0
+	for i := range s {
+		if n == maxGitMessage {
+			return s[:i] + "…"
+		}
+		n++
+	}
+	return s
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

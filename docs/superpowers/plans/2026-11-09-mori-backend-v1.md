@@ -1710,13 +1710,15 @@ func TestSessionSurvivesMoriRestart(t *testing.T) {
 **Files:**
 - Create: `internal/gitx/gitx.go`, `internal/gitx/parse.go`
 - Test: `internal/gitx/parse_test.go`, `internal/gitx/gitx_test.go`
-- Modify: `internal/server/errors.go`(`*gitx.Error` → 422 `git_failed`, 메시지는 stderr 앞 400자)
+- Modify: `internal/server/errors.go`(`*gitx.Error` → 422 `git_failed`, 메시지는 stderr 앞 400자, 시간 초과·git 없음은 한국어 문구; `*gitx.NameError` → 400 `invalid_params`, 결정 66)
 
 **Interfaces:**
 - Produces:
 ```go
-type Runner struct { Path string; Timeout time.Duration }    // 기본 "git", 10s
-type Error struct { Args []string; Stderr string; Err error }
+const DefaultTimeout = 10 * time.Second
+type Runner struct { Path string; Timeout time.Duration }    // 기본 "git", DefaultTimeout
+type Error struct { Args []string; Stderr string; Err error } // Unwrap → Err(context.DeadlineExceeded, exec.ErrNotFound, *exec.ExitError)
+type NameError struct { Name string }                         // 브랜치·기준 이름으로 쓸 수 없음
 type Change struct { Path, Orig, Index, Worktree, Kind string } // json: path, orig(omitempty), index, worktree, kind(changed|renamed|unmerged|untracked)
 type Status struct { Head, Branch string; Detached bool; Upstream string; Ahead, Behind int; Changes []Change }
 type Worktree struct { Path, Head, Branch string; Main, Bare, Detached, Locked, Prunable bool }
@@ -1733,10 +1735,10 @@ func (g Runner) AddWorktree(ctx, repo, path, branch string, create bool, base st
 func (g Runner) RemoveWorktree(ctx, repo, path string, force bool) error
 func IsRepo(dir string) bool                       // dir/.git 존재(파일이나 디렉터리)
 func WorktreePath(mainRoot, branch string) string  // <부모>/<이름>.wt/<슬러그>; 있으면 -2, -3…
-func BranchSlug(branch string) string              // [A-Za-z0-9._-] 밖은 -, 연속 - 하나로, 앞뒤 -. 제거, 비면 "wt"
-func SafeRelPath(file string) bool                 // 상대 경로, .. 성분 없음, 비지 않음
+func BranchSlug(branch string) string              // [A-Za-z0-9._-] 밖은 -, 연속 - 하나로, 64바이트, 앞뒤 -. 제거, 비면 "wt", Windows 장치 이름은 "wt-" 앞에(결정 65)
+func SafeRelPath(file string) bool                 // 상대 경로, .. 성분 없음, 비지 않음, 드라이브·UNC·NUL 없음
 ```
-모든 실행: `git -c core.quotepath=off -c color.ui=false <args>`, `cmd.Dir = dir`, env에 `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, 시간 제한, `procutil.HideWindow`. 브랜치 목록 형식: `for-each-ref --format=%(refname)%00%(objectname)%00%(upstream:short)%00%(HEAD) refs/heads refs/remotes`(`refs/remotes/*/HEAD` 제외). diff: 추적되는 파일은 `diff --no-color --no-ext-diff [--cached] -- <file>`, 추적 안 되는 파일(`status -- <file>`이 `?`)은 `diff --no-color --no-index -- /dev/null <file>`(종료 코드 1도 성공). `limit` 바이트에서 자르고 `truncated=true`. 브랜치·base가 `-`로 시작하면 거부, `check-ref-format --branch`로 검사.
+모든 실행: `git -c core.quotepath=off -c color.ui=false <args>`, `cmd.Dir = dir`, 시간 제한, `procutil.HideWindow`. env는 저장소 위치 변수(`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_COMMON_DIR`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_NAMESPACE`)와 패턴 변수(`GIT_GLOB_PATHSPECS`, `GIT_NOGLOB_PATHSPECS`, `GIT_ICASE_PATHSPECS`)를 빼고 `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `GIT_LITERAL_PATHSPECS=1`을 넣는다(결정 61). stderr는 8 KiB까지만 담는다. 브랜치 목록 형식: `for-each-ref --format=%(refname)%00%(objectname)%00%(upstream:short)%00%(HEAD) refs/heads refs/remotes`(`refs/remotes/*/HEAD` 제외). 워크트리 목록은 `worktree list --porcelain -z`, 실패하면 `-z` 없이 한 번 더(git < 2.36, 결정 64). diff: `diff --no-color --no-ext-diff [--cached] [-- <file>]`. 스테이지 안 한 diff이고 `file`이 있으면 `status --porcelain=v2 -z --untracked-files=all -- <file>`의 `?` 항목(100개까지)마다 `diff --no-color --no-ext-diff --no-index -- /dev/null <f>`(종료 코드 1도 성공)를 붙인다(결정 62). `limit` 바이트에서 파이프를 닫아 git을 멈추고, 마지막 온전한 줄까지 돌려주며 `truncated=true`(결정 63). 브랜치·base가 `-`로 시작하거나 `check-ref-format --branch`가 128이면 `NameError`. `RemoveWorktree`는 지운 뒤 부모 `<이름>.wt`가 비었으면 지운다(결정 67).
 
 - [ ] **Step 1: 실패하는 테스트(고정 입력)**
 
@@ -1794,7 +1796,7 @@ func TestSafeRelPath(t *testing.T) {
 	}
 }
 ```
-`gitx_test.go`(실제 git, 임시 저장소): `git init -b main`, 커밋 하나, 파일 수정·추가 → `Status` 변경 2건, `Diff`가 `+` 줄 포함, 추적 안 된 파일 diff가 `/dev/null` 헤더 포함, `AddWorktree(create)` → `Worktrees` 2개, `RemoveWorktree` → 1개. `git`이 없으면 건너뛴다.
+`gitx_test.go`(실제 git, 임시 저장소 `저장소 하나/app`, `GIT_CONFIG_GLOBAL`은 빈 파일, `GIT_CONFIG_NOSYSTEM=1`): `git init -b main`, 커밋 하나, 파일 수정·추가 → `Status` 변경 3건, `Diff`가 `+` 줄 포함, 추적 안 된 파일 diff가 `/dev/null` 헤더 포함, `[ab].txt`의 diff에 `a.txt`가 섞이지 않음, 64바이트 한도에서 줄 단위로 잘림, 추적 안 된 디렉터리 `새 폴더/`의 diff에 안의 파일 둘, `AddWorktree(create)` → `app.wt/feat`, 연결 워크트리에서 본 `Worktrees`도 주 워크트리가 먼저, 이미 체크아웃된 브랜치는 거절되고 디렉터리가 남지 않음, 변경 있는 워크트리는 force 없이 안 지워짐, `RemoveWorktree` → 1개 + 빈 `app.wt` 없어짐. 잘못된 이름(`-x`, `bad..name`, `a b`, 빈 이름, base `-q`)은 `NameError`. 저장소 아님·git 없음·시간 초과는 `*Error`. `git`이 없으면 건너뛴다.
 
 - [ ] **Step 2: 실패 확인** — `go test ./internal/gitx/` → 컴파일 실패.
 - [ ] **Step 3: 구현** — 위 규칙. `ParseStatus`는 NUL로 나눈 필드를 차례로 읽고, `2`로 시작하는 항목은 다음 필드를 `Orig`로 먹는다. 경로는 `1` 항목의 9번째 공백 뒤 나머지 전부(공백 포함)다(`strings.SplitN(field, " ", 9)`; `2`는 10, `u`는 11).

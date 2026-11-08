@@ -101,6 +101,15 @@ herdr 제품군에는 두 계열이 있다.
 - **코어 재시작:** `hc server restart`를 하면 `hc connect`의 연결이 EOF로 끝난다. 붙어 있던 스트림은 CLOSE 없이 끊긴다.
 - **코어 중지:** `hc server stop`을 하면 붙어 있던 스트림이 CLOSE `server_stop`을 받는다. 코어가 다시 뜨면 약 2초 뒤 keep 터미널은 같은 주소에 로그인 셸로 돌아오고, keep이 아닌 터미널은 `finished`로 남는다.
 
+아래는 단계 6에서 git 2.54로 확인한 것이다(2026-11-09). `internal/gitx`가 이 동작에 기댄다.
+
+- **실제 경로:** `/tmp/…`처럼 심볼릭 링크를 거친 경로로 불러도 `worktree list`는 주 워크트리와 연결 워크트리 모두 실제 경로(`/private/tmp/…`)를 보고한다. 그래서 경로를 비교하는 쪽은 `filepath.EvalSymlinks`를 거친 경로로 비교한다.
+- **추적 안 된 디렉터리:** `status`는 추적 안 된 디렉터리를 `dir/` 하나로 보여 준다. `diff --no-index -- /dev/null dir/`는 "Could not access 'dir/null'"로 실패한다. `-uall`을 주면 그 안의 파일이 하나씩 나온다.
+- **경로 패턴:** 경로 인자는 기본으로 패턴이다. `[ab].txt`를 주면 `a.txt`도 맞는다. `GIT_LITERAL_PATHSPECS=1`이면 이름 그대로다.
+- **이름 확인:** `check-ref-format --branch`는 `bad..x`, `-x`, `a b`에 128로 끝난다.
+- **워크트리:** `worktree add`는 없는 상위 디렉터리를 만든다. 브랜치가 이미 다른 워크트리에 있어 거절되면 디렉터리를 남기지 않는다. 잠긴 워크트리는 `remove --force` 하나로는 지워지지 않는다("use 'remove -f -f'"). `-z`는 줄마다 NUL, 항목마다 NUL을 하나 더 붙이고, 잠금 이유에 줄바꿈이 그대로 들어간다. `-z`가 없으면 이유를 C 문자열처럼 따옴표로 싼다. `worktree list -z`는 git 2.36부터다(Ubuntu 22.04는 2.34).
+- **diff 머리:** 이름에 공백이 있으면 `+++ b/<이름>` 끝에 탭이 붙는다. `diff --no-index`는 파일이 다르면 1로 끝난다.
+
 ### 2.4 현재 환경 (2026-11-09)
 
 - 호스트: `macmini`(macOS arm64, 개발 머신), `ikhyeon-desktop`·`ikhyeon-labtop`(Windows). 클라이언트에는 iPhone이 있다.
@@ -170,6 +179,13 @@ herdr 제품군에는 두 계열이 있다.
 | 58 | 끝난 터미널에 붙기 | 코어가 `finished`로 거절하면 `terminal.get`으로 레코드를 읽고(실패하면 캐시) `closed`를 보낸 뒤 1000으로 닫는다. 이유를 모르면 `finished`다 | 4404로 닫음 · 캐시만 봄 | 브라우저는 끝난 세션의 마지막 상태를 보여 줘야 한다. 캐시는 `finished` 이벤트보다 늦을 수 있다 |
 | 59 | WS 닫기 | `CloseSockets`는 모든 WS를 1001로 닫고 새 WS도 1001로 거절한 뒤, 핸들러가 다 끝나거나 시간이 다 될 때까지 기다린다 | `http.Server.Shutdown`에 맡김 | `Shutdown`은 하이재킹된 연결을 닫지도 기다리지도 않는다 |
 | 60 | 이벤트 WS 밀림 | 보낼 변화가 1024개 넘게 밀리면 1013으로 닫는다. 브라우저는 다시 붙어 새 스냅숏을 받는다 | 밀린 것을 버리고 계속 · 무한 버퍼 | 몇 개를 버리면 브라우저의 목록이 말없이 틀어진다. 다시 붙으면 스냅숏이 맞는 목록을 준다 |
+| 61 | git 환경 | 저장소 위치 변수(`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` 등)와 패턴 변수를 빼고, `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `GIT_LITERAL_PATHSPECS=1`을 넣는다 | 환경을 그대로 물려줌 | git 훅 안에서 시작된 Mori는 모든 질의를 엉뚱한 저장소에 한다. 경로가 패턴으로 읽히면 `[ab].txt`의 diff에 `a.txt`가 섞인다(§2.3) |
+| 62 | 추적 안 된 파일의 diff | 스테이지 안 한 diff는 `file` 아래의 추적 안 된 파일(디렉터리면 그 안 파일 전부, 100개까지)을 `/dev/null`과 비교한 새 파일 diff로 뒤에 붙인다. `file`이 비면 추적 파일만이다 | 파일 하나만 받음 · 상태를 `-uall`로 봄 | 상태는 추적 안 된 디렉터리를 `dir/` 하나로 보여 주는데, `diff --no-index`는 디렉터리를 비교하지 못한다(§2.3). `-uall`은 무시되지 않은 큰 트리에서 목록을 수만 줄로 늘린다 |
+| 63 | diff 자르기 | 상한에 닿으면 파이프를 닫아 git을 멈추고, 마지막 온전한 줄까지 돌려주며 `truncated`를 켠다 | 끝까지 읽고 버림 | 큰 diff에 메모리와 시간을 쓰지 않는다. 줄이나 UTF-8 문자 중간에서 끊기지 않는다 |
+| 64 | 오래된 git | `worktree list --porcelain -z`가 실패하면 `-z` 없이 다시 부른다. 파서는 두 형식을 모두 읽는다 | git 2.36 이상을 요구 | Ubuntu 22.04의 git(2.34)에서 워크트리 목록이 깨진다. 두 형식은 구분자만 다르다 |
+| 65 | 브랜치 슬러그 | 결정 15의 슬러그는 64바이트로 자르고, Windows 장치 이름(`CON`, `AUX`, `NUL`, `COM1`…, 대소문자 무관, 확장자가 붙어도)이면 앞에 `wt-`를 붙인다 | 그대로 씀 | Windows 호스트에서는 `aux` 브랜치의 워크트리 디렉터리를 만들 수 없다. 아주 긴 브랜치 이름은 경로 길이 한도를 넘는다 |
+| 66 | git 오류 | 브랜치·기준 이름이 `-`로 시작하거나 `check-ref-format --branch`를 통과하지 못하면 400 `invalid_params`다. git이 실패하면 422 `git_failed`이고, 메시지는 stderr 앞 400자다. 시간 초과와 git 없음은 한국어 문구로 알린다 | 모두 422 | 이름 오류는 입력을 고치면 되는 것이라 UI가 입력란을 가리킬 수 있어야 한다. stderr가 비는 실패에도 이유가 보여야 한다 |
+| 67 | `.wt` 디렉터리 정리 | 워크트리를 지운 뒤 `<이름>.wt`가 비었으면 지운다 | 남김 | 결정 15에 따라 Mori가 만든 디렉터리다. 비었을 때만 지우므로 다른 것을 잃지 않는다 |
 
 ## 4. 구조
 
@@ -291,12 +307,12 @@ herdr 제품군에는 두 계열이 있다.
 | `GET /api/overview` | 첫 화면용 `{host, core, folders, terminals, presets, hosts}` |
 | `GET/POST /api/folders` · `PATCH/DELETE /api/folders/{id}` | 폴더 목록·등록 `{path, name?}` · 이름 변경·등록 해제(파일은 건드리지 않는다) |
 | `GET /api/fs?path=&hidden=0` | 폴더 고르기용 하위 디렉터리 목록 `{path, parent, entries: [{name, path, git}]}` |
-| `GET /api/folders/{id}/git` | `{repo, branch, upstream, ahead, behind, changes, worktrees: [{path, branch, head, main, locked, prunable}]}` |
+| `GET /api/folders/{id}/git` | `{repo, branch, upstream, ahead, behind, changes, worktrees: [{path, branch, head, main, bare, detached, locked, prunable}]}` |
 | `GET /api/folders/{id}/branches` | 로컬·원격 브랜치 |
 | `POST /api/folders/{id}/worktrees` | `{branch, create, base?}` → `git worktree add` |
 | `DELETE /api/folders/{id}/worktrees?path=&force=0` | 그 경로에서 살아 있는 세션이 있으면 409 |
 | `GET /api/git/status?path=` | 워크트리의 변경 파일(스테이지·작업 트리·추적 안 됨·충돌) |
-| `GET /api/git/diff?path=&file=&staged=0` | 파일 하나의 unified diff(읽기 전용, 1 MiB에서 자름) |
+| `GET /api/git/diff?path=&file=&staged=0` | `file`(파일이나 디렉터리, 비우면 추적 파일 전체)의 unified diff `{diff, truncated}`. 읽기 전용이고, 1 MiB에서 줄 단위로 자른다. 스테이지 안 한 diff에는 추적 안 된 파일이 새 파일로 붙는다(결정 62) |
 | `GET /api/terminals?all=0` | 터미널 목록(각각 `folder_id`, `worktree`, `display_title` 포함). 기본값은 살아 있는 것과 24시간 안에 끝난 것 |
 | `POST /api/terminals` | 세션 만들기(§6.3) |
 | `GET/PATCH/DELETE /api/terminals/{t}` | 한 터미널 · 제목 변경(`mori.title` 라벨) · 끝난 터미널 지우기(`terminal.rm`) |
@@ -383,11 +399,11 @@ Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limit
 | 응답 없는 브라우저(잠긴 휴대폰 등) | ping에 답이 없으면 끊고 포커스를 푼다 | 없음. 다시 열면 다시 붙는다 |
 | 브라우저 네트워크 끊김 | 채널을 CLOSE한다 | 재접속하면 `resumed=1`로 크기를 뺏지 않는다 |
 | 느린 브라우저 | 크레딧을 늦게 보낸다. 4 MiB 넘게 밀리면 코어가 새 화면을 보낸다 | 잠깐 멈춘 뒤 화면이 새로 그려짐 |
-| git 명령 실패 | 422 `git_failed` + stderr 앞부분 | 오류 메시지 |
+| git 명령 실패 | 422 `git_failed` + stderr 앞 400자. 쓸 수 없는 브랜치 이름은 400 `invalid_params`(결정 66) | 오류 메시지 |
 | 푸시 발송 실패 | 404·410이면 구독을 지운다. 그 밖에는 로그만 남긴다 | 없음 |
 | `state.json` 손상 | `state.json.bad`로 옮기고 새로 시작한다(기기 다시 페어링) | 다시 페어링 요구 |
 
-모든 외부 명령(`git`, `hc server start`)에는 시간 제한(git은 기본 10초)이 있다. git에는 `GIT_TERMINAL_PROMPT=0`과 `GIT_OPTIONAL_LOCKS=0`을 준다.
+모든 외부 명령(`git`, `hc server start`)에는 시간 제한(git은 기본 10초)이 있다. git에는 `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, `GIT_LITERAL_PATHSPECS=1`을 준다(결정 61).
 
 ## 10. 저장
 

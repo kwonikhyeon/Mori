@@ -301,6 +301,13 @@ func (c *Conn) handleReply(b []byte) {
 	}
 }
 
+// unregister forgets a channel without waiting for the core's CLOSE.
+func (c *Conn) unregister(ch uint32) {
+	c.mu.Lock()
+	delete(c.sinks, ch)
+	c.mu.Unlock()
+}
+
 // fail ends the connection once: every waiting call and open stream gets
 // an error wrapping ErrClosed.
 func (c *Conn) fail(cause error) {

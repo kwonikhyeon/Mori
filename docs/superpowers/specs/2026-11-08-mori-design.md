@@ -66,6 +66,23 @@ herdr 제품군에는 두 계열이 있다.
 - **attach:** 결과 키는 `channel`, `terminal`, `resize_notifications`, `automatic_input`이다. 첫 화면은 셸에서 약 2.3 KB였다. detach는 CLOSE를 보내면 코어가 빈 CLOSE로 답한다.
 - **코어 자동 시작:** macOS에서 `hc connect`는 코어가 없으면 띄운다.
 
+아래는 단계 2에서 테스트용 격리 코어(`HC_SESSION=mori-test-<id>`, §13)로 확인한 것이다(2026-11-09).
+
+- **코어 수명(macOS):** 자동으로 뜬 코어는 launchd 작업(`hc --hc-launchd …`, 부모 PID 1)이다. stdio는 `/dev/null`이고 stderr는 `<XDG_STATE_HOME>/herdr-core/<session>/core.log`로 간다. 그래서 Mori가 끝나도 코어는 산다. `hc connect`는 stdin이 닫히면 끝난다. 상태 디렉터리에는 `core.json`, `core.lock`, `core.log`, `holder.log`, `screens/`, `terminals.json`이 있다.
+- **attach 바이트:** 첫 화면은 코어가 다시 그린 화면이다(`CAN`, `CSI !p` 리셋, 화면 지우기, 탭 위치, 프롬프트, 커서 위치, `CSI ?9001l`). 그 뒤로는 PTY 원시 출력이 작은 조각으로 온다. `A ESC[31m B ESC[0m C`가 바이트 그대로 왔다.
+- **터미널 질의:** 프로그램이 보낸 DA1(`CSI c`), DSR(`CSI 6n`), OSC 11 질의는 뷰어 스트림에서 빠지고 코어가 직접 답한다. 답은 `CSI ?62;22c`, `CSI 1;5R`, 그리고 attach `display`의 배경색으로 만든 `OSC 11;rgb:1111/2222/3333`이었다. 그래서 xterm.js가 겹쳐 답하는 일은 없다. 대신 Mori는 브라우저의 색과 셀 크기를 attach의 `display`나 FACTS로 넘겨야 한다(§6.4).
+- **attach 플래그:** 활성 뷰어는 `resize_notifications`를 요청해도 `false`를 받았다. 그래서 크기 변화는 `size` 이벤트로 따라간다(§6.4). `automatic_input`은 `true`였지만 입력은 모두 DATA로 보낸다(§14).
+- **RESIZE:** 보내면 `size` 이벤트(`{cols, rows}`)가 오고 셸이 프롬프트를 다시 그린다.
+- **이벤트 데이터:** `created`와 `restarted`는 Terminal 레코드 전체다(`identity: "ghostty"`, `screen: "exact"`). `size`는 `{cols, rows}`, `foreground`는 `{argv, cwd, name, pid}`, `lost`와 `finished`는 `{exit_code, finished_ms, reason, signal}`이다. 이벤트의 `terminal`은 짧은 주소(`t1`)이고 `terminal.run` 결과의 `address`와 같다.
+- **끝나는 방식:** 결과는 아래와 같다. 이것으로 §6.8의 판정을 확인했다.
+
+  | 경우 | CLOSE와 이벤트 | 레코드 |
+  |---|---|---|
+  | `exit 3` | `exited`, exit_code 3, `finished` | `finished` |
+  | `terminal.kill` | `killed`, signal 1, `finished`(같은 값). 코어는 hangup → terminate → kill 순서로 보내고, 셸은 SIGHUP에서 끝났다 | `finished`, `terminal.list {all: true}`에 남는다(1.5초 안에 `removed` 없음) |
+  | `keep: false` 셸에 SIGKILL | `exited`, signal 9, `finished` | `finished` |
+  | `keep: true` 셸에 SIGKILL | `signaled`, signal 9, `lost` | `state: "live"`, `pid: null`. 그동안 attach는 `unavailable`("t1 is lost, waiting for its new shell")로 거절된다. 약 2.5초 뒤 같은 주소로 `restarted`가 왔다. 새 argv는 원래의 `/bin/sh`가 아니라 로그인 셸(`/bin/zsh -l`)이고 폴더는 그대로다 |
+
 ### 2.4 현재 환경 (2026-11-09)
 
 - 호스트: `macmini`(macOS arm64, 개발 머신), `ikhyeon-desktop`·`ikhyeon-labtop`(Windows). 클라이언트에는 iPhone이 있다.
@@ -97,6 +114,11 @@ herdr 제품군에는 두 계열이 있다.
 | 20 | 폰 입력 | xterm.js 직접 입력 + 여러 줄 입력창(`terminal.send`) + 빠른 키 바 | 감시·승인 전용 | 폰도 주 작업 환경이다(§1.1) |
 | 21 | 알림 대상 | 부모 없는 터미널만(기본값) | 모든 터미널 | 자식 에이전트의 대기는 부모 에이전트가 받는다(hc가 부모에게 알린다) |
 | 22 | UI 프레임워크 | 후보 선택 뒤 정한다. 백엔드는 빌드된 정적 파일만 서빙한다 | 지금 고정 | UI는 아티팩트 후보에서 고른다(§1.1) |
+| 23 | 이벤트 채널 CREDIT | 읽어 낸 줄의 바이트에 더해, 줄을 기다리는 동안 받은 미완성 줄의 바이트도 CREDIT한다 | 받는 즉시 전부 CREDIT · 완성된 줄만 CREDIT | 받는 즉시 주면 소비자가 느릴 때 버퍼가 끝없이 커진다. 완성된 줄만 주면 256 KiB보다 긴 메시지(큰 스냅숏)에서 멈춘다 |
+| 24 | 깨진 이벤트 줄 | 구독을 끝낸다. 소비자는 다시 구독해 새 스냅숏을 받는다 | 그 줄만 건너뛴다 | 건너뛰면 캐시가 모르는 사이 코어와 어긋난다. 스냅숏은 어긋남을 고친다 |
+| 25 | 채널별 수신 큐 | 읽기 루프는 채널마다 큐에 넣기만 한다. 큐가 32 MiB를 넘으면 그 스트림만 끊는다 | 읽기 루프에서 소비자에게 바로 넘김 · 한도 없는 큐 | 바로 넘기면 느린 브라우저 하나가 모든 채널과 RPC를 막는다. 코어가 CREDIT을 지키면 큐는 256 KiB를 넘지 않으므로, 한도는 고장 난 코어에만 걸린다 |
+| 26 | detach 뒤 읽기 | `Close` 직후 `Recv`는 남은 출력 없이 `ErrDetached`를 돌려준다 | 남은 큐를 다 내준 뒤 끝냄 | 닫은 쪽은 남은 출력을 쓰지 않는다. 닫는 동안 온 출력을 흘리지 않아도 된다 |
+| 27 | `hc connect` 오류 | hc의 stderr 마지막 2 KiB를 연결 오류 메시지에 붙인다 | stderr 버림 · 전부 로그로 보냄 | 연결 실패의 이유(설치·권한·소켓 경로)는 대개 hc가 stderr에 쓴다. 로그는 `Options.Stderr`로 따로 받을 수 있다 |
 
 ## 4. 구조
 
@@ -199,7 +221,7 @@ herdr 제품군에는 두 계열이 있다.
 ### 6.8 프로그램 손실과 복구(`keep`)
 `lost` 이벤트가 오면 attach 스트림이 닫힌다. Mori는 CLOSE 이유로 닫는 방법을 고른다.
 
-- `keep` 터미널이고 이유가 `exited`·`killed`가 아니면(시그널, holder 손실 등) attach WS를 코드 4409로 닫는다. UI는 "복구 대기"를 보여 주고, `restarted` 이벤트가 오면 다시 붙는다.
+- `keep` 터미널이고 이유가 `exited`·`killed`가 아니면(시그널이면 `signaled`, holder 손실 등, §2.3) attach WS를 코드 4409로 닫는다. UI는 "복구 대기"를 보여 주고, `restarted` 이벤트가 오면 다시 붙는다. 그 전의 attach는 `unavailable`로 거절된다.
 - 그 밖에는 `{type: "closed", reason, exit_code, signal}`을 보낸 뒤 1000으로 닫는다. 종료 코드가 있는 정상 종료와 명시적 kill은 `keep`이어도 최종이기 때문이다.
 
 ## 7. API
@@ -384,6 +406,6 @@ Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limit
    - Run 키로 띄운 `moriw.exe`가 콘솔 창 없이 뜨는지
 5. `tailscale serve`가 원래 `Host` 헤더를 넘기는지, `X-Forwarded-Host`를 붙이는지(§8)
 6. OSC 7501 보고 문법. hc 바이너리에는 `]7501;`, `state=`, 질의 응답 `]7501;?:states=idle,working,done,blocked,error:kinds=permission,question,auth`가 있다. 보고 형식은 `ESC ] 7501 ; state=blocked:kind=permission … BEL`로 보이지만 단계 7 통합 테스트에서 확인한다
-7. `terminal.kill`이 attach CLOSE에 주는 이유 문자열(`killed`로 가정, §6.8). 단계 5 통합 테스트에서 확인한다
+7. ~~`terminal.kill`이 attach CLOSE에 주는 이유 문자열(`killed`로 가정, §6.8). 단계 5 통합 테스트에서 확인한다~~ 확인함(2026-11-09, §2.3): `killed`, signal 1(hangup)이다. 시그널로 프로그램을 잃은 `keep` 터미널은 `signaled`다.
 8. iOS 홈 화면 PWA에서 `*.ts.net` origin의 Web Push가 오는지(VAPID `sub`는 `https://github.com/kwonikhyeon/Mori`).
 9. 프로그램이 kitty 키보드 프로토콜을 켰을 때 xterm.js가 보내는 기존 방식 키가 잘 통하는지.

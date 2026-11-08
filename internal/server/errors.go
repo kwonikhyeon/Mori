@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+
+	"github.com/kwonikhyeon/mori/internal/core"
+	"github.com/kwonikhyeon/mori/internal/hc"
 )
 
 // apiError is an error with the HTTP status and kind the API reports (spec §7.4).
@@ -58,8 +61,19 @@ func writeError(w http.ResponseWriter, err error) {
 	writeJSON(w, ae.Status, map[string]any{"error": body})
 }
 
-// toAPIError classifies errors from the layers below the API.
+// toAPIError classifies errors from the layers below the API. The core's
+// kinds pass through as they are (spec §7.4).
 func toAPIError(err error) *apiError {
+	if errors.Is(err, core.ErrUnavailable) {
+		return &apiError{Status: http.StatusServiceUnavailable, Kind: "core_unavailable", Message: err.Error()}
+	}
+	if kind := hc.KindOf(err); kind != "" {
+		msg := err.Error()
+		if e := (*hc.Error)(nil); errors.As(err, &e) && e.Message != "" {
+			msg = e.Message
+		}
+		return &apiError{Status: statusFor(kind), Kind: kind, Message: msg, Hint: hc.HintOf(err)}
+	}
 	return &apiError{Status: http.StatusInternalServerError, Kind: "internal", Message: err.Error()}
 }
 

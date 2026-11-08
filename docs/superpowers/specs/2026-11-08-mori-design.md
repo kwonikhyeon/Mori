@@ -119,6 +119,9 @@ herdr 제품군에는 두 계열이 있다.
 | 25 | 채널별 수신 큐 | 읽기 루프는 채널마다 큐에 넣기만 한다. 큐가 32 MiB를 넘으면 그 스트림만 끊는다 | 읽기 루프에서 소비자에게 바로 넘김 · 한도 없는 큐 | 바로 넘기면 느린 브라우저 하나가 모든 채널과 RPC를 막는다. 코어가 CREDIT을 지키면 큐는 256 KiB를 넘지 않으므로, 한도는 고장 난 코어에만 걸린다 |
 | 26 | detach 뒤 읽기 | `Close` 직후 `Recv`는 남은 출력 없이 `ErrDetached`를 돌려준다 | 남은 큐를 다 내준 뒤 끝냄 | 닫은 쪽은 남은 출력을 쓰지 않는다. 닫는 동안 온 출력을 흘리지 않아도 된다 |
 | 27 | `hc connect` 오류 | hc의 stderr 마지막 2 KiB를 연결 오류 메시지에 붙인다 | stderr 버림 · 전부 로그로 보냄 | 연결 실패의 이유(설치·권한·소켓 경로)는 대개 hc가 stderr에 쓴다. 로그는 `Options.Stderr`로 따로 받을 수 있다 |
+| 28 | 캐시 레코드 복사 | 레코드를 제자리에서 바꾸지 않는다. 바뀐 필드만 다른 얕은 복사본을 새로 넣고, 안의 맵·슬라이스는 공유한 채 읽기만 한다. 이미 가진 값이 다시 오면 바뀐 것이 없다고 본다 | 이벤트마다 JSON 왕복으로 깊은 복사 | foreground 이벤트는 터미널마다 1초에 두 번쯤 온다. 깊은 복사는 그때마다 레코드 전체를 직렬화한다. 같은 값을 걸러야 브라우저에 헛된 갱신이 가지 않는다 |
+| 29 | 이벤트 채널 오류 | 연결이 살아 있으면 이벤트 채널만 다시 구독해 새 스냅숏을 받는다. 연달아 3번 넘게 실패하면 연결을 다시 맺는다 | 오류마다 `hc connect`부터 다시 연결 | 연결을 다시 맺으면 그 위의 attach가 모두 끊겨 브라우저의 터미널이 전부 4503으로 닫힌다. 깨진 줄 하나(결정 24) 때문에 그럴 까닭이 없다 |
+| 30 | Watch의 시작 상태 | `Watch`는 시작 시점의 터미널 목록과 연결 상태를 함께 준다. 방송과 같은 잠금 안에서 잡고, 방송도 그 잠금 안에서 막히지 않게 보낸다. `OnChange`만 잠금 밖에서 부른다 | `Watch`와 `Terminals`를 따로 부름 · 방송을 잠금 밖에서 보냄 | 따로 부르면 그 사이의 변경이 빠지거나 두 번 온다. 잠금 밖에서 보내면 시작 상태보다 오래된 업데이트가 뒤에 올 수 있다 |
 
 ## 4. 구조
 
@@ -152,7 +155,7 @@ herdr 제품군에는 두 계열이 있다.
 | 단위 | 하는 일 | 쓰는 쪽에 주는 것 | 기대는 것 |
 |---|---|---|---|
 | `internal/hc` | 프레임 인코딩, JSON-RPC, `hc connect` 프로세스, attach·이벤트 채널, 크레딧 | `Dial(ctx, opts) → *Conn`; `Conn.Call`, `Conn.Attach → *Stream`, `Conn.Subscribe → *Events`, `Conn.Done()`; 코어 타입(`Terminal`, `Status` 등) | `hc` 실행 파일 |
-| `internal/core` | 연결 유지(끊기면 재연결), 터미널 캐시, 변경 방송 | `Manager.Terminals()`, `Manager.Watch() → 변경 채널`, `Manager.Call`·`Manager.Attach`(연결이 없으면 `core_unavailable`), 연결 상태 | `internal/hc` |
+| `internal/core` | 연결 유지(끊기면 재연결), 터미널 캐시, 변경 방송 | `Manager.Terminals()`, `Manager.Watch(buf) → 시작 상태와 변경 채널`(결정 30), `Manager.Call`·`Manager.Attach`(연결이 없으면 `core_unavailable`), 연결 상태 | `internal/hc` |
 | `internal/store` | `state.json` 읽기·쓰기, 동시성 보호 | `Store.Get()`, `Store.Update(func(*State) error)` | 파일 시스템 |
 | `internal/auth` | 기기·페어링 코드·쿠키·Origin 검사·시도 제한 | `Middleware`, `Pair(code, name)`, `NewCode()`, `Revoke(id)`, 철회 알림 | `internal/store` |
 | `internal/folders` | 폴더 등록과 터미널 소속 계산. 순서는 라벨 `mori.folder` → 시작 cwd를 품는 가장 깊은 등록 폴더나 그 워크트리 → "기타"다 | `Resolve(terminal) → (folderID, worktree)`, 워크트리 경로 캐시(폴더 추가, 워크트리 변경, git 조회, 30초마다 갱신) | `internal/store`, `internal/gitx` |

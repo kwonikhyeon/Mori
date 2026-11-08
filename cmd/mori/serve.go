@@ -23,6 +23,8 @@ import (
 	"github.com/kwonikhyeon/mori/internal/gitx"
 	"github.com/kwonikhyeon/mori/internal/hc"
 	"github.com/kwonikhyeon/mori/internal/paths"
+	"github.com/kwonikhyeon/mori/internal/presence"
+	"github.com/kwonikhyeon/mori/internal/push"
 	"github.com/kwonikhyeon/mori/internal/server"
 	"github.com/kwonikhyeon/mori/internal/store"
 	"github.com/kwonikhyeon/mori/internal/tailscale"
@@ -35,6 +37,10 @@ const defaultListen = "127.0.0.1:7761"
 // worktreeRefresh is how often the worktrees of every folder are listed
 // again, for those made or removed outside Mori (spec §5).
 const worktreeRefresh = 30 * time.Second
+
+// pushSubject is the contact push services see in the VAPID token (RFC
+// 8292): the project, since each host runs its own Mori.
+const pushSubject = "https://github.com/kwonikhyeon/Mori"
 
 func runServe(args []string) error {
 	fs := newFlagSet("serve", "[옵션]")
@@ -86,20 +92,28 @@ func runServe(args []string) error {
 		return fmt.Errorf("상태 파일을 열지 못했습니다: %w", err)
 	}
 	au := auth.New(st, auth.Options{})
+	vapid, err := push.EnsureVAPID(st)
+	if err != nil {
+		return fmt.Errorf("알림 키를 만들지 못했습니다: %w", err)
+	}
 	ln, err := net.Listen("tcp", *listen)
 	if err != nil {
 		return fmt.Errorf("%s에서 수신하지 못했습니다: %w", *listen, err)
 	}
 	addr := ln.Addr().String()
 	pub := publicURL(*publicFlag, addr, tailscale.DNSName)
+	host := hostName(tailscale.DNSName)
+	pres := presence.New()
+	notifier := push.New(push.Options{Store: st, Sender: push.NewWebPush(vapid, pushSubject), Focused: pres.Focused, Host: host, Logger: logger})
 	// hc connect may not start the core on Windows (spec §15), so there the
 	// manager runs hc server start once when the first connect fails.
-	cm := core.New(core.Options{HC: *hcPath, Session: *hcSession, StartServer: runtime.GOOS == "windows", Logger: logger})
+	cm := core.New(core.Options{HC: *hcPath, Session: *hcSession, StartServer: runtime.GOOS == "windows", Logger: logger,
+		OnChange: notifier.OnChange})
 	git := gitx.Runner{}
 	fr := folders.New(st, git)
 	srv := server.New(server.Deps{
 		Version:   version.Version,
-		HostName:  hostName(tailscale.DNSName),
+		HostName:  host,
 		Auth:      au,
 		Store:     st,
 		Core:      cm,
@@ -108,6 +122,8 @@ func runServe(args []string) error {
 		PublicURL: pub,
 		UI:        webui.Handler(),
 		Logger:    logger,
+		Presence:  pres,
+		Push:      notifier,
 	})
 	hs := &http.Server{
 		Handler:           srv.Handler(),
@@ -158,6 +174,14 @@ func runServe(args []string) error {
 	stopCore()
 	select {
 	case <-coreDone: // hc connect has ended; the core and its sessions live on
+		// No change comes any more, so the notifications under way can be
+		// waited for, as long as the time allows.
+		sent := make(chan struct{})
+		go func() { notifier.Wait(); close(sent) }()
+		select {
+		case <-sent:
+		case <-sctx.Done():
+		}
 	case <-sctx.Done():
 	}
 	return serveErr

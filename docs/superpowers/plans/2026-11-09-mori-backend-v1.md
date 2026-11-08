@@ -1906,112 +1906,117 @@ func TestWorktreeLifecycleRefusesLiveSession(t *testing.T) {
 ### Task 13: 알림 (단계 7)
 
 **Files:**
-- Create: `internal/push/decide.go`, `internal/push/push.go`, `internal/push/webpush.go`, `internal/server/api_push.go`
-- Modify: `cmd/mori/serve.go`(VAPID 보장, Notifier를 `core.Options.OnChange`에), `internal/server/server.go`(Deps에 `Push *push.Notifier`, `Presence *presence.Registry`)
-- Test: `internal/push/decide_test.go`, `internal/push/push_test.go`, `internal/server/push_test.go`
+- Create: `internal/push/decide.go`(판정), `internal/push/push.go`(Notifier: 억제·발송·구독·시험 알림), `internal/push/webpush.go`(VAPID 키, webpush-go 발송기), `internal/server/api_push.go`
+- Modify: `cmd/mori/serve.go`(`push.EnsureVAPID`, `presence.New()`, Notifier를 만들어 `core.Options.OnChange`에 건다. 종료할 때는 코어 관리자가 멈춘 뒤에만 남은 시간 안에서 `notifier.Wait()`), `internal/server/server.go`(Deps에 `Push *push.Notifier`, 라우트), `internal/server/errors.go`(`push_failed` 502, push 오류 분류), `go.mod`(webpush-go v1.4.0, 결정 87)
+- Test: `internal/push/decide_test.go`, `internal/push/push_test.go`, `internal/push/webpush_test.go`, `internal/push/core_test.go`(격리 코어), `internal/server/push_test.go`, `internal/server/server_test.go`(`TestStatusForKinds`)
 
 **Interfaces:**
-- Consumes: `core.Change`, `core.DisplayTitle`, `presence.Registry.Focused`, `store.PushSub`, `store.VAPID`.
+- Consumes: `core.Change`, `core.DisplayTitle`, `presence.Registry.Focused`, `store.PushSub`·`store.VAPID`·`store.Notify`, `auth.Revoke`(기기를 철회하면 그 구독도 지운다).
 - Produces:
 ```go
 type Kind string
 const (KindBlocked Kind = "blocked"; KindWaiting Kind = "waiting"; KindError Kind = "error"; KindExited Kind = "exited")
+func (k Kind) Label() string                                        // 승인 대기·입력 대기·오류·종료
+var Kinds = []Kind{KindBlocked, KindWaiting, KindError, KindExited} // 저장 순서
 var DefaultKinds = []Kind{KindBlocked, KindWaiting, KindError}
-func Decide(c core.Change, children bool) Kind   // "" = 알림 없음
-type Payload struct { Title, Body, Tag, URL string } // json: title, body, tag, url
+func Decide(c core.Change, children bool) Kind                      // "" = 알림 없음
+func KindsOf(s store.PushSub) []string                              // 저장된 종류, 비었으면 DefaultKinds
+type Payload struct { Title, Body, Tag, URL string }                // json: title, body, tag, url
 type Sender interface { Send(ctx context.Context, sub store.PushSub, payload []byte) (status int, err error) }
 type Options struct { Store *store.Store; Sender Sender; Focused func(addr string) bool; Host string; Now func() time.Time; Window time.Duration; Logger *slog.Logger }
 func New(o Options) *Notifier
-func (n *Notifier) OnChange(c core.Change)
-func (n *Notifier) Wait()                                           // 테스트: 진행 중 발송을 기다림
-func (n *Notifier) Subscribe(deviceID string, sub Subscription, kinds []Kind) (store.PushSub, error) // endpoint 기준 upsert
-func (n *Notifier) Unsubscribe(endpoint string) error
-func (n *Notifier) Test(ctx context.Context, deviceID string) (int, error)
-type Subscription struct { Endpoint string; Keys struct{ P256dh, Auth string } } // PushSubscription.toJSON()
+func (n *Notifier) OnChange(c core.Change)                          // 판정만 하고, 발송은 고루틴에서
+func (n *Notifier) Wait()                                           // 진행 중 발송을 기다림(종료·테스트)
+type Subscription struct { Endpoint string; Keys Keys }             // PushSubscription.toJSON()
+type Keys struct { P256dh, Auth string }                            // json: p256dh, auth
+func (n *Notifier) Subscribe(deviceID string, sub Subscription, kinds []Kind) (store.PushSub, error)
+func (n *Notifier) Unsubscribe(deviceID, endpoint string) error     // endpoint가 비면 그 기기의 구독 전부
+func (n *Notifier) Subscriptions(deviceID string) []store.PushSub
+func (n *Notifier) Test(ctx context.Context, deviceID string) (sent int, err error)
+var ErrNoSubscription, ErrUnknownDevice error                      // 409 conflict, 401 unauthorized
+type InvalidError struct{ Msg string }                              // 400 invalid_params
+type SendError struct{ Status int; Err error }                      // 502 push_failed. Gone(): 404·410
 func EnsureVAPID(st *store.Store) (store.VAPID, error)
-func NewWebPush(st *store.Store, subject string) Sender           // webpush-go, TTL 1일, Urgency high
+func NewWebPush(v store.VAPID, subject string) Sender
 ```
-판정(§6.5): `New==nil`이면 없음. `children==false`이고 부모가 있으면 없음. 이벤트가 있으면 `status`: 새 상태가 `blocked`이고 이전이 아니면 blocked, `error`이고 이전이 아니면 error. `turn`: data의 `state`가 `done`·`idle`이면 waiting. `finished`면 exited. 스냅숏 비교(Event==nil, Old!=nil)면 같은 상태 규칙, 그다음 `New.Turn > Old.Turn`이고 새 상태가 done·idle이면 waiting, live → finished면 exited. Old==nil이면 없음.
+판정(§6.5, 결정 78): `New==nil`이면 없음. 주소에 `/`가 있으면(다른 머신) 없음. `children==false`이고 부모가 있으면 없음. 이벤트가 있으면 `status`: 새 상태가 `blocked`이고 이전이 아니면 blocked, `error`이고 이전이 아니면 error. `turn`: data의 `state`(없으면 새 레코드의 상태)가 `done`·`idle`이면 waiting. `finished`면 exited. `lost`를 비롯한 다른 이벤트는 없음. 스냅숏 비교(Event==nil, Old!=nil)면 live → finished가 exited, 다음 같은 상태 규칙, 다음 `New.Turn > Old.Turn`이고 새 상태가 done·idle이면 waiting. Old==nil이면 없음.
 
-발송: 판정 뒤 `Focused(addr)`면 버림. `(addr, kind)`가 `Window`(기본 10초) 안에 이미 나갔으면 버림. 구독마다 그 종류를 켰을 때만 보낸다(`Kinds`가 비면 DefaultKinds). 페이로드 `{title: "<host> · 승인 대기", body: "<제목> — <status.msg>", tag: addr, url: "/#/t/<addr>"}`. 문구: blocked "승인 대기", waiting "입력 대기", error "오류", exited "종료". 응답 404·410이면 그 구독을 지운다.
+발송(결정 79·80): 판정 뒤 `Focused(addr)`면 버리고, 보낸 것으로 치지 않는다. `(addr, kind)`가 `Window`(기본 10초) 안에 이미 나갔으면 버리고, 창이 지난 기록은 새 기록을 남길 때 지운다. 구독마다 그 종류를 켰을 때만(`KindsOf`) 고루틴에서 30초 제한으로 보낸다. 404·410이면 그 구독을 지우고 Info, 다른 실패는 Warn이다. 로그에는 엔드포인트 대신 푸시 서비스 호스트만 남긴다.
 
-REST: `GET /api/push/key` → `{key}`. `POST /api/push/subscriptions {subscription, kinds?}` → 201 `{id, kinds}`. `DELETE /api/push/subscriptions {endpoint}` → 204. `POST /api/push/test` → `{sent}`.
+페이로드(결정 81): `{title: "<host> · <Label>", body: "<DisplayTitle> — <status.msg>", tag: addr, url: "/#/t/<PathEscape(addr)>"}`. 메시지가 없으면 본문은 이름만이고, exited는 메시지 대신 `시그널 N`이나 `종료 코드 N`(시그널이 먼저)이다. 제어 문자는 공백으로 바꾸고 공백을 접은 뒤 240자에서 `…`로 자른다. 시험 알림은 `{title: "<host> · 시험 알림", body: "이 기기로 알림이 옵니다.", tag: "mori-test", url: "/"}`.
+
+구독(결정 82): 기기마다 하나다. 같은 엔드포인트면 ID·만든 시각을 지키고 키·종류를 바꾼다. 새 엔드포인트는 그 기기의 이전 구독을 바꾸고, 다른 기기의 엔드포인트는 이 기기로 옮긴다. 기기 확인은 `Store.Update` 안에서 한다. 엔드포인트는 2048바이트까지의 https, 키는 어느 base64든 받아 패딩 없는 base64url로 저장한다(`p256dh`는 P-256 점, `auth`는 16바이트). 종류는 `Kinds` 순서로 저장한다. VAPID(결정 83): `crypto/ecdh` P-256, 공개 키는 비압축 65바이트의 base64url이다. 쌍이 맞지 않으면 새로 만들고 구독을 모두 지운다.
+
+REST(§7.1, 결정 85·86): `GET /api/push/key` → `{key}`. `GET /api/push/subscriptions` → `[{id, endpoint, kinds, created_ms}]`(이 기기만, 키 없음). `POST /api/push/subscriptions {subscription, kinds?}` → 201과 구독 하나. `DELETE /api/push/subscriptions {endpoint?}` → 204. `POST /api/push/test` → `{sent}`, 구독이 없으면 409 `conflict`, 모두 실패하면 502 `push_failed`. `GET/PUT /api/push/settings` → `{children}`. Notifier가 없으면 모두 503 `unavailable`.
 
 - [ ] **Step 1: 실패하는 테스트**
 
+`internal/push/decide_test.go`:
+- `TestDecide` — 23개 경우: 상태 진입(blocked, error)과 그대로인 상태, `working`, turn 없는 done, status가 사라짐, turn의 done·idle은 waiting이고 blocked·error는 아님, state 없는 turn은 레코드로, finished, lost, 부모 있는 터미널(설정 꺼짐·켜짐), 다른 머신, created·removed, 스냅숏의 blocked·turn·같은 turn·finished·새 터미널.
+
+`internal/push/push_test.go`(가짜 발송기는 엔드포인트마다 답할 상태를 정할 수 있다):
+- `TestNotifierSendsPayload` — 구독한 기기 모두에게 간다. 제목·본문·tag·url을 보고, 메시지가 없으면 본문은 이름만이다.
+- `TestNotifierDedupeFocusAndGone` — 10초 안의 중복은 버리고 창이 지나면 다시 보낸다. 포커스 중이면 버리되 보낸 것으로 치지 않는다. 404·410이면 구독을 지운다.
+- `TestNotifierServerErrorKeepsSubscription` — 500이면 구독을 지킨다.
+- `TestKindsFilter` — `exited`만 켠 구독은 종료만 받고 기본 구독은 승인 대기를 받는다. 모르는 종류는 `InvalidError`다.
+- `TestChildSetting` — 부모가 있는 터미널은 `Notify.Children`이 켜졌을 때만 알린다.
+- `TestSubscribe` — 같은 엔드포인트는 그 자리에서 바뀐다. 새 엔드포인트는 이전 구독을 바꾸고 다른 기기의 엔드포인트는 옮긴다. 잘못된 입력(http, 2048바이트 초과, 키 없음·길이 틀림)은 `InvalidError`, 모르는 기기는 `ErrUnknownDevice`다. 패딩이나 표준 알파벳의 키를 정규화하고, 해제는 그 기기 것만 지운다.
+- `TestTestNotification` — 구독이 없으면 `ErrNoSubscription`이다. 이 기기로만 `macmini · 시험 알림`이 가고, 410이면 오류에 410이 보이고 구독이 지워진다.
+- `TestEnsureVAPIDStable` — 공개 키는 base64url 65바이트(비압축 P-256)이고 비밀 키와 쌍이 맞는다. 두 번 불러도 같은 키다.
+
+`internal/push/webpush_test.go`:
+- `TestWebPushSend` — 가짜 푸시 서비스로 보내 브라우저처럼 RFC 8291대로 풀고, VAPID 서명(RFC 8292: aud는 엔드포인트 origin, sub)과 TTL·Urgency·`Content-Encoding: aes128gcm`을 확인한다. 실패한 연결의 오류에는 엔드포인트 경로가 없다.
+- `TestEnsureVAPIDReplacesBrokenPair` — 쌍이 깨진 키는 새로 만들고 구독을 모두 지운다.
+
+`internal/push/core_test.go`(격리 코어, OSC 7501 문법은 §2.3):
 ```go
-func term(addr, state string, turn int, parent *string) *hc.Terminal {
-	t := &hc.Terminal{Address: addr, State: "live", Turn: turn, Parent: parent}
-	if state != "" { t.Status = &hc.Status{State: state} }
-	return t
-}
-
-func TestDecide(t *testing.T) {
-	p := "t1"
-	evt := func(typ, data string) *hc.Event { return &hc.Event{Type: typ, Data: json.RawMessage(data)} }
-	cases := []struct{ name string; c core.Change; children bool; want Kind }{
-		{"blocked", core.Change{Old: term("t2", "working", 0, nil), New: term("t2", "blocked", 0, nil), Event: evt("status", `{}`)}, false, KindBlocked},
-		{"still blocked", core.Change{Old: term("t2", "blocked", 0, nil), New: term("t2", "blocked", 0, nil), Event: evt("status", `{}`)}, false, ""},
-		{"turn done", core.Change{Old: term("t2", "working", 0, nil), New: term("t2", "done", 1, nil), Event: evt("turn", `{"turn":1,"state":"done"}`)}, false, KindWaiting},
-		{"turn blocked is not waiting", core.Change{Old: term("t2", "working", 0, nil), New: term("t2", "blocked", 1, nil), Event: evt("turn", `{"turn":1,"state":"blocked"}`)}, false, ""},
-		{"error", core.Change{Old: term("t2", "working", 0, nil), New: term("t2", "error", 0, nil), Event: evt("status", `{}`)}, false, KindError},
-		{"child skipped", core.Change{Old: term("t3", "working", 0, &p), New: term("t3", "blocked", 0, &p), Event: evt("status", `{}`)}, false, ""},
-		{"child allowed", core.Change{Old: term("t3", "working", 0, &p), New: term("t3", "blocked", 0, &p), Event: evt("status", `{}`)}, true, KindBlocked},
-		{"snapshot turn", core.Change{Old: term("t2", "working", 3, nil), New: term("t2", "idle", 4, nil)}, false, KindWaiting},
-		{"created", core.Change{New: term("t2", "blocked", 0, nil)}, false, ""},
+func TestNotifierWithCore(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses /bin/sh")
 	}
-	for _, c := range cases { if got := Decide(c.c, c.children); got != c.want { t.Errorf("%s: %q want %q", c.name, got, c.want) } }
-}
+	hcc := hctest.Start(t)
+	e := newEnv(t)
+	e.subscribe(t, "d1", "https://push.example.com/a")
+	m := core.New(core.Options{HC: hcc.HC, Env: hcc.Env, MinBackoff: 100 * time.Millisecond, MaxBackoff: 500 * time.Millisecond,
+		Logger: slog.New(slog.DiscardHandler), OnChange: e.n.OnChange})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { m.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done; e.n.Wait() })
+	waitFor(t, "the core", func() bool { return m.Status().Connected })
 
-type fakeSender struct { mu sync.Mutex; sent []store.PushSub; payloads []Payload; status int }
-func (f *fakeSender) Send(ctx context.Context, sub store.PushSub, b []byte) (int, error) { ... 기록, f.status(기본 201) 반환 }
-
-func TestNotifierDedupeFocusAndGone(t *testing.T) {
-	st, _ := store.Open(filepath.Join(t.TempDir(), "state.json"))
-	fs := &fakeSender{}
-	focused := map[string]bool{}
-	clk := time.Unix(1_800_000_000, 0)
-	n := New(Options{Store: st, Sender: fs, Focused: func(a string) bool { return focused[a] }, Host: "macmini", Now: func() time.Time { return clk }})
-	n.Subscribe("d_1", Subscription{Endpoint: "https://push.example/1"}, nil)
-	blocked := core.Change{Address: "t2", Old: term("t2", "working", 0, nil), New: term("t2", "blocked", 0, nil), Event: &hc.Event{Type: "status"}}
-	n.OnChange(blocked); n.Wait()
-	n.OnChange(blocked); n.Wait() // 10초 안 중복
-	if len(fs.sent) != 1 || fs.payloads[0].Tag != "t2" || fs.payloads[0].URL != "/#/t/t2" || !strings.Contains(fs.payloads[0].Title, "승인 대기") { t.Fatalf("%+v", fs.payloads) }
-	clk = clk.Add(11 * time.Second)
-	focused["t2"] = true
-	n.OnChange(blocked); n.Wait() // 포커스 중
-	if len(fs.sent) != 1 { t.Fatal("focused viewer must suppress") }
-	focused["t2"] = false
-	fs.status = 410
-	n.OnChange(blocked); n.Wait()
-	if len(st.Get().PushSubs) != 0 { t.Fatal("410 must delete the subscription") }
-}
-
-func TestKindsFilter(t *testing.T) {
-	// kinds=[exited]만 켠 구독은 blocked를 받지 않고 finished 이벤트에서만 받는다
-}
-
-func TestEnsureVAPIDStable(t *testing.T) {
-	// 두 번 불러도 같은 키, 공개 키는 base64url 65바이트(비압축 P-256)
+	report := func(kv string) string { return `printf '\033]7501;` + kv + `\007'; sleep 0.3; ` }
+	msg := base64.StdEncoding.EncodeToString([]byte("Allow Bash?"))
+	script := report("state=working") + report("state=blocked:kind=permission:msg="+msg) +
+		report("state=working") + report("state=done") + "sleep 30"
+	// terminal.run → 정확히 두 건: "macmini · 승인 대기"(본문 끝이 " — Allow Bash?"), "macmini · 입력 대기"
 }
 ```
-`internal/server/push_test.go`: 페어링 → `GET /api/push/key` 200 → `POST /api/push/subscriptions` 201 → `POST /api/push/test`가 가짜 발송기로 1건 → 기기 철회하면 그 구독이 지워진다.
+
+`internal/server/push_test.go`:
+- `TestPushAPI` — 페어링 전 401, key, 빈 목록 `[]`, 구독 없이 test 409, 구독 201(종류 순서 정리), 목록에 키 없음, test `{sent: 1}`, 잘못된 본문 400 네 가지, settings GET·PUT, 410이면 502 `push_failed`와 구독 삭제, 기본 종류, DELETE 204, 로그아웃하면 구독도 지운다.
+- `TestPushAPIOff` — Notifier가 없으면 일곱 라우트 모두 503 `unavailable`.
 
 - [ ] **Step 2: 실패 확인** — `go test ./internal/push/ ./internal/server/` → FAIL.
-- [ ] **Step 3: 구현** — 위 규칙. 실제 발송기:
+- [ ] **Step 3: 구현** — 위 규칙. 실제 발송기(결정 84):
 ```go
 func (w *webPush) Send(ctx context.Context, sub store.PushSub, payload []byte) (int, error) {
-	v := w.st.Get().VAPID
-	res, err := webpush.SendNotificationWithContext(ctx, payload, &webpush.Subscription{
-		Endpoint: sub.Endpoint, Keys: webpush.Keys{P256dh: sub.P256dh, Auth: sub.Auth},
-	}, &webpush.Options{Subscriber: w.subject, VAPIDPublicKey: v.Public, VAPIDPrivateKey: v.Private, TTL: 86400, Urgency: webpush.UrgencyHigh})
-	if err != nil { return 0, err }
-	defer res.Body.Close()
-	return res.StatusCode, nil
+	resp, err := webpush.SendNotificationWithContext(ctx, payload,
+		&webpush.Subscription{Endpoint: sub.Endpoint, Keys: webpush.Keys{P256dh: sub.P256dh, Auth: sub.Auth}},
+		&webpush.Options{HTTPClient: w.client, Subscriber: w.subject, TTL: ttl, Urgency: webpush.UrgencyHigh,
+			VAPIDPublicKey: w.vapid.Public, VAPIDPrivateKey: w.vapid.Private})
+	if err != nil {
+		if ue := (*url.Error)(nil); errors.As(err, &ue) { // 엔드포인트를 로그에 남기지 않는다
+			err = fmt.Errorf("%s %s: %w", ue.Op, serviceHost(sub.Endpoint), ue.Err)
+		}
+		return 0, err
+	}
+	defer resp.Body.Close()
+	// 2xx면 상태만, 아니면 상태와 응답 앞부분 300바이트를 오류로
 }
 ```
-subject는 `https://github.com/kwonikhyeon/Mori`.
-- [ ] **Step 4: 통과 확인** — `go test -race ./internal/push/ ./internal/server/` → PASS. 격리 코어에서 OSC 7501(`printf '\033]7501;state=blocked\007'`)로 상태를 만들어 Notifier가 한 건 내는지 통합 테스트도 하나 둔다(문법이 다르면 스펙 §15에 적고 단위 테스트만 남긴다).
+subject는 `https://github.com/kwonikhyeon/Mori`(`cmd/mori`의 `pushSubject`).
+- [ ] **Step 4: 통과 확인** — `go test -race ./...` → PASS, `go vet ./...`와 `GOOS=windows go vet ./...`. 격리 코어로 `mori serve`를 띄워 key·구독·test(닿지 않는 엔드포인트면 502)·settings를 부르고, OSC 7501 승인 대기에 발송을 시도하는지 로그로 본다. 로그에 엔드포인트 경로가 없어야 한다.
 - [ ] **Step 5: 커밋 후 단계 7 푸시** — `git commit -m "feat(push): 승인·입력 대기 알림"` → `git push`.
 
 ---
@@ -2097,6 +2102,7 @@ func TestInstallDryRunChangesNothing(t *testing.T) {
 - §8(Task 1·7): CSP에 xterm.js용 `style-src 'self' 'unsafe-inline'`과 같은 호스트의 `ws(s)://`를 더한다. Origin은 `Host` 또는 `X-Forwarded-Host`와 비교한다.
 - §3 #18, §11(Task 14): Windows 상주는 HKCU Run 키다. 버린 대안은 `schtasks /SC ONLOGON`(일반 사용자는 모든 사용자 대상 로그온 트리거를 만들 수 없다)과 Windows 서비스(세션 0)다. Run 키에는 비정상 종료 뒤 자동 재시작이 없다. LaunchAgent에는 설치할 때의 PATH를 넣는다.
 - §6.2(Task 8): `mori pair --name`의 이름은 코드에 붙는다. 기기가 이름을 보내지 않으면 그 이름을 쓴다. 관리 소켓 동작은 pair, devices, revoke, status, shutdown이다.
+- §2.3, §15.6(Task 13): OSC 7501 보고는 `ESC ] 7501 ; 키=값:키=값 BEL`이고 `msg`·`title`은 base64다. 상태가 `working`을 벗어나면 `status` 다음에 `turn`이 오고, 끝나면 `status: null` 다음에 `finished`가 온다. §7.1에 알림 API를 네 줄로, §7.4에 `push_failed`(502)를, §5에 `OnChange` 계약을 적었다. 결정 78~87.
 
 ## Self-Review
 

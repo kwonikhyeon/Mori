@@ -110,6 +110,13 @@ herdr 제품군에는 두 계열이 있다.
 - **워크트리:** `worktree add`는 없는 상위 디렉터리를 만든다. 브랜치가 이미 다른 워크트리에 있어 거절되면 디렉터리를 남기지 않는다. 잠긴 워크트리는 `remove --force` 하나로는 지워지지 않는다("use 'remove -f -f'"). `-z`는 줄마다 NUL, 항목마다 NUL을 하나 더 붙이고, 잠금 이유에 줄바꿈이 그대로 들어간다. `-z`가 없으면 이유를 C 문자열처럼 따옴표로 싼다. `worktree list -z`는 git 2.36부터다(Ubuntu 22.04는 2.34).
 - **diff 머리:** 이름에 공백이 있으면 `+++ b/<이름>` 끝에 탭이 붙는다. `diff --no-index`는 파일이 다르면 1로 끝난다.
 
+아래는 단계 7에서 격리 코어로 확인한 것이다(2026-11-09). 알림 판정(§6.5, 결정 78)이 이 동작에 기댄다.
+
+- **OSC 7501 보고:** 프로그램이 `ESC ] 7501 ; 키=값:키=값 BEL`을 출력하면 코어가 그 터미널의 상태로 받는다. 쌍은 `:`로 잇는다. `;`로 이으면 보고 전체가 무시된다. 키는 `state`(`idle`·`working`·`done`·`blocked`·`error`), `kind`(`permission`·`question`·`auth`), `progress`(0~100), `app`(문자열 그대로), `msg`·`title`(UTF-8 문자열의 base64, 패딩은 있어도 없어도 된다)이다. 모르는 키는 무시한다.
+- **잘못된 값:** `msg`나 `title`이 base64가 아니거나 풀어서 UTF-8이 아니면 보고 전체가 버려진다. 값에 공백이 있으면 그 값만 빠지고 나머지는 받는다.
+- **이벤트:** 보고마다 `status` 이벤트(`{records: {}, reported: true, status: {…}}`)가 온다. 같은 보고를 되풀이해도 온다. Mori의 캐시는 레코드가 그대로면 변경으로 치지 않으므로 알림기에도 넘기지 않는다. 상태가 `working`을 벗어나면 `status` 다음에 `turn` 이벤트 `{state: <새 상태>, turn: N}`이 온다. `idle`에서 `idle`로 가면 `turn`이 없다.
+- **끝날 때:** 프로그램이 끝나면 `status: null`인 `status` 이벤트가 먼저 오고, 그다음 `finished`(`{exit_code, finished_ms, reason: "exited", signal}`)가 온다.
+
 ### 2.4 현재 환경 (2026-11-09)
 
 - 호스트: `macmini`(macOS arm64, 개발 머신), `ikhyeon-desktop`·`ikhyeon-labtop`(Windows). 클라이언트에는 iPhone이 있다.
@@ -196,6 +203,16 @@ herdr 제품군에는 두 계열이 있다.
 | 75 | git 경로 확인 | `/api/git/*`의 `path`는 등록된 폴더의 워크트리 최상위여야 한다(받은 그대로나 실제 경로로 비교). git은 git이 보고한 경로에서 돈다. 모르는 경로면 모든 폴더의 목록을 한 번 다시 받아 보고, 그래도 없으면 400이다 | 아무 저장소나 허용 · 하위 폴더 허용 | API로 호스트의 아무 저장소나 읽지 못하게 한다(§8). 방금 Mori 밖에서 만든 워크트리도 다음 갱신(30초)을 기다리지 않고 열린다 |
 | 76 | 갱신 오류 로그 | 30초 갱신에서 폴더의 git 오류는 처음 났을 때와 메시지가 바뀌었을 때만 Warn으로 남기고, 풀리면 Info를 한 번 남긴다. 실패한 폴더는 이전 목록을 그대로 둔다 | 갱신마다 로그 · 실패하면 목록을 비움 | 같은 오류가 30초마다 쌓이면 로그를 읽을 수 없다. 잠깐의 실패(잠금 등)로 워크트리 목록과 터미널 소속이 흔들리지 않는다 |
 | 77 | 저장소 아닌 폴더의 git | `GET /api/folders/{id}/git`은 200과 `repo: false`, 빈 `worktrees`를 준다. 브랜치·워크트리 API는 409 `conflict`다. 없는 폴더만 404다 | 모두 404 · 모두 409 | 화면은 폴더마다 요약을 물을 수 있어야 하므로 요약은 실패하지 않는다. 저장소가 아닌 폴더에서 브랜치·워크트리는 할 수 없는 동작이라 충돌이다 |
+| 78 | 알림 판정 | 알림 대상은 이 머신의 터미널 전부다(Mori가 띄우지 않은 것도). 주소에 `/`가 있는 다른 머신의 터미널은 알리지 않는다. 부모가 있는 터미널은 설정 `children`이 켜졌을 때만 알린다. `status` 이벤트에서 상태가 `blocked`·`error`로 들어가면 승인 대기·오류다. `turn` 이벤트는 그 `state`(없으면 새 레코드의 상태)가 `done`·`idle`이면 입력 대기다. `finished`는 종료이고 `lost`는 알리지 않는다. 다시 붙을 때의 스냅숏 비교(원인 이벤트 없음)에는 레코드로 같은 규칙을 쓴다: 끝났으면 종료, 상태 진입, `turn` 번호가 늘었고 지금 상태가 `done`·`idle`이면 입력 대기 | 상태가 바뀔 때마다 알림 · 다른 머신의 터미널도 알림 · Mori가 띄운 터미널만 | 다른 머신의 터미널은 그 머신의 Mori가 알리므로 같은 알림이 두 번 온다. 같은 상태를 되풀이한 보고는 새 소식이 아니다. 연결이 끊긴 사이에 끝난 턴이나 승인 대기도 놓치지 않는다. `lost`는 keep 터미널이 셸로 돌아오는 중간 단계다(§6.8). 목록에 보이는 터미널은 모두 알려야 헷갈리지 않는다 |
+| 79 | 알림 억제 | 그 터미널을 포커스한 뷰어가 있으면 보내지 않고, 보낸 것으로 치지도 않는다. 같은 (터미널, 종류)는 10초 창 안에 한 번만 보낸다. 창이 지난 기록은 새 기록을 남길 때 지운다 | 포커스로 막은 것도 보낸 것으로 침 · 기록을 계속 둠 | 보던 사람이 눈을 돌린 뒤의 다음 변화는 알려야 한다. 오래 도는 서버에서 기록이 끝없이 늘지 않는다 |
+| 80 | 발송 | `OnChange`는 판정만 하고, 발송은 구독마다 고루틴에서 30초 제한으로 한다. 푸시 서비스가 404·410이면 구독을 지우고 Info, 다른 실패는 Warn으로 남긴다. 로그에는 엔드포인트 대신 푸시 서비스의 호스트만 남기고, `url.Error`의 주소도 그렇게 바꾼다. 종료할 때는 코어 관리자가 멈춘 뒤에만, 종료 시간 안에서 진행 중인 발송을 기다린다 | 이벤트 흐름 안에서 보냄 · 실패하면 다시 보냄 | `OnChange`는 코어 관리자의 이벤트 고루틴에서 불리므로 막으면 안 된다(§5). 푸시 서비스가 느려도 이벤트 흐름과 화면이 밀리지 않는다. 엔드포인트는 그 기기로 알림을 보낼 수 있는 자격이라 로그에 남기지 않는다. 늦게 간 승인 대기 알림은 쓸모가 없어 다시 보내지 않는다. `OnChange`가 더는 불리지 않을 때 기다려야 `WaitGroup`을 바르게 쓴다 |
+| 81 | 알림 내용 | 제목은 `<호스트> · <종류>`(승인 대기·입력 대기·오류·종료), 본문은 `<보여 줄 이름> — <프로그램 메시지>`다. 종료는 메시지 대신 `시그널 N`이나 `종료 코드 N`이고 시그널이 먼저다. 제어 문자는 공백으로 바꾸고 공백을 접은 뒤 240자에서 자른다. `tag`는 터미널 주소, `url`은 `/#/t/<주소>`다 | 화면 텍스트를 넣음 · 길이 제한 없음 | 호스트마다 따로 알리므로 어느 호스트인지 제목에서 보여야 한다. 푸시 서비스가 하루 동안 맡아 두므로 최소로 둔다. 같은 터미널의 새 알림이 옛 알림을 바꾼다 |
+| 82 | 구독 | 기기마다 구독 하나다. 새 엔드포인트는 그 기기의 이전 구독을 바꾸고, 다른 기기가 가졌던 엔드포인트는 이 기기로 옮긴다. 같은 엔드포인트를 다시 구독하면 ID와 만든 시각을 지키고 키와 종류를 바꾼다. 기기 확인은 저장 잠금 안에서 해서, 그사이 철회된 기기는 구독을 되찾지 못한다(401). 엔드포인트는 2048바이트까지의 https 주소여야 한다. 키는 어느 base64든 받아 패딩 없는 base64url로 저장한다(`p256dh`는 P-256 점, `auth`는 16바이트). 종류는 확인해서 정해진 순서로 저장하고, 비어 있는 저장 값은 기본값(승인 대기·입력 대기·오류)으로 읽는다. 기기를 철회하면 그 구독도 지운다 | 기기마다 여러 구독 · 받은 그대로 저장 | 다시 페어링한 브라우저는 새 기기가 되지만 엔드포인트는 같다. 한 브라우저에 같은 알림이 두 번 오면 안 된다. 잘못된 키는 보낼 때가 아니라 구독할 때 알려야 고칠 수 있다 |
+| 83 | VAPID 키 | 처음 띄울 때 `crypto/ecdh`로 P-256 키를 만들어 `state.json`에 둔다. 저장된 쌍이 맞지 않으면(공개 키가 비밀 키의 것이 아니면) 새로 만들고 구독을 모두 지운다 | 띄울 때마다 새로 만듦 · 맞지 않으면 시작 실패 | 키가 바뀌면 푸시 서비스가 옛 구독을 거절하므로 기기들이 다시 구독해야 한다. 키 하나가 망가졌다고 세션 서버가 멈추면 안 된다 |
+| 84 | 발송 형식 | `aes128gcm`, TTL 86400초(하루), Urgency `high`이고 Topic은 쓰지 않는다. VAPID `sub`는 `https://github.com/kwonikhyeon/Mori`다(§15) | TTL 4주 · Topic으로 합침 | 하루 지난 승인 대기는 낡은 소식이다. 절전 중인 휴대폰도 바로 깨운다. 같은 터미널의 알림은 기기가 `tag`로 합친다 |
+| 85 | 시험 알림 | `POST /api/push/test`는 이 기기의 구독으로 보내고 푸시 서비스의 답을 기다린다. 구독이 없으면 409 `conflict`, 모두 실패하면 502 `push_failed`(한국어 이유. 404·410이면 구독을 지웠으니 다시 켜라고 한다), 하나라도 가면 `{sent}`다 | 백그라운드로 보내고 204 | 알림이 오지 않을 때 사용자가 이유(만료, 푸시 서비스 거절, 연결 실패)를 화면에서 봐야 한다 |
+| 86 | 알림 API | `GET /api/push/key`(VAPID 공개 키), `GET/POST/DELETE /api/push/subscriptions`(이 기기의 구독만 다룬다. 목록에는 키를 넣지 않는다. 삭제 본문은 `{endpoint?}`이고 비우면 이 기기 전부다), `GET/PUT /api/push/settings` `{children}`(호스트 전체 설정)이다. 알림기가 없는 서버에서는 모두 503 `unavailable`이다 | 구독 ID를 경로에 · 기기마다 설정 | 기기는 제 구독만 보고 바꾼다. 엔드포인트를 URL에 넣지 않는다. 부모 있는 터미널의 알림 여부는 호스트의 알림기가 판정할 때 읽는 값이다 |
+| 87 | Web Push 라이브러리 | `github.com/SherClockHolmes/webpush-go` v1.4.0을 쓴다. 그것이 요구하는 `golang-jwt/jwt/v5` v5.2.1과 `golang.org/x/crypto` v0.31.0에는 알려진 취약점이 있어(govulncheck: jwt 헤더 파싱의 메모리 과다 할당, x/crypto 21건), 최신인 v5.3.1과 v0.58.0으로 올린다. v0.58.0에 남은 GO-2026-5932는 Mori가 쓰지 않는 `openpgp` 패키지 건이다 | RFC 8291·8292를 직접 구현 | 검증된 구현이 새로 짠 암호 코드보다 낫다. 테스트가 가짜 푸시 서비스로 받은 메시지를 RFC대로 풀고 서명을 확인하므로 라이브러리를 바꿔도 같은 기준으로 잰다 |
 
 ## 4. 구조
 
@@ -229,12 +246,12 @@ herdr 제품군에는 두 계열이 있다.
 | 단위 | 하는 일 | 쓰는 쪽에 주는 것 | 기대는 것 |
 |---|---|---|---|
 | `internal/hc` | 프레임 인코딩, JSON-RPC, `hc connect` 프로세스, attach·이벤트 채널, 크레딧 | `Dial(ctx, opts) → *Conn`; `Conn.Call`, `Conn.Attach → *Stream`, `Conn.Subscribe → *Events`, `Conn.Done()`; 코어 타입(`Terminal`, `Status` 등) | `hc` 실행 파일 |
-| `internal/core` | 연결 유지(끊기면 재연결), 터미널 캐시, 변경 방송 | `Manager.Terminals()`, `Manager.Watch(buf) → 시작 상태와 변경 채널`(결정 30), `Manager.Call`·`Manager.Attach`(연결이 없으면 `core_unavailable`), 연결 상태 | `internal/hc` |
+| `internal/core` | 연결 유지(끊기면 재연결), 터미널 캐시, 변경 방송 | `Manager.Terminals()`, `Manager.Watch(buf) → 시작 상태와 변경 채널`(결정 30), `Manager.Call`·`Manager.Attach`(연결이 없으면 `core_unavailable`), 연결 상태, `Options.OnChange(change)`(이벤트 순서대로 한 고루틴에서 부른다. 첫 스냅숏에는 부르지 않고, 다시 붙을 때의 스냅숏은 달라진 것만 준다. 막으면 안 된다) | `internal/hc` |
 | `internal/store` | `state.json` 읽기·쓰기, 동시성 보호 | `Store.Get()`, `Store.Folders()`, `Store.Update(func(*State) error)` | 파일 시스템 |
 | `internal/auth` | 기기·페어링 코드·쿠키·Origin 검사·시도 제한 | `Middleware`, `Pair(code, name)`, `NewCode()`, `Revoke(id)`, 철회 알림 | `internal/store` |
 | `internal/folders` | 터미널 소속 계산과 폴더별 워크트리 목록. 순서는 라벨 `mori.folder` → 시작 cwd(실제 경로, 다음 받은 그대로)를 품는 가장 깊은 등록 폴더나 그 워크트리 → "기타"다(결정 70) | `Resolver.Resolve(terminal) → (folderID, worktree)`, `Refresh(id)`·`RefreshAll()`·`Run(ctx, every, log)`(폴더 추가, 워크트리 변경, git 조회, 30초마다 갱신. 결정 72·76), `Worktrees(id)`, `Owner(path)`, `OnChange(f)`; `Inside(terminal, dir)`, `Within`, `Canonical` | `internal/store`, `internal/gitx` |
 | `internal/gitx` | git CLI 실행과 출력 파싱 | `Runner.Status`, `Worktrees`, `Branches`, `Diff`, `AddWorktree`, `RemoveWorktree`; `IsRepo`, `WorktreePath`, `SafeRelPath` | `git` 실행 파일 |
-| `internal/push` | VAPID 키, 구독, 알림 판정, 발송 | `Notifier.OnChange(change)`(바뀌기 전과 후의 레코드, 원인 이벤트), `Subscribe`, `Test` | `internal/store`, `internal/core`, webpush 라이브러리 |
+| `internal/push` | VAPID 키, 구독, 알림 판정, 발송 | `Decide(change, children) → Kind`(결정 78); `EnsureVAPID(store)`, `NewWebPush(vapid, subject) → Sender`, `New(opts) → *Notifier`; `Notifier.OnChange(change)`(바뀌기 전과 후의 레코드, 원인 이벤트), `Subscribe`, `Unsubscribe`, `Subscriptions`, `Test`, `Wait` | `internal/store`, `internal/core`, webpush 라이브러리 |
 | `internal/server` | 라우팅, REST 핸들러, 이벤트 WS, attach WS 브리지 | `http.Handler` | 위 전부 |
 | `internal/admin` | 관리 소켓(Unix 도메인 소켓, Windows 10 이상 포함)과 그 클라이언트 | `Listen(path)`, `Serve(ctx, ln, h)`, `Client.Do(req)` | `internal/auth` |
 | `internal/service` | LaunchAgent·Run 키 설치와 제거 | `Install(opts)`, `Uninstall()` | OS 도구(`launchctl`, `reg`) |
@@ -286,8 +303,10 @@ herdr 제품군에는 두 계열이 있다.
    - 루트 상태가 `error`로 바뀌면 **오류**를 보낸다.
    - `finished`가 오면 **종료**를 보낸다(기본값은 끔).
    - 부모가 있는 터미널은 건너뛴다(설정으로 켤 수 있다).
+   - 다른 머신의 터미널(`machine/t7`)은 건너뛴다. 그 머신의 Mori가 알린다(결정 78).
 3. 두 경우에는 보내지 않는다. 그 터미널을 지금 포커스한 뷰어가 있을 때(브라우저가 `focus`와 페이지 가시성을 보고한다)와, 같은 터미널의 같은 종류 알림을 10초 안에 이미 보냈을 때다.
-4. 구독한 기기마다 켠 종류만 보낸다. 페이로드는 `{title, body, tag: 주소, url: "/#/t/<주소>"}`로 최소로 둔다. 푸시 서비스가 404나 410을 돌려주면 그 구독을 지운다.
+4. 구독한 기기마다 켠 종류만 보낸다. 페이로드는 `{title, body, tag: 주소, url: "/#/t/<주소>"}`로 최소로 둔다. 푸시 서비스가 404나 410을 돌려주면 그 구독을 지운다(결정 80~82).
+5. 연결이 끊긴 사이의 변화는 다시 붙을 때의 스냅숏 비교가 같은 규칙으로 판정한다. 첫 스냅숏(§6.1)은 알리지 않는다.
 
 ### 6.6 코어 재시작·업데이트
 `hc connect`가 끝나면 열린 attach WS를 모두 코드 4503으로 닫는다. 브라우저는 `resumed=1`로 다시 붙는다. 이벤트 WS에는 `{type: "core", connected: false}`를 보낸다. Mori는 hc 경로를 다시 찾고(업데이트로 링크가 바뀔 수 있다) 다시 연결해 새 스냅숏으로 캐시를 바꾼다. 그 사이의 상태 변화는 바뀌기 전과 후의 스냅숏을 비교해 알림을 판정한다.
@@ -332,7 +351,10 @@ herdr 제품군에는 두 계열이 있다.
 | `POST /api/terminals/{t}/files` | multipart `file` 항목 하나(8 MiB까지, 넘으면 413. 결정 36) → `terminal.put`, `{path, bytes}`를 돌려준다 |
 | `GET /api/terminals/{t}/text?lines=0` | 화면 텍스트(`terminal.read`) |
 | `GET/PUT /api/presets` · `GET/PUT /api/hosts` | 프리셋 · 호스트 링크 목록 |
-| `GET /api/push/key` · `POST/DELETE /api/push/subscriptions` · `POST /api/push/test` | VAPID 공개 키 · 구독 `{subscription, kinds}` · 시험 알림 |
+| `GET /api/push/key` | VAPID 공개 키 `{key}`(브라우저 `applicationServerKey`, 패딩 없는 base64url) |
+| `GET/POST/DELETE /api/push/subscriptions` | 이 기기의 구독 목록 `[{id, endpoint, kinds, created_ms}]`(키는 돌려주지 않는다) · 구독 `{subscription: PushSubscription.toJSON(), kinds?}` → 201과 구독 하나(`kinds`는 `blocked`·`waiting`·`error`·`exited` 중에서, 비우면 앞의 셋. 결정 82) · 해제 `{endpoint?}`(비우면 이 기기 전부) → 204 |
+| `POST /api/push/test` | 이 기기로 시험 알림 `{sent}`. 구독이 없으면 409 `conflict`, 모두 실패하면 502 `push_failed`(결정 85) |
+| `GET/PUT /api/push/settings` | 호스트의 알림 설정 `{children}`(부모가 있는 터미널도 알림). 알림 API는 알림기가 없으면 503 `unavailable`이다(결정 86) |
 
 `{t}`는 터미널 주소다. 다른 머신의 터미널이면 `machine/t7`처럼 `/`가 들어가므로 URL에서는 `%2F`로 쓴다.
 
@@ -378,7 +400,7 @@ herdr 제품군에는 두 계열이 있다.
 | 503 | `unavailable`, `core_unavailable` |
 | 500 | 나머지 |
 
-Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limited`(429), `too_large`(413), `git_failed`(422)가 있다. Mori가 만든 `message`는 한국어이고, hc가 준 `message`는 그대로 넘긴다(결정 31).
+Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limited`(429), `too_large`(413), `git_failed`(422), `push_failed`(502)가 있다. Mori가 만든 `message`는 한국어이고, hc가 준 `message`는 그대로 넘긴다(결정 31).
 
 ## 8. 보안
 
@@ -499,7 +521,7 @@ Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limit
    - ConPTY의 `CSI ?9001h`(win32-input-mode)와 xterm.js 입력이 문제없는지
    - Run 키로 띄운 `moriw.exe`가 콘솔 창 없이 뜨는지
 5. `tailscale serve`가 원래 `Host` 헤더를 넘기는지, `X-Forwarded-Host`를 붙이는지(§8)
-6. OSC 7501 보고 문법. hc 바이너리에는 `]7501;`, `state=`, 질의 응답 `]7501;?:states=idle,working,done,blocked,error:kinds=permission,question,auth`가 있다. 보고 형식은 `ESC ] 7501 ; state=blocked:kind=permission … BEL`로 보이지만 단계 7 통합 테스트에서 확인한다
+6. ~~OSC 7501 보고 문법. hc 바이너리에는 `]7501;`, `state=`, 질의 응답 `]7501;?:states=idle,working,done,blocked,error:kinds=permission,question,auth`가 있다. 보고 형식은 `ESC ] 7501 ; state=blocked:kind=permission … BEL`로 보이지만 단계 7 통합 테스트에서 확인한다~~ 확인함(2026-11-09, §2.3): 쌍은 `:`로 잇고 `msg`·`title`은 base64다. `working`을 벗어나면 `turn` 이벤트가 따라온다.
 7. ~~`terminal.kill`이 attach CLOSE에 주는 이유 문자열(`killed`로 가정, §6.8). 단계 5 통합 테스트에서 확인한다~~ 확인함(2026-11-09, §2.3): `killed`, signal 1(hangup)이다. 시그널로 프로그램을 잃은 `keep` 터미널은 `signaled`다.
 8. iOS 홈 화면 PWA에서 `*.ts.net` origin의 Web Push가 오는지(VAPID `sub`는 `https://github.com/kwonikhyeon/Mori`).
 9. 프로그램이 kitty 키보드 프로토콜을 켰을 때 xterm.js가 보내는 기존 방식 키가 잘 통하는지.

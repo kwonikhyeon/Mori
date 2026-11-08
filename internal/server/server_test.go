@@ -66,7 +66,7 @@ func TestStatusForKinds(t *testing.T) {
 	for kind, want := range map[string]int{
 		"not_found": 404, "invalid_params": 400, "blocked": 409, "finished": 409, "live": 409,
 		"unavailable": 503, "core_unavailable": 503, "unauthorized": 401, "forbidden_origin": 403,
-		"rate_limited": 429, "git_failed": 422, "whatever": 500,
+		"rate_limited": 429, "git_failed": 422, "push_failed": 502, "whatever": 500,
 	} {
 		if got := statusFor(kind); got != want {
 			t.Errorf("%s: %d want %d", kind, got, want)

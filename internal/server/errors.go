@@ -12,6 +12,7 @@ import (
 	"github.com/kwonikhyeon/mori/internal/core"
 	"github.com/kwonikhyeon/mori/internal/gitx"
 	"github.com/kwonikhyeon/mori/internal/hc"
+	"github.com/kwonikhyeon/mori/internal/push"
 )
 
 // apiError is an error with the HTTP status and kind the API reports (spec §7.4).
@@ -49,6 +50,8 @@ func statusFor(kind string) int {
 		return http.StatusUnprocessableEntity
 	case "too_large":
 		return http.StatusRequestEntityTooLarge
+	case "push_failed":
+		return http.StatusBadGateway
 	}
 	return http.StatusInternalServerError
 }
@@ -85,6 +88,18 @@ func toAPIError(err error) *apiError {
 	}
 	if ge := (*gitx.Error)(nil); errors.As(err, &ge) {
 		return &apiError{Status: http.StatusUnprocessableEntity, Kind: "git_failed", Message: gitMessage(ge)}
+	}
+	if ie := (*push.InvalidError)(nil); errors.As(err, &ie) {
+		return &apiError{Status: http.StatusBadRequest, Kind: "invalid_params", Message: ie.Msg}
+	}
+	if se := (*push.SendError)(nil); errors.As(err, &se) {
+		return &apiError{Status: http.StatusBadGateway, Kind: "push_failed", Message: se.Error()}
+	}
+	switch {
+	case errors.Is(err, push.ErrNoSubscription):
+		return &apiError{Status: http.StatusConflict, Kind: "conflict", Message: err.Error(), Hint: "이 기기에서 알림을 먼저 켜세요"}
+	case errors.Is(err, push.ErrUnknownDevice):
+		return &apiError{Status: http.StatusUnauthorized, Kind: "unauthorized", Message: err.Error()}
 	}
 	if kind := hc.KindOf(err); kind != "" {
 		msg := err.Error()

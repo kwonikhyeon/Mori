@@ -12,6 +12,7 @@ import (
 	"github.com/kwonikhyeon/mori/internal/folders"
 	"github.com/kwonikhyeon/mori/internal/gitx"
 	"github.com/kwonikhyeon/mori/internal/presence"
+	"github.com/kwonikhyeon/mori/internal/push"
 	"github.com/kwonikhyeon/mori/internal/store"
 )
 
@@ -37,6 +38,9 @@ type Deps struct {
 	// Presence learns from attached browsers which terminals a viewer has
 	// in focus, for the notifier to read. New makes one when it is nil.
 	Presence *presence.Registry
+	// Push keeps the devices' notification subscriptions and sends the
+	// test notification. Without it the push APIs answer 503.
+	Push *push.Notifier
 }
 
 // Server routes requests. Build it with New and serve Handler().
@@ -115,6 +119,13 @@ func (s *Server) routes() {
 	api.HandleFunc("PUT /api/presets", s.handlePutPresets)
 	api.HandleFunc("GET /api/hosts", s.handleGetHosts)
 	api.HandleFunc("PUT /api/hosts", s.handlePutHosts)
+	api.HandleFunc("GET /api/push/key", s.needPush(s.handlePushKey))
+	api.HandleFunc("GET /api/push/subscriptions", s.needPush(s.handlePushSubs))
+	api.HandleFunc("POST /api/push/subscriptions", s.needPush(s.handleSubscribe))
+	api.HandleFunc("DELETE /api/push/subscriptions", s.needPush(s.handleUnsubscribe))
+	api.HandleFunc("POST /api/push/test", s.needPush(s.handlePushTest))
+	api.HandleFunc("GET /api/push/settings", s.needPush(s.handleGetPushSettings))
+	api.HandleFunc("PUT /api/push/settings", s.needPush(s.handlePutPushSettings))
 	api.HandleFunc("GET /ws/events", s.handleEventsWS)
 	api.HandleFunc("GET /ws/attach", s.handleAttachWS)
 	notFound := func(w http.ResponseWriter, r *http.Request) {

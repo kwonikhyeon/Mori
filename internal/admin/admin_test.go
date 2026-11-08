@@ -125,3 +125,15 @@ func TestSecondServerRefused(t *testing.T) {
 		t.Fatal("first server must keep its socket:", err)
 	}
 }
+
+func TestLongSocketPathExplained(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, strings.Repeat("d", 120), "mori.sock")
+	_, err := Listen(path)
+	if err == nil || !strings.Contains(err.Error(), "너무 깁니다") || !strings.Contains(err.Error(), "--home") {
+		t.Fatal(err)
+	}
+	if _, err := (Client{Path: path}).Do(Request{Op: "status"}); err == nil || !strings.Contains(err.Error(), "너무 깁니다") {
+		t.Fatal(err)
+	}
+}

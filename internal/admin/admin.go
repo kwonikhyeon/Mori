@@ -64,6 +64,9 @@ const (
 // Listen opens the socket at path. It fails when another server answers
 // there, and removes a socket file that a crashed server left behind.
 func Listen(path string) (net.Listener, error) {
+	if err := checkPath(path); err != nil {
+		return nil, err
+	}
 	if c, err := net.DialTimeout("unix", path, time.Second); err == nil {
 		c.Close()
 		return nil, fmt.Errorf("이 상태 디렉터리를 쓰는 Mori 서버가 이미 돌고 있습니다(%s)", path)
@@ -82,6 +85,24 @@ func Listen(path string) (net.Listener, error) {
 		}
 	}
 	return ln, nil
+}
+
+// maxPath is the longest socket path the OS takes: sun_path holds 104
+// bytes on macOS and the BSDs and 108 elsewhere, the last one for NUL.
+func maxPath() int {
+	switch runtime.GOOS {
+	case "darwin", "ios", "freebsd", "netbsd", "openbsd", "dragonfly":
+		return 103
+	}
+	return 107
+}
+
+// checkPath explains a path the OS would refuse with a bare EINVAL.
+func checkPath(path string) error {
+	if n := len(path); n > maxPath() {
+		return fmt.Errorf("관리 소켓 경로가 너무 깁니다(%d바이트, 최대 %d): %s. --home이나 MORI_HOME으로 더 짧은 상태 디렉터리를 쓰세요", n, maxPath(), path)
+	}
+	return nil
 }
 
 // Serve answers requests on ln until ctx ends or ln closes. Closing ln
@@ -147,6 +168,9 @@ type Client struct{ Path string }
 // Do sends req and waits for the answer. An answer that reports an error
 // comes back as that error too.
 func (c Client) Do(req Request) (Response, error) {
+	if err := checkPath(c.Path); err != nil {
+		return Response{}, err
+	}
 	conn, err := net.DialTimeout("unix", c.Path, clientTimeout)
 	if err != nil {
 		return Response{}, fmt.Errorf("%w. mori serve를 먼저 실행하세요(%s에 연결하지 못했습니다)", ErrNotRunning, c.Path)

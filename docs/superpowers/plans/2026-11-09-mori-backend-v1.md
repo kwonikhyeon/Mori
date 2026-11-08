@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Go 모듈 경로 `github.com/kwonikhyeon/mori`, `go 1.26` 이상. 외부 의존성은 위 세 개만 쓴다.
+- Go 모듈 경로 `github.com/kwonikhyeon/mori`, `go 1.26.5`, `toolchain go1.26.10`(결정 88). 외부 의존성은 위 세 개만 쓴다.
 - 기본 수신 주소 `127.0.0.1:7761`. 루프백이 아닌 주소는 거부한다.
 - 상태 위치: `--home`, 다음 `MORI_HOME`, 다음 `os.UserConfigDir()/Mori`. 파일은 `state.json`(0600, 임시 파일 → fsync → rename), `mori.sock`, `mori.log`. 디렉터리는 0700.
 - `hc` 찾기: `--hc` → `PATH` → `~/.local/bin/hc(.exe)`. `hc connect` 자식 환경에서 `HC_TERMINAL_ID`를 뺀다.
@@ -2103,6 +2103,7 @@ func TestInstallDryRunChangesNothing(t *testing.T) {
 - §3 #18, §11(Task 14): Windows 상주는 HKCU Run 키다. 버린 대안은 `schtasks /SC ONLOGON`(일반 사용자는 모든 사용자 대상 로그온 트리거를 만들 수 없다)과 Windows 서비스(세션 0)다. Run 키에는 비정상 종료 뒤 자동 재시작이 없다. LaunchAgent에는 설치할 때의 PATH를 넣는다.
 - §6.2(Task 8): `mori pair --name`의 이름은 코드에 붙는다. 기기가 이름을 보내지 않으면 그 이름을 쓴다. 관리 소켓 동작은 pair, devices, revoke, status, shutdown이다.
 - §2.3, §15.6(Task 13): OSC 7501 보고는 `ESC ] 7501 ; 키=값:키=값 BEL`이고 `msg`·`title`은 base64다. 상태가 `working`을 벗어나면 `status` 다음에 `turn`이 오고, 끝나면 `status: null` 다음에 `finished`가 온다. §7.1에 알림 API를 네 줄로, §7.4에 `push_failed`(502)를, §5에 `OnChange` 계약을 적었다. 결정 78~87.
+- §3 #88(Task 13 뒤): govulncheck가 go1.26.5 표준 라이브러리에서 Mori가 부르는 취약점 16건을 보고해, go.mod에 `toolchain go1.26.10`을 두고 `make vuln`을 더했다.
 
 ## Self-Review
 

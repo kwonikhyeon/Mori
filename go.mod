@@ -2,6 +2,8 @@ module github.com/kwonikhyeon/mori
 
 go 1.26.5
 
+toolchain go1.26.10
+
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/coder/websocket v1.8.15

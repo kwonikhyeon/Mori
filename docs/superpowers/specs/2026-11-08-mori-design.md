@@ -120,7 +120,7 @@ herdr 제품군에는 두 계열이 있다.
 ### 2.4 현재 환경 (2026-11-09)
 
 - 호스트: `macmini`(macOS arm64, 개발 머신), `ikhyeon-desktop`·`ikhyeon-labtop`(Windows). 클라이언트에는 iPhone이 있다.
-- 개발 머신 도구: hc 0.1.19, Tailscale 1.102.2, Go 1.26.5, Node 22, git 2.54, Claude Code 2.1.319, Codex 0.146.0.
+- 개발 머신 도구: hc 0.1.19, Tailscale 1.102.2, Go 1.26.5(빌드는 go.mod의 `toolchain go1.26.10`, 결정 88), Node 22, git 2.54, Claude Code 2.1.319, Codex 0.146.0.
 
 ## 3. 결정 요약
 
@@ -213,6 +213,7 @@ herdr 제품군에는 두 계열이 있다.
 | 85 | 시험 알림 | `POST /api/push/test`는 이 기기의 구독으로 보내고 푸시 서비스의 답을 기다린다. 구독이 없으면 409 `conflict`, 모두 실패하면 502 `push_failed`(한국어 이유. 404·410이면 구독을 지웠으니 다시 켜라고 한다), 하나라도 가면 `{sent}`다 | 백그라운드로 보내고 204 | 알림이 오지 않을 때 사용자가 이유(만료, 푸시 서비스 거절, 연결 실패)를 화면에서 봐야 한다 |
 | 86 | 알림 API | `GET /api/push/key`(VAPID 공개 키), `GET/POST/DELETE /api/push/subscriptions`(이 기기의 구독만 다룬다. 목록에는 키를 넣지 않는다. 삭제 본문은 `{endpoint?}`이고 비우면 이 기기 전부다), `GET/PUT /api/push/settings` `{children}`(호스트 전체 설정)이다. 알림기가 없는 서버에서는 모두 503 `unavailable`이다 | 구독 ID를 경로에 · 기기마다 설정 | 기기는 제 구독만 보고 바꾼다. 엔드포인트를 URL에 넣지 않는다. 부모 있는 터미널의 알림 여부는 호스트의 알림기가 판정할 때 읽는 값이다 |
 | 87 | Web Push 라이브러리 | `github.com/SherClockHolmes/webpush-go` v1.4.0을 쓴다. 그것이 요구하는 `golang-jwt/jwt/v5` v5.2.1과 `golang.org/x/crypto` v0.31.0에는 알려진 취약점이 있어(govulncheck: jwt 헤더 파싱의 메모리 과다 할당, x/crypto 21건), 최신인 v5.3.1과 v0.58.0으로 올린다. v0.58.0에 남은 GO-2026-5932는 Mori가 쓰지 않는 `openpgp` 패키지 건이다 | RFC 8291·8292를 직접 구현 | 검증된 구현이 새로 짠 암호 코드보다 낫다. 테스트가 가짜 푸시 서비스로 받은 메시지를 RFC대로 풀고 서명을 확인하므로 라이브러리를 바꿔도 같은 기준으로 잰다 |
+| 88 | Go 툴체인 | go.mod에 `toolchain go1.26.10`을 둔다. `go` 줄은 1.26.5 그대로다. 표준 라이브러리와 의존성의 알려진 취약점은 `make vuln`(govulncheck)으로 확인한다 | 개발 머신의 go1.26.5로 빌드 · `go` 줄을 올림 · Go 1.27로 올림 | go1.26.5의 표준 라이브러리에는 Mori가 부르는 `net/http`·`crypto/tls`·`crypto/x509`·`net/url`·`encoding/asn1` 코드에 govulncheck가 보고하는 취약점이 16건 있고, go1.26.10에서 모두 고쳐졌다(2026-11-09 확인). `GOTOOLCHAIN=auto`(기본)면 go 명령이 이 툴체인을 받아 쓰므로 `make release`가 개발 머신의 Go 버전에 매이지 않는다. `go` 줄을 올리면 `GOTOOLCHAIN=local`로 일부러 다른 Go를 고른 빌드까지 막는다. 1.27은 언어와 라이브러리가 바뀌는 업그레이드라 따로 정한다 |
 
 ## 4. 구조
 

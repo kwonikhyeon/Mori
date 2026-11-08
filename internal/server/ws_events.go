@@ -13,7 +13,6 @@ import (
 
 	"github.com/kwonikhyeon/mori/internal/core"
 	"github.com/kwonikhyeon/mori/internal/hc"
-	"github.com/kwonikhyeon/mori/internal/store"
 )
 
 const (
@@ -27,7 +26,7 @@ type (
 	snapshotMsg struct {
 		Type      string         `json:"type"`
 		Core      core.Status    `json:"core"`
-		Folders   []store.Folder `json:"folders"`
+		Folders   []FolderView   `json:"folders"`
 		Terminals []TerminalView `json:"terminals"`
 	}
 	terminalMsg struct {
@@ -39,8 +38,8 @@ type (
 		Address string `json:"address"`
 	}
 	foldersMsg struct {
-		Type    string         `json:"type"`
-		Folders []store.Folder `json:"folders"`
+		Type    string       `json:"type"`
+		Folders []FolderView `json:"folders"`
 	}
 	coreMsg struct {
 		Type string `json:"type"`
@@ -103,7 +102,7 @@ func (f *eventFeed) tell(v TerminalView) TerminalView {
 // snapshot is the first message: the live terminals and those that
 // finished within recentFinished, as the REST list shows them.
 func (f *eventFeed) snapshot(ts []hc.Terminal, st core.Status, now time.Time) snapshotMsg {
-	m := snapshotMsg{Type: "snapshot", Core: st, Folders: f.s.d.Store.Get().Folders, Terminals: []TerminalView{}}
+	m := snapshotMsg{Type: "snapshot", Core: st, Folders: f.s.folderViews(f.s.d.Store.Folders()), Terminals: []TerminalView{}}
 	for _, t := range ts {
 		if recent(t, now) {
 			m.Terminals = append(m.Terminals, f.tell(f.s.view(t)))
@@ -136,7 +135,7 @@ func (f *eventFeed) update(u core.Update, now time.Time) any {
 // foldersChanged is what FoldersChanged sends: the folders, then each
 // terminal shown whose folder or worktree is now another.
 func (f *eventFeed) foldersChanged() []any {
-	out := []any{foldersMsg{Type: "folders", Folders: f.s.d.Store.Get().Folders}}
+	out := []any{foldersMsg{Type: "folders", Folders: f.s.folderViews(f.s.d.Store.Folders())}}
 	for _, addr := range slices.Sorted(maps.Keys(f.told)) {
 		old := f.told[addr]
 		if v := f.s.view(old.Terminal); v.FolderID != old.FolderID || v.Worktree != old.Worktree {

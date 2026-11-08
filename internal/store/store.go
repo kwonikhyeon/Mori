@@ -59,6 +59,13 @@ func (s *Store) Get() State {
 	return clone(s.cur)
 }
 
+// Folders returns a copy of the registered folders, cheaper than Get.
+func (s *Store) Folders() []Folder {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]Folder{}, s.cur.Folders...)
+}
+
 // Update runs fn on a copy of the state, saves the result, and only then
 // makes it current. When fn or the save fails nothing changes.
 func (s *Store) Update(fn func(*State) error) error {

@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -29,7 +29,7 @@ type wsMsg struct {
 	Type      string         `json:"type"`
 	Core      *core.Status   `json:"core"`
 	Connected bool           `json:"connected"`
-	Folders   []store.Folder `json:"folders"`
+	Folders   []FolderView   `json:"folders"`
 	Terminals []TerminalView `json:"terminals"`
 	Terminal  *TerminalView  `json:"terminal"`
 	Address   string         `json:"address"`
@@ -245,40 +245,36 @@ func TestEventsWithCoreDown(t *testing.T) {
 }
 
 func TestEventFeed(t *testing.T) {
-	var mu sync.Mutex
-	folderOf := map[string]string{"t1": "f1", "t2": "f1"}
-	e := newTestEnv(t, func(d *Deps) {
-		d.Resolve = func(t hc.Terminal) (string, string) {
-			mu.Lock()
-			defer mu.Unlock()
-			return folderOf[t.Address], ""
-		}
-	})
+	e := newTestEnv(t)
+	one := e.addFolder(filepath.FromSlash("/w/one"))
 	now := time.Now()
 	old := now.Add(-2 * recentFinished).UnixMilli()
 	f := newEventFeed(e.s)
 
-	snap := f.snapshot([]hc.Terminal{{Address: "t1", State: "live"}, {Address: "t2", State: "live"},
+	snap := f.snapshot([]hc.Terminal{{Address: "t1", State: "live", Cwd: filepath.FromSlash("/w/one/a")},
+		{Address: "t2", State: "live", Cwd: filepath.FromSlash("/w/one/b")},
 		{Address: "t3", State: "finished", FinishedMs: &old}}, core.Status{Connected: true}, now)
 	var got []string
 	for _, v := range snap.Terminals {
+		if v.FolderID != one.ID {
+			t.Fatalf("%s in %q", v.Address, v.FolderID)
+		}
 		got = append(got, v.Address)
 	}
-	if !slices.Equal(got, []string{"t1", "t2"}) || !snap.Core.Connected || snap.Folders == nil {
+	if !slices.Equal(got, []string{"t1", "t2"}) || !snap.Core.Connected || len(snap.Folders) != 1 || snap.Folders[0].Worktrees == nil {
 		t.Fatalf("%v %+v", got, snap)
 	}
 
-	mu.Lock()
-	folderOf["t2"] = "f2"
-	mu.Unlock()
+	// A folder registered inside the first takes the terminal that started there.
+	two := e.addFolder(filepath.FromSlash("/w/one/b"))
 	msgs := f.foldersChanged()
 	if len(msgs) != 2 {
 		t.Fatalf("%+v", msgs)
 	}
-	if _, ok := msgs[0].(foldersMsg); !ok {
+	if m, ok := msgs[0].(foldersMsg); !ok || len(m.Folders) != 2 {
 		t.Fatalf("%+v", msgs[0])
 	}
-	if m, ok := msgs[1].(terminalMsg); !ok || m.Terminal.Address != "t2" || m.Terminal.FolderID != "f2" {
+	if m, ok := msgs[1].(terminalMsg); !ok || m.Terminal.Address != "t2" || m.Terminal.FolderID != two.ID {
 		t.Fatalf("%+v", msgs[1])
 	}
 	if msgs := f.foldersChanged(); len(msgs) != 1 {

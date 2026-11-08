@@ -186,6 +186,16 @@ herdr 제품군에는 두 계열이 있다.
 | 65 | 브랜치 슬러그 | 결정 15의 슬러그는 64바이트로 자르고, Windows 장치 이름(`CON`, `AUX`, `NUL`, `COM1`…, 대소문자 무관, 확장자가 붙어도)이면 앞에 `wt-`를 붙인다 | 그대로 씀 | Windows 호스트에서는 `aux` 브랜치의 워크트리 디렉터리를 만들 수 없다. 아주 긴 브랜치 이름은 경로 길이 한도를 넘는다 |
 | 66 | git 오류 | 브랜치·기준 이름이 `-`로 시작하거나 `check-ref-format --branch`를 통과하지 못하면 400 `invalid_params`다. git이 실패하면 422 `git_failed`이고, 메시지는 stderr 앞 400자다. 시간 초과와 git 없음은 한국어 문구로 알린다 | 모두 422 | 이름 오류는 입력을 고치면 되는 것이라 UI가 입력란을 가리킬 수 있어야 한다. stderr가 비는 실패에도 이유가 보여야 한다 |
 | 67 | `.wt` 디렉터리 정리 | 워크트리를 지운 뒤 `<이름>.wt`가 비었으면 지운다 | 남김 | 결정 15에 따라 Mori가 만든 디렉터리다. 비었을 때만 지우므로 다른 것을 잃지 않는다 |
+| 68 | 저장소 여부 | 폴더 경로 바로 아래에 `.git`(주 워크트리는 디렉터리, 연결 워크트리는 파일)이 있을 때만 저장소로 본다. 저장소 안의 하위 폴더를 등록하면 git 기능이 없는 일반 폴더다 | `git rev-parse --show-toplevel`로 위쪽 저장소를 찾음 | 폴더 목록을 그릴 때마다 git을 부르지 않는다. 하위 폴더에서 위쪽 저장소의 워크트리를 만들고 지우면 사용자가 등록하지 않은 저장소를 건드린다 |
+| 69 | 폴더 레코드 | 폴더는 실제 경로(`EvalSymlinks`)로 저장하고, 같은 실제 경로는 두 번 등록하지 않는다(409 `conflict`). 이름을 주지 않으면 사용자가 고른 경로의 마지막 이름이다. API의 폴더는 저장된 레코드에 `repo`와 git이 마지막으로 알려 준 `worktrees`(주 워크트리가 먼저, 저장소가 아니면 `[]`)를 더한 것이다 | 받은 경로 그대로 저장 · 워크트리를 따로 조회 | git은 실제 경로를 보고한다(§2.3). 링크 두 개로 같은 폴더를 두 번 넣으면 터미널이 어느 쪽에 들어갈지 모호하다. 화면은 폴더 아래에 워크트리를 함께 그리므로 한 번에 받는다 |
+| 70 | 소속 경로 비교 | 라벨이 등록된 폴더를 가리키지 않으면, 시작 cwd를 실제 경로로 먼저, 받은 그대로 다음으로 비교한다. 가장 깊은 폴더나 워크트리가 이긴다. 같은 깊이면 폴더 자신이 워크트리보다, 먼저 등록된 폴더가 나중 것보다 앞선다. 대소문자는 Windows에서만 무시한다. 실제 경로는 1024개까지 기억하고, 차면 비운다 | 받은 경로만 비교 · 매번 `EvalSymlinks` · macOS에서도 대소문자 무시 | `~/proj-link`처럼 링크를 거쳐 시작한 셸도 제 폴더에 들어간다. 매번 풀면 목록을 그릴 때마다 터미널 수만큼 파일 시스템을 묻는다. macOS에도 대소문자를 가리는 볼륨이 있다. 폴더 고르기와 git, Mori가 띄운 세션은 실제 대소문자를 쓰므로, 어긋나는 것은 다른 대소문자로 직접 친 cwd뿐이고 그 터미널은 "기타"에 들어간다 |
+| 71 | 다른 머신의 터미널 | 주소에 `/`가 있는 터미널(`rohan/t7`)은 어느 폴더에도 넣지 않고("기타") 워크트리 삭제도 막지 않는다 | 경로로 비교 | 그 cwd는 다른 호스트의 경로다. 같은 경로가 우연히 이 호스트에도 있을 수 있다 |
+| 72 | 워크트리 갱신 경합 | 갱신은 git을 부르기 전에 번호표를 받고, 폴더마다 저장된 번호보다 늦은 번호의 결과만 저장한다. 전체 갱신은 끝에서 등록이 풀린 폴더의 목록을 지우는데, 등록 목록은 Resolver 잠금을 잡은 채 다시 읽는다 | 끝난 순서대로 덮어씀 · 처음 읽은 등록 목록으로 지움 | 30초 갱신과 워크트리 추가가 겹치면, 먼저 시작해 늦게 끝난 갱신이 방금 만든 워크트리를 지운다. 처음 목록으로 지우면 그사이 등록되어 이미 갱신된 폴더의 목록이 사라진다 |
+| 73 | 워크트리 삭제 확인 | 주 워크트리와 그 폴더의 목록에 없는 경로는 400이다. 등록된 폴더가 그 안에 있으면 409 `conflict`, 살아 있는 세션이 그곳에서 시작했거나 그 포그라운드 프로그램이 그곳에 있으면 409 `live`다. 세션은 캐시가 아니라 코어에 `terminal.list`로 묻고, 코어가 없으면 503 `core_unavailable`이다. `force`는 변경이 있는 워크트리를 지운다. 잠긴 워크트리는 git이 거절한다(422) | git에 맡김 · 캐시로 확인 · `-f -f`로 잠금까지 무시 | git은 셸이 그 안에 있어도 지운다. cwd가 사라진 세션은 쓸 수 없다. 방금 만든 세션의 `created` 이벤트는 캐시에 아직 없을 수 있다. 잠금은 사용자가 일부러 건 것이다 |
+| 74 | 폴더 고르기 목록 | `GET /api/fs`는 디렉터리(디렉터리로 이어지는 링크와 정션 포함)만 대소문자 무시 이름순으로 2000개까지 주고, 넘으면 `truncated`를 켠다. 점으로 시작하는 이름과 Windows 숨김 속성은 `hidden=1`일 때만 보인다. 항목마다 `git`(결정 68의 저장소 여부)을 붙인다. `path`가 비면 홈 폴더다 | 파일까지 보여 줌 · 한도 없음 | 등록할 수 있는 것은 폴더뿐이다. 아주 큰 디렉터리가 응답을 끝없이 키우지 않는다. `git` 표시로 저장소를 골라 등록하기 쉽다 |
+| 75 | git 경로 확인 | `/api/git/*`의 `path`는 등록된 폴더의 워크트리 최상위여야 한다(받은 그대로나 실제 경로로 비교). git은 git이 보고한 경로에서 돈다. 모르는 경로면 모든 폴더의 목록을 한 번 다시 받아 보고, 그래도 없으면 400이다 | 아무 저장소나 허용 · 하위 폴더 허용 | API로 호스트의 아무 저장소나 읽지 못하게 한다(§8). 방금 Mori 밖에서 만든 워크트리도 다음 갱신(30초)을 기다리지 않고 열린다 |
+| 76 | 갱신 오류 로그 | 30초 갱신에서 폴더의 git 오류는 처음 났을 때와 메시지가 바뀌었을 때만 Warn으로 남기고, 풀리면 Info를 한 번 남긴다. 실패한 폴더는 이전 목록을 그대로 둔다 | 갱신마다 로그 · 실패하면 목록을 비움 | 같은 오류가 30초마다 쌓이면 로그를 읽을 수 없다. 잠깐의 실패(잠금 등)로 워크트리 목록과 터미널 소속이 흔들리지 않는다 |
+| 77 | 저장소 아닌 폴더의 git | `GET /api/folders/{id}/git`은 200과 `repo: false`, 빈 `worktrees`를 준다. 브랜치·워크트리 API는 409 `conflict`다. 없는 폴더만 404다 | 모두 404 · 모두 409 | 화면은 폴더마다 요약을 물을 수 있어야 하므로 요약은 실패하지 않는다. 저장소가 아닌 폴더에서 브랜치·워크트리는 할 수 없는 동작이라 충돌이다 |
 
 ## 4. 구조
 
@@ -220,10 +230,10 @@ herdr 제품군에는 두 계열이 있다.
 |---|---|---|---|
 | `internal/hc` | 프레임 인코딩, JSON-RPC, `hc connect` 프로세스, attach·이벤트 채널, 크레딧 | `Dial(ctx, opts) → *Conn`; `Conn.Call`, `Conn.Attach → *Stream`, `Conn.Subscribe → *Events`, `Conn.Done()`; 코어 타입(`Terminal`, `Status` 등) | `hc` 실행 파일 |
 | `internal/core` | 연결 유지(끊기면 재연결), 터미널 캐시, 변경 방송 | `Manager.Terminals()`, `Manager.Watch(buf) → 시작 상태와 변경 채널`(결정 30), `Manager.Call`·`Manager.Attach`(연결이 없으면 `core_unavailable`), 연결 상태 | `internal/hc` |
-| `internal/store` | `state.json` 읽기·쓰기, 동시성 보호 | `Store.Get()`, `Store.Update(func(*State) error)` | 파일 시스템 |
+| `internal/store` | `state.json` 읽기·쓰기, 동시성 보호 | `Store.Get()`, `Store.Folders()`, `Store.Update(func(*State) error)` | 파일 시스템 |
 | `internal/auth` | 기기·페어링 코드·쿠키·Origin 검사·시도 제한 | `Middleware`, `Pair(code, name)`, `NewCode()`, `Revoke(id)`, 철회 알림 | `internal/store` |
-| `internal/folders` | 폴더 등록과 터미널 소속 계산. 순서는 라벨 `mori.folder` → 시작 cwd를 품는 가장 깊은 등록 폴더나 그 워크트리 → "기타"다 | `Resolve(terminal) → (folderID, worktree)`, 워크트리 경로 캐시(폴더 추가, 워크트리 변경, git 조회, 30초마다 갱신) | `internal/store`, `internal/gitx` |
-| `internal/gitx` | git CLI 실행과 출력 파싱 | `Status`, `Worktrees`, `Branches`, `Diff`, `AddWorktree`, `RemoveWorktree` | `git` 실행 파일 |
+| `internal/folders` | 터미널 소속 계산과 폴더별 워크트리 목록. 순서는 라벨 `mori.folder` → 시작 cwd(실제 경로, 다음 받은 그대로)를 품는 가장 깊은 등록 폴더나 그 워크트리 → "기타"다(결정 70) | `Resolver.Resolve(terminal) → (folderID, worktree)`, `Refresh(id)`·`RefreshAll()`·`Run(ctx, every, log)`(폴더 추가, 워크트리 변경, git 조회, 30초마다 갱신. 결정 72·76), `Worktrees(id)`, `Owner(path)`, `OnChange(f)`; `Inside(terminal, dir)`, `Within`, `Canonical` | `internal/store`, `internal/gitx` |
+| `internal/gitx` | git CLI 실행과 출력 파싱 | `Runner.Status`, `Worktrees`, `Branches`, `Diff`, `AddWorktree`, `RemoveWorktree`; `IsRepo`, `WorktreePath`, `SafeRelPath` | `git` 실행 파일 |
 | `internal/push` | VAPID 키, 구독, 알림 판정, 발송 | `Notifier.OnChange(change)`(바뀌기 전과 후의 레코드, 원인 이벤트), `Subscribe`, `Test` | `internal/store`, `internal/core`, webpush 라이브러리 |
 | `internal/server` | 라우팅, REST 핸들러, 이벤트 WS, attach WS 브리지 | `http.Handler` | 위 전부 |
 | `internal/admin` | 관리 소켓(Unix 도메인 소켓, Windows 10 이상 포함)과 그 클라이언트 | `Listen(path)`, `Serve(ctx, ln, h)`, `Client.Do(req)` | `internal/auth` |
@@ -305,13 +315,13 @@ herdr 제품군에는 두 계열이 있다.
 | `GET /api/devices` · `DELETE /api/devices/{id}` | 기기 목록 · 철회(그 기기의 WS를 바로 끊는다) |
 | `POST /api/pair-codes` | 새 페어링 코드 `{code, url, expires_ms}` |
 | `GET /api/overview` | 첫 화면용 `{host, core, folders, terminals, presets, hosts}` |
-| `GET/POST /api/folders` · `PATCH/DELETE /api/folders/{id}` | 폴더 목록·등록 `{path, name?}` · 이름 변경·등록 해제(파일은 건드리지 않는다) |
-| `GET /api/fs?path=&hidden=0` | 폴더 고르기용 하위 디렉터리 목록 `{path, parent, entries: [{name, path, git}]}` |
-| `GET /api/folders/{id}/git` | `{repo, branch, upstream, ahead, behind, changes, worktrees: [{path, branch, head, main, bare, detached, locked, prunable}]}` |
-| `GET /api/folders/{id}/branches` | 로컬·원격 브랜치 |
-| `POST /api/folders/{id}/worktrees` | `{branch, create, base?}` → `git worktree add` |
-| `DELETE /api/folders/{id}/worktrees?path=&force=0` | 그 경로에서 살아 있는 세션이 있으면 409 |
-| `GET /api/git/status?path=` | 워크트리의 변경 파일(스테이지·작업 트리·추적 안 됨·충돌) |
+| `GET/POST /api/folders` · `PATCH/DELETE /api/folders/{id}` | 폴더 목록 · 등록 `{path, name?}`(실제 경로로 저장하고 같은 폴더는 409. 결정 69) · 이름 변경 `{name}`(비우면 디렉터리 이름) · 등록 해제(파일·워크트리·세션은 그대로다). 폴더 레코드는 `{id, name, path, created_ms, repo, worktrees}` |
+| `GET /api/fs?path=&hidden=0` | 폴더 고르기용 하위 디렉터리 목록 `{path, parent, entries: [{name, path, git}], truncated}`. `path`가 비면 홈 폴더이고, 루트의 `parent`는 `""`다(결정 74) |
+| `GET /api/folders/{id}/git` | `{repo, head, branch, detached, upstream, ahead, behind, changes, worktrees: [{path, head, branch, main, bare, detached, locked, prunable}]}`. `changes`는 변경 파일 수다. 저장소가 아니면 `repo: false`(결정 77) |
+| `GET /api/folders/{id}/branches` | `{local, remote}`. 둘 다 `[{name, head, upstream?, current, remote}]`이고, `current`는 폴더 경로에 체크아웃된 브랜치다 |
+| `POST /api/folders/{id}/worktrees` | `{branch, create, base?}` → `git worktree add`(위치는 결정 15), 201과 새 워크트리 레코드. `create`면 `base`(없으면 HEAD)에서 새 브랜치를 만들고, 아니면 있는 브랜치를 쓴다. 원격 하나에만 있는 브랜치는 git이 그것을 따르는 로컬 브랜치로 만든다. 원격 여럿에 있으면 `{branch: "x", create: true, base: "origin/x"}`처럼 준다 |
+| `DELETE /api/folders/{id}/worktrees?path=&force=0` | 결정 73의 확인을 거쳐 `git worktree remove`, 204. 그곳에서 살아 있는 세션이 있으면 409 `live` |
+| `GET /api/git/status?path=` | 워크트리 상태 `{head, branch, detached, upstream, ahead, behind, changes: [{path, orig?, index, worktree, kind}]}`. `kind`는 `changed`·`renamed`·`unmerged`·`untracked`다. `path`는 결정 75 |
 | `GET /api/git/diff?path=&file=&staged=0` | `file`(파일이나 디렉터리, 비우면 추적 파일 전체)의 unified diff `{diff, truncated}`. 읽기 전용이고, 1 MiB에서 줄 단위로 자른다. 스테이지 안 한 diff에는 추적 안 된 파일이 새 파일로 붙는다(결정 62) |
 | `GET /api/terminals?all=0` | 터미널 목록(각각 `folder_id`, `worktree`, `display_title` 포함). 기본값은 살아 있는 것과 24시간 안에 끝난 것 |
 | `POST /api/terminals` | 세션 만들기(§6.3) |
@@ -377,7 +387,7 @@ Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limit
 - **CSRF·교차 출처:** 쿠키는 SameSite=Strict다. 상태를 바꾸는 요청과 모든 WS 업그레이드는 `Origin`의 호스트가 `Host` 헤더(프록시가 붙였다면 `X-Forwarded-Host`)와 같아야 한다. 다르면 403이다. `X-Forwarded-Host`도 받는 것은 `tailscale serve`가 `Host`를 그대로 넘기는지 확인하지 못했기 때문이다(§15).
 - **페어링 남용:** 코드는 한 번만 쓰고 5분 뒤 만료된다. 실패는 10분 동안 10번까지 받는다. 넘으면 그 창이 끝날 때까지 모든 페어링을 거절한다.
 - **코어 보호:** 브라우저는 JSON-RPC를 직접 보낼 수 없다. Mori는 표(§7.1)에 있는 동작만 중계한다. `hc connect` 자식 환경에서 `HC_TERMINAL_ID`를 뺀다.
-- **입력 검증:** git의 `path`는 그 폴더의 워크트리 목록에 있는 경로여야 한다. `file`은 상대 경로여야 하고, `..`나 절대 경로는 안 된다. 경로 앞에는 항상 `--`를 둔다. 업로드 크기와 diff 크기에 상한이 있다.
+- **입력 검증:** git의 `path`는 등록된 폴더의 워크트리 최상위여야 한다(결정 75). `file`은 상대 경로여야 하고, `..`나 절대 경로, 드라이브 문자는 안 된다. 경로 앞에는 항상 `--`를 둔다. 업로드 크기와 diff 크기에 상한이 있다.
 - **비밀 저장:** `state.json`은 0600이다(Windows는 사용자 프로필의 기본 ACL을 따른다). VAPID 개인 키와 토큰 해시가 들어 있다.
 - **응답 헤더:** 모든 응답에 `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`와 이 CSP를 붙인다.
   - `default-src 'self'`, `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'none'`

@@ -9,7 +9,8 @@ import (
 
 	"github.com/kwonikhyeon/mori/internal/auth"
 	"github.com/kwonikhyeon/mori/internal/core"
-	"github.com/kwonikhyeon/mori/internal/hc"
+	"github.com/kwonikhyeon/mori/internal/folders"
+	"github.com/kwonikhyeon/mori/internal/gitx"
 	"github.com/kwonikhyeon/mori/internal/presence"
 	"github.com/kwonikhyeon/mori/internal/store"
 )
@@ -26,9 +27,12 @@ type Deps struct {
 	UI        http.Handler
 	Logger    *slog.Logger
 
-	// Resolve tells which folder and worktree a terminal belongs to. The
-	// default trusts the folder label alone.
-	Resolve func(hc.Terminal) (folderID, worktree string)
+	// Folders tells which folder and worktree a terminal belongs to and
+	// keeps the worktrees of each folder. New makes one over Store and Git
+	// when it is nil; serve runs its refresh loop.
+	Folders *folders.Resolver
+	// Git runs the host's git for the folder and git APIs.
+	Git gitx.Runner
 
 	// Presence learns from attached browsers which terminals a viewer has
 	// in focus, for the notifier to read. New makes one when it is nil.
@@ -58,14 +62,15 @@ func New(d Deps) *Server {
 	if d.UI == nil {
 		d.UI = http.NotFoundHandler()
 	}
-	if d.Resolve == nil {
-		d.Resolve = func(t hc.Terminal) (string, string) { return t.Labels[core.LabelFolder], "" }
+	if d.Folders == nil {
+		d.Folders = folders.New(d.Store, d.Git)
 	}
 	if d.Presence == nil {
 		d.Presence = presence.New()
 	}
 	s := &Server{d: d, log: d.Logger, mux: http.NewServeMux(), hub: newHub()}
 	d.Auth.OnRevoke(s.hub.closeDevice)
+	d.Folders.OnChange(s.FoldersChanged)
 	s.routes()
 	return s
 }
@@ -84,6 +89,17 @@ func (s *Server) routes() {
 	api.HandleFunc("DELETE /api/devices/{id}", s.handleRevokeDevice)
 	api.HandleFunc("POST /api/pair-codes", s.handlePairCode)
 	api.HandleFunc("GET /api/overview", s.handleOverview)
+	api.HandleFunc("GET /api/folders", s.handleListFolders)
+	api.HandleFunc("POST /api/folders", s.handleAddFolder)
+	api.HandleFunc("PATCH /api/folders/{id}", s.handlePatchFolder)
+	api.HandleFunc("DELETE /api/folders/{id}", s.handleRemoveFolder)
+	api.HandleFunc("GET /api/fs", s.handleFs)
+	api.HandleFunc("GET /api/folders/{id}/git", s.handleFolderGit)
+	api.HandleFunc("GET /api/folders/{id}/branches", s.handleBranches)
+	api.HandleFunc("POST /api/folders/{id}/worktrees", s.handleAddWorktree)
+	api.HandleFunc("DELETE /api/folders/{id}/worktrees", s.handleRemoveWorktree)
+	api.HandleFunc("GET /api/git/status", s.handleGitStatus)
+	api.HandleFunc("GET /api/git/diff", s.handleGitDiff)
 	api.HandleFunc("GET /api/terminals", s.handleListTerminals)
 	api.HandleFunc("POST /api/terminals", s.handleCreateTerminal)
 	api.HandleFunc("GET /api/terminals/{t}", s.handleGetTerminal)

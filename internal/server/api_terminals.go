@@ -142,7 +142,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"host":      map[string]string{"name": s.d.HostName, "version": s.d.Version},
 		"core":      s.d.Core.Status(),
-		"folders":   st.Folders,
+		"folders":   s.folderViews(st.Folders),
 		"terminals": s.terminalViews(false, time.Now()),
 		"presets":   st.Presets,
 		"hosts":     st.Hosts,

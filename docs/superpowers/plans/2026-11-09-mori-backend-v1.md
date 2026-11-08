@@ -1808,98 +1808,97 @@ func TestSafeRelPath(t *testing.T) {
 ### Task 12: 폴더 소속과 폴더·Git API (단계 6)
 
 **Files:**
-- Create: `internal/folders/folders.go`, `internal/server/api_folders.go`, `internal/server/api_git.go`
-- Modify: `internal/server/server.go`(Deps에 `Folders *folders.Resolver`, `Git gitx.Runner`; `Resolve`를 해석기로), `cmd/mori/serve.go`(해석기 30초 갱신 고루틴, `onChange: srv.FoldersChanged`)
-- Test: `internal/folders/folders_test.go`, `internal/server/folders_test.go`
+- Create: `internal/folders/folders.go`, `internal/gittest/gittest.go`(테스트용 저장소: `Repo(t)`는 첫 커밋이 있는 임시 저장소, `Isolate(t)`는 `GIT_CONFIG_GLOBAL`을 빈 파일로·`GIT_CONFIG_NOSYSTEM=1`, `Git(t, dir, args...)`), `internal/server/api_folders.go`, `internal/server/api_git.go`, `internal/server/hidden_windows.go`·`hidden_other.go`(Windows 숨김 속성 `hiddenAttr`)
+- Modify: `internal/store/store.go`(`Folders()`), `internal/server/server.go`(Deps의 `Resolve`를 `Folders *folders.Resolver`·`Git gitx.Runner`로 바꾼다. `Folders`가 nil이면 `folders.New(Store, Git)`, `Folders.OnChange(s.FoldersChanged)`, 라우트), `internal/server/view.go`(`FolderView`), `internal/server/ws_events.go`·`api_terminals.go`(폴더를 `FolderView`로 보냄), `cmd/mori/serve.go`(`worktreeRefresh = 30 * time.Second`, `go fr.Run(ctx, worktreeRefresh, logger)`)
+- Test: `internal/folders/folders_test.go`, `internal/server/folders_test.go`, `internal/store/store_test.go`(`TestFoldersIsACopy`), `internal/server/ws_test.go`(`TestEventFeed`)
 
 **Interfaces:**
-- Consumes: `store.Folder`, `gitx.Runner`, `gitx.Worktree`, `core.LabelFolder`.
+- Consumes: `store.Folder`, `gitx.Runner`·`gitx.Worktree`·`gitx.IsRepo`·`gitx.WorktreePath`·`gitx.SafeRelPath`, `core.LabelFolder`, `core.Manager.Call`, `core.ErrUnavailable`, `core.DisplayTitle`, `Server.FoldersChanged`.
 - Produces:
 ```go
-func New(st *store.Store, git gitx.Runner) *Resolver
-func (r *Resolver) Resolve(t hc.Terminal) (folderID, worktree string)
-func (r *Resolver) Refresh(ctx context.Context, folderID string) ([]gitx.Worktree, error)  // 바뀌면 onChange
-func (r *Resolver) RefreshAll(ctx context.Context)
-func (r *Resolver) Run(ctx context.Context, every time.Duration, onChange func())
-func (r *Resolver) Worktrees(folderID string) []gitx.Worktree
-func (r *Resolver) Owner(path string) (folderID string, wt gitx.Worktree, ok bool)          // path가 어느 폴더의 워크트리인가
-func Canonical(path string) (string, error)                                                 // Abs → Clean → EvalSymlinks
-```
-소속 순서(§5): 라벨 `mori.folder`가 등록된 폴더면 그 폴더, 워크트리는 그 폴더 워크트리 중 cwd를 품는 가장 깊은 것. 라벨이 없거나 모르는 폴더면 등록 폴더 경로와 모든 워크트리 경로 중 cwd를 품는 가장 깊은 것. 아무 데도 없으면 `("", "")`(UI의 "기타"). cwd가 바로 맞지 않으면 `EvalSymlinks(cwd)`로 한 번 더 본다(결과는 작은 맵에 캐시, Review Focus 5). Windows는 대소문자를 무시하고 비교한다.
+// internal/store
+func (s *Store) Folders() []Folder // 사본, Get보다 싸다
 
-REST(§7.1): 폴더 목록 `[{id, name, path, created_ms, repo}]`; 등록 `{path, name?}` → `Canonical`, 디렉터리여야 함, 같은 경로가 있으면 409 `conflict`, id `f_xxxxxxxx`, 등록 뒤 `Refresh` + `FoldersChanged`; PATCH `{name}`; DELETE(파일은 건드리지 않음). `GET /api/fs?path=&hidden=0`(기본 경로는 홈, 절대 경로만, 디렉터리만, 이름순(대소문자 무시), 숨김 제외, 2000개까지 + `truncated`) → `{path, parent, entries:[{name, path, git}]}`. `GET /api/folders/{id}/git` → 저장소가 아니면 `{repo:false}`, 맞으면 `{repo:true, branch, upstream, ahead, behind, changes(개수), worktrees}`. `/branches`. `POST /worktrees {branch, create, base?}` → 주 워크트리 경로로 `WorktreePath` → `AddWorktree` → `Refresh` → `FoldersChanged` → 201 `{path}`. `DELETE /worktrees?path=&force=0` → 그 폴더의 워크트리이고 주 워크트리가 아니어야 함(아니면 400), 그 워크트리로 해석되는 live 터미널이 있으면 409 `live` "이 워크트리에서 실행 중인 세션이 있습니다" → `RemoveWorktree`. `GET /api/git/status?path=`와 `/api/git/diff?path=&file=&staged=0`은 `Owner(path)`로 검증(모르면 한 번 `RefreshAll` 후 다시), `SafeRelPath(file)`, diff 한도 1 MiB → `{diff, truncated}`.
+// internal/folders
+func New(st *store.Store, git gitx.Runner) *Resolver
+func (r *Resolver) OnChange(f func())                                               // 워크트리 목록이 바뀌면 부름(잠금 없이)
+func (r *Resolver) Resolve(t hc.Terminal) (folderID, worktree string)
+func (r *Resolver) Refresh(ctx context.Context, id string) ([]gitx.Worktree, error) // 저장소 아니면 빈 목록, 실패하면 이전 목록과 오류
+func (r *Resolver) RefreshAll(ctx context.Context) map[string]error                 // 폴더 ID → git 오류
+func (r *Resolver) Run(ctx context.Context, every time.Duration, log *slog.Logger)   // RefreshAll을 바로, 다음 every마다
+func (r *Resolver) Worktrees(id string) []gitx.Worktree                             // 사본, 주 워크트리가 먼저, 없으면 []
+func (r *Resolver) Owner(path string) (folderID string, wt gitx.Worktree, ok bool)  // path가 어느 등록 폴더의 워크트리 최상위인가
+func Match(ws []gitx.Worktree, path string) (gitx.Worktree, bool)                   // 받은 그대로나 실제 경로로 같은 것
+func Inside(t hc.Terminal, dir string) bool                                         // 시작 cwd나 포그라운드 cwd가 dir 안(다른 머신은 false)
+func Canonical(path string) (string, error)                                         // Abs → EvalSymlinks
+func Within(path, dir string) bool                                                  // 경로 성분 단위로 dir이거나 그 안
+func SamePath(a, b string) bool                                                     // Windows만 대소문자 무시
+
+// internal/server
+type FolderView struct { store.Folder; Repo bool `json:"repo"`; Worktrees []gitx.Worktree `json:"worktrees"` } // 결정 69
+```
+
+소속(§5, 결정 13·70·71): 주소에 `/`가 있으면 `("", "")`. 라벨 `mori.folder`가 등록된 폴더면 그 폴더이고, 워크트리는 그 폴더 워크트리 중 cwd를 품는 가장 깊은 것이다. 아니면 시작 cwd를 실제 경로로 먼저, 받은 그대로 다음으로 모든 등록 폴더와 그 워크트리에 비교해 가장 깊은 것이 이긴다. 같은 깊이면 폴더 자신이 워크트리보다, 먼저 등록한 폴더가 나중 것보다 앞선다. 실제 경로는 잠금 밖에서 풀고 1024개까지 기억한다(차면 비움). 갱신(결정 72): git을 부르기 전에 번호표를 받고, 폴더마다 저장된 것보다 늦은 번호만 저장하며, 바뀌면 `onChange`. `RefreshAll`은 끝에 등록 해제된 폴더의 목록을 지우는데, 등록 목록은 `r.mu`를 잡은 채 다시 읽는다. `Run`의 오류 로그는 결정 76.
+
+REST(§7.1): 폴더 레코드는 `FolderView`. 등록 `{path, name?}` → 절대 경로·존재·디렉터리 확인 → `Canonical` → 같은 실제 경로면 409 `conflict`(결정 69) → id `f_xxxxxxxx`, 이름 기본값은 받은 경로의 마지막 이름, 공백은 한 칸으로, 100자(`maxTitle`)까지 → `Refresh` → 201. PATCH `{name}`(비우면 디렉터리 이름), DELETE 204(파일은 그대로). `GET /api/fs` → 결정 74. `GET /api/folders/{id}/git` → 결정 77, 저장소면 `{repo:true, head, branch, detached, upstream, ahead, behind, changes(개수), worktrees}`. `/branches` → `gitx.Branches`. `POST /worktrees {branch, create, base?}` → 빈 branch 400 → 주 워크트리(`Refresh` 첫 항목)로 `WorktreePath` → `AddWorktree` → `Refresh` → 201과 새 `gitx.Worktree`. `DELETE /worktrees?path=&force=0` → 결정 73(`worktreeInUse`가 등록 폴더와 코어 `terminal.list`를 봄) → `RemoveWorktree` → `Refresh` → 204. `GET /api/git/status?path=`와 `/api/git/diff?path=&file=&staged=0` → `worktreeParam`이 `Owner(path)`로 확인(모르면 `RefreshAll` 한 번 뒤 다시, 결정 75), `SafeRelPath(file)`, diff 한도 1 MiB → `{diff, truncated}`. 불리언 쿼리(`hidden`, `force`, `staged`)는 `strconv.ParseBool`로 읽고, 못 읽으면 400.
 
 - [ ] **Step 1: 실패하는 테스트**
 
-`folders_test.go`:
-```go
-func TestResolveOrder(t *testing.T) {
-	st, _ := store.Open(filepath.Join(t.TempDir(), "state.json"))
-	st.Update(func(s *store.State) error {
-		s.Folders = []store.Folder{{ID: "f_a", Path: "/w/app"}, {ID: "f_b", Path: "/w/app/sub"}, {ID: "f_c", Path: "/w/other"}}
-		return nil
-	})
-	r := New(st, gitx.Runner{})
-	r.setWorktrees("f_a", []gitx.Worktree{{Path: "/w/app", Main: true}, {Path: "/w/app.wt/feat"}}) // 테스트용 비공개 설정
-	cases := []struct{ cwd string; labels map[string]string; id, wt string }{
-		{"/w/app/src", nil, "f_a", "/w/app"},
-		{"/w/app/sub/x", nil, "f_b", ""},                                // 더 깊은 등록 폴더
-		{"/w/app.wt/feat/pkg", nil, "f_a", "/w/app.wt/feat"},           // 워크트리
-		{"/w/other", map[string]string{"mori.folder": "f_a"}, "f_a", ""}, // 라벨이 먼저
-		{"/w/other", map[string]string{"mori.folder": "f_gone"}, "f_c", ""},
-		{"/elsewhere", nil, "", ""},
-		{"/w/application", nil, "", ""},                                // 접두사만 같은 형제는 아님
-	}
-	for _, c := range cases {
-		id, wt := r.Resolve(hc.Terminal{Cwd: c.cwd, Labels: c.labels})
-		if id != c.id || wt != c.wt { t.Errorf("%s → (%s,%s) want (%s,%s)", c.cwd, id, wt, c.id, c.wt) }
-	}
-}
+`internal/folders/folders_test.go`(워크트리 목록은 테스트 파일의 비공개 도우미 `setWorktrees`로 넣고, `TestRefreshFromGit`만 `gittest.Repo`로 실제 git을 쓴다):
+- `TestWithin` — `/w/app` 안의 `/w/app/src`는 참, 접두사만 같은 `/w/application`은 거짓, 루트 `/`는 모두 품음, Windows는 대소문자 무시.
+- `TestResolveOrder` — 더 깊은 등록 폴더가 이김, 워크트리 안이면 그 워크트리, 라벨이 먼저, 모르는 라벨은 경로로, 어디에도 없으면 기타, 다른 머신(`rohan/t7`)은 기타.
+- `TestResolveTies` — 같은 경로의 폴더 자신 > 다른 폴더의 워크트리, 먼저 등록한 폴더가 이김.
+- `TestResolveThroughSymlink` — 링크를 거쳐 시작한 cwd도 실제 경로의 폴더로(Review Focus 5).
+- `TestOwner` — 워크트리 최상위만, 링크 경로도 됨, 하위 폴더·모르는 경로는 아님.
+- `TestInside` — 시작 cwd와 포그라운드 cwd 둘 다 보고, 다른 머신은 거짓.
+- `TestRefreshFromGit` — 저장소 폴더는 주 워크트리가 먼저, 저장소 아닌 폴더는 빈 목록, 바뀔 때만 `onChange`, git이 실패하면 이전 목록 유지, 등록 해제한 폴더는 `RefreshAll` 뒤 목록이 사라짐.
+- `TestLaterRefreshWins` — 먼저 받은 번호표의 결과는 늦게 저장해도 버려짐.
+- `TestLogErrorsOnChangeOnly` — 같은 오류는 한 번만 Warn, 바뀌면 다시, 풀리면 Info 한 번.
 
-func TestResolveThroughSymlink(t *testing.T) { // Review Focus 5
-	real := t.TempDir()
-	link := filepath.Join(t.TempDir(), "link")
-	if err := os.Symlink(real, link); err != nil { t.Skip(err) }
-	canon, _ := Canonical(real)
-	st, _ := store.Open(filepath.Join(t.TempDir(), "state.json"))
-	st.Update(func(s *store.State) error { s.Folders = []store.Folder{{ID: "f_a", Path: canon}}; return nil })
-	if id, _ := New(st, gitx.Runner{}).Resolve(hc.Terminal{Cwd: link}); id != "f_a" { t.Fatal(id) }
-}
-```
+`internal/server/folders_test.go`:
+- `TestFolderCRUD` — 끝의 구분자를 떼고 실제 경로로 저장, 400(빈 요청·상대 경로·없는 경로·파일·너무 긴 이름), 같은 폴더 409, 링크로 같은 폴더 409, 이름 공백 정리, PATCH·DELETE와 404.
+- `TestFsListsDirectoriesOnly` — `a, B, .hidden, r/.git, f.txt, l→a, lf→f.txt`에서 `[a, B, l, r(git)]`, `hidden=1`이면 `.hidden`, 404·400, path 없으면 홈, 루트의 parent `""`.
+- `TestGitOnPlainFolder` — 결정 77의 200·409·404와 입력 400.
+- `TestRemoveWorktreeChecks` — 주 워크트리·모르는 경로 400, 코어가 없으면 503 `core_unavailable`, 안에 등록 폴더가 있으면 409 `conflict`.
+- `TestWorktreeLifecycleRefusesLiveSession` — 아래.
+- `TestGitStatusAndDiff` — 상태 종류, 전체 diff는 추적 파일만, `file=new.txt`는 새 파일 diff, `staged=1`, 벗어나는 `file`과 등록 안 된 `path`는 400, 링크 경로 허용, Mori 밖에서 만든 워크트리도 열림.
+- `TestFolderViewsCarryWorktrees` — overview와 WS snapshot의 폴더에 `repo`·`worktrees`, 워크트리가 바뀌면 `folders` 메시지.
 
-`internal/server/folders_test.go`(단계 6 완료 기준):
 ```go
 func TestWorktreeLifecycleRefusesLiveSession(t *testing.T) {
-	core := hctest.Start(t)
-	e := newTestEnv(t, withCore(t, core), withFolders())
+	if runtime.GOOS == "windows" {
+		t.Skip("uses /bin/sh")
+	}
+	repo := gittest.Repo(t)
+	e := newTestEnv(t, withCore(t, hctest.Start(t)))
 	e.pair()
-	repo := gitRepo(t) // 임시 저장소 + 첫 커밋
-	var f struct{ ID string }
+	e.addPreset(store.Preset{ID: "sh", Name: "sh", Argv: []string{"/bin/sh"}})
+	var f FolderView
 	e.json("POST", "/api/folders", map[string]any{"path": repo}, 201, &f)
-	var wt struct{ Path string }
-	e.json("POST", "/api/folders/"+f.ID+"/worktrees", map[string]any{"branch": "feat/x", "create": true}, 201, &wt)
-	if !strings.HasSuffix(wt.Path, filepath.Join(filepath.Base(repo)+".wt", "feat-x")) { t.Fatal(wt.Path) }
+	base := "/api/folders/" + f.ID
+	var wt gitx.Worktree
+	e.json("POST", base+"/worktrees", map[string]any{"branch": "feat/x", "create": true}, 201, &wt)
+	if want := filepath.Join(filepath.Dir(repo), filepath.Base(repo)+".wt", "feat-x"); wt.Path != want {
+		t.Fatalf("%+v, want it at %s", wt, want)
+	}
 	var tv TerminalView
-	e.json("POST", "/api/terminals", map[string]any{"folder_id": f.ID, "worktree": wt.Path, "preset": "shell"}, 201, &tv)
-	e.eventually(func() bool { var v TerminalView; e.json("GET", "/api/terminals/"+tv.Address, nil, 200, &v); return v.Worktree == wt.Path })
-	e.expectError("DELETE", "/api/folders/"+f.ID+"/worktrees?path="+url.QueryEscape(wt.Path), nil, 409)
-	e.json("POST", "/api/terminals/"+tv.Address+"/kill", nil, 200, nil)
-	e.eventually(func() bool { var v TerminalView; e.json("GET", "/api/terminals/"+tv.Address, nil, 200, &v); return v.State == "finished" })
-	e.json("DELETE", "/api/folders/"+f.ID+"/worktrees?path="+url.QueryEscape(wt.Path), nil, 204, nil)
-}
-
-func TestGitDiffRejectsEscapingPaths(t *testing.T) {
-	// 등록 안 된 path → 400, file=../x → 400, 등록된 워크트리의 수정 파일 → 200 + "+" 줄
-}
-
-func TestFsListsDirectoriesOnly(t *testing.T) {
-	// tmp/{a, .hidden, f.txt, r/.git} → entries [a, r(git:true)], hidden=1이면 .hidden 포함
+	e.json("POST", "/api/terminals", map[string]any{"folder_id": f.ID, "preset": "sh", "worktree": wt.Path}, 201, &tv)
+	del := base + "/worktrees?path=" + url.QueryEscape(wt.Path)
+	if eb := e.expectError("DELETE", del, nil, 409); eb.Error.Kind != "live" { // 캐시가 아직 몰라도
+		t.Fatal(eb)
+	}
+	term := "/api/terminals/" + url.PathEscape(tv.Address)
+	e.json("POST", term+"/kill", nil, 200, nil)
+	e.eventually(func() bool { var got TerminalView; e.json("GET", term, nil, 200, &got); return got.State == "finished" })
+	e.json("DELETE", del, nil, 204, nil)
+	gone(t, wt.Path)
 }
 ```
+(실제 테스트는 브랜치 목록, 같은 브랜치 다시 만들기 422, 이름 검사 400, 있는 브랜치로 추가, 요약, 변경이 있는 워크트리의 422와 `force`, 빈 `.wt` 정리까지 본다.)
 
-- [ ] **Step 2: 실패 확인** — `go test ./internal/folders/ ./internal/server/` → FAIL.
-- [ ] **Step 3: 구현** — 위 규칙. `Refresh`는 저장소가 아니면 빈 목록을 캐시한다.
-- [ ] **Step 4: 통과 확인** — `go test -race ./internal/folders/ ./internal/server/` → PASS.
+- [ ] **Step 2: 실패 확인** — `go test ./internal/folders/ ./internal/server/ ./internal/store/` → FAIL.
+- [ ] **Step 3: 구현** — 위 규칙.
+- [ ] **Step 4: 통과 확인** — `go test -race ./...` → PASS, `go vet ./...`와 `GOOS=windows go vet ./...`.
 - [ ] **Step 5: 커밋 후 단계 6 푸시** — `git commit -m "feat: 폴더 소속, 폴더·Git·워크트리 API"` → `git push`.
 
 ---

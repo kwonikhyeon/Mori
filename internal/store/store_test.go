@@ -75,6 +75,27 @@ func TestUpdatePersistsAndGetIsCopy(t *testing.T) {
 	}
 }
 
+func TestFoldersIsACopy(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := s.Folders(); f == nil || len(f) != 0 {
+		t.Fatalf("a fresh state has no folders, as []: %#v", f)
+	}
+	if err := s.Update(func(st *State) error {
+		st.Folders = []Folder{{ID: "f_1", Name: "a", Path: "/a"}, {ID: "f_2", Name: "b", Path: "/b"}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got := s.Folders()
+	got[0].Name = "changed"
+	if cur := s.Folders(); len(cur) != 2 || cur[0].Name != "a" || cur[1].ID != "f_2" {
+		t.Fatalf("Folders must return a copy: %+v", cur)
+	}
+}
+
 func TestUpdateErrorChangesNothing(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "state.json")
 	s, _ := Open(p)

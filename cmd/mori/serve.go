@@ -19,6 +19,8 @@ import (
 	"github.com/kwonikhyeon/mori/internal/admin"
 	"github.com/kwonikhyeon/mori/internal/auth"
 	"github.com/kwonikhyeon/mori/internal/core"
+	"github.com/kwonikhyeon/mori/internal/folders"
+	"github.com/kwonikhyeon/mori/internal/gitx"
 	"github.com/kwonikhyeon/mori/internal/hc"
 	"github.com/kwonikhyeon/mori/internal/paths"
 	"github.com/kwonikhyeon/mori/internal/server"
@@ -29,6 +31,10 @@ import (
 )
 
 const defaultListen = "127.0.0.1:7761"
+
+// worktreeRefresh is how often the worktrees of every folder are listed
+// again, for those made or removed outside Mori (spec §5).
+const worktreeRefresh = 30 * time.Second
 
 func runServe(args []string) error {
 	fs := newFlagSet("serve", "[옵션]")
@@ -89,12 +95,16 @@ func runServe(args []string) error {
 	// hc connect may not start the core on Windows (spec §15), so there the
 	// manager runs hc server start once when the first connect fails.
 	cm := core.New(core.Options{HC: *hcPath, Session: *hcSession, StartServer: runtime.GOOS == "windows", Logger: logger})
+	git := gitx.Runner{}
+	fr := folders.New(st, git)
 	srv := server.New(server.Deps{
 		Version:   version.Version,
 		HostName:  hostName(tailscale.DNSName),
 		Auth:      au,
 		Store:     st,
 		Core:      cm,
+		Folders:   fr,
+		Git:       git,
 		PublicURL: pub,
 		UI:        webui.Handler(),
 		Logger:    logger,
@@ -118,6 +128,7 @@ func runServe(args []string) error {
 	defer stopCore()
 	coreDone := make(chan struct{})
 	go func() { cm.Run(coreCtx); close(coreDone) }()
+	go fr.Run(ctx, worktreeRefresh, logger)
 	go admin.Serve(ctx, adminLn, adminHandler{auth: au, publicURL: pub, shutdown: shutdown, status: func() any {
 		return map[string]any{
 			"version": version.Version, "pid": os.Getpid(), "listen": addr, "home": home,

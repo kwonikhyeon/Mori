@@ -91,6 +91,7 @@ func TestStreamResizeNotification(t *testing.T) {
 	f.send(Frame{5, KindData, []byte("a")}, Frame{5, KindResize, sizePayload(100, 30)},
 		Frame{5, KindResize, sizePayload(120, 40)}, Frame{5, KindData, []byte("b")},
 		Frame{5, KindClose, []byte(`{"reason":"lost"}`)})
+	<-s.Done() // all queued: sizes join only while both wait in the queue
 	if got := recvData(t, s); got != "a" {
 		t.Fatal(got)
 	}

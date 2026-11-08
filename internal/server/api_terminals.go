@@ -124,6 +124,19 @@ func queryBool(r *http.Request, name string) (bool, error) {
 	return b, nil
 }
 
+// queryInt reads a count from the query; absent is def.
+func queryInt(r *http.Request, name string, def int) (int, error) {
+	v := r.URL.Query().Get(name)
+	if v == "" {
+		return def, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 0, invalid("%s=%q: 0 이상의 정수여야 합니다", name, v)
+	}
+	return n, nil
+}
+
 func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	st := s.d.Store.Get()
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -149,15 +162,19 @@ func (s *Server) handleListTerminals(w http.ResponseWriter, r *http.Request) {
 // finished within recentFinished, or every one with all. While the core is
 // away the cache keeps what it last knew.
 func (s *Server) terminalViews(all bool, now time.Time) []TerminalView {
-	cutoff := now.Add(-recentFinished).UnixMilli()
 	out := []TerminalView{}
 	for _, t := range s.d.Core.Terminals() {
-		if !all && t.State == "finished" && t.FinishedMs != nil && *t.FinishedMs < cutoff {
+		if !all && !recent(t, now) {
 			continue
 		}
 		out = append(out, s.view(t))
 	}
 	return out
+}
+
+// recent reports whether t is live or finished within recentFinished.
+func recent(t hc.Terminal, now time.Time) bool {
+	return t.State != "finished" || t.FinishedMs == nil || *t.FinishedMs >= now.Add(-recentFinished).UnixMilli()
 }
 
 // terminal finds addr in the cache, else asks the core: the created event
@@ -334,12 +351,12 @@ func (s *Server) handleKill(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleText(w http.ResponseWriter, r *http.Request) {
 	params := map[string]any{"terminal": terminalParam(r)}
-	if v := r.URL.Query().Get("lines"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 0 {
-			writeError(w, invalid("lines=%q: 0 이상의 정수여야 합니다", v))
-			return
-		}
+	n, err := queryInt(r, "lines", -1)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if n >= 0 {
 		params["lines"] = n
 	}
 	s.relay(w, r, "terminal.read", params)

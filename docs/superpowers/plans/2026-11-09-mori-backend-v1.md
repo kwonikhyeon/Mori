@@ -1632,12 +1632,12 @@ func (r *Registry) Set(addr, viewer string, focused bool)
 func (r *Registry) Remove(addr, viewer string)
 func (r *Registry) Focused(addr string) bool
 // server
-func (s *Server) FoldersChanged()   // 모든 이벤트 WS에 folders + 전체 terminal 재전송 신호(채널 cap 1, 막히지 않음)
+func (s *Server) FoldersChanged()   // 모든 이벤트 WS에 folders와 소속이 바뀐 terminal을 보내라는 신호(채널 cap 1, 막히지 않음, 스펙 결정 52)
 func closeCodeFor(err error, keep bool) (websocket.StatusCode, *closedMsg)  // 순수 함수(테스트 대상)
 ```
-이벤트 WS(§7.2): 접속하면 `{type:"snapshot", core, folders, terminals}`. 그다음 Watcher 업데이트마다 `{type:"terminal", terminal: view}` / `{type:"removed", address}` / `{type:"core", connected, version, name}`. FoldersChanged 신호면 `{type:"folders", folders}`와 모든 터미널. 30초마다 `{type:"ping"}`. Watcher `Lost`면 1013(다시 시도)으로 닫는다.
+이벤트 WS(§7.2): 접속하면 `{type:"snapshot", core, folders, terminals}`. 그다음 Watcher 업데이트마다 `{type:"terminal", terminal: view}` / `{type:"removed", address}` / `{type:"core", connected, version, name}`. FoldersChanged 신호면 `{type:"folders", folders}`와 소속이 바뀐 터미널(스펙 결정 52). 30초마다 `{type:"ping"}`. Watcher `Lost`면 1013(다시 시도)으로 닫는다.
 
-attach WS(§7.3): 쿼리 `t`, `cols`, `rows`(기본 80×24, 1~1000), `history`(기본 1000, 최대 10000), `observe`, `resumed`. 수락 → 허브 등록 → `Attach`(observe면 `ResizeNotifications: true`). 실패하면 `not_found` → 4404, `unavailable` → 4409, `finished` → `closed` 메시지(캐시 레코드의 이유) + 1000, 연결 없음 → 4503. 성공하면 `{type:"attached", terminal: view, cols, rows}`.
+attach WS(§7.3): 쿼리 `t`, `cols`, `rows`(기본 80×24, 10~1000으로 맞춤), `history`(기본 1000, 최대 10000), `observe`, `resumed`. 수락 → 허브 등록 → `Attach`(observe면 `ResizeNotifications: true`). 실패하면 `not_found` → 4404, `unavailable` → 4409, `finished` → `closed` 메시지(`terminal.get` 레코드의 이유, 스펙 결정 58) + 1000, 연결 없음 → 4503. 성공하면 `{type:"attached", terminal: view, cols, rows}`.
 - 코어 → 브라우저: `Recv` → 이진 쓰기 → `Credit(len)`. `Size` → `{type:"size"}`. 같은 터미널의 `size` 이벤트(Watcher)도 `{type:"size"}`로.
 - 브라우저 → 코어: 이진 → `Write`. 텍스트 JSON: `resize` → `Resize`, `focus` → `Focus` + presence, `display` → `Facts`. 모르는 type은 무시.
 - 끝: `*hc.ClosedError` → keep 터미널이고 이유가 `exited`·`killed`가 아니면 4409(복구 대기), 아니면 `{type:"closed", reason, exit_code, signal}` + 1000. `hc.ErrClosed` → 4503. 브라우저가 끊으면 `stream.Close()`(detach). 언제나 presence에서 뺀다.

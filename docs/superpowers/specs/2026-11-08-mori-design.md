@@ -94,6 +94,13 @@ herdr 제품군에는 두 계열이 있다.
 - **`terminal.read`:** `lines`는 화면 위 기록의 줄 수다. 0이면 화면만 읽는다.
 - **터미널 인자:** `t7`, 터미널 이름, `machine/t7`을 모두 받는다.
 
+아래는 단계 5의 WebSocket 작업에서 격리 코어로 확인한 것이다(2026-11-09). §7.2와 §7.3이 이 동작에 기댄다.
+
+- **관찰자:** `observe: true`와 `resize_notifications: true`로 붙은 관찰자는 출력 사이에 RESIZE를 받는다. 활성 뷰어는 요청해도 `false`를 받으므로 `size` 이벤트로 크기를 따라간다. 관찰자가 보낸 DATA는 코어가 무시한다.
+- **attach 거절:** 끝난 터미널은 kind `finished`, 없는 터미널은 `not_found`, 셸을 되살리는 중인 keep 터미널은 `unavailable`이다.
+- **코어 재시작:** `hc server restart`를 하면 `hc connect`의 연결이 EOF로 끝난다. 붙어 있던 스트림은 CLOSE 없이 끊긴다.
+- **코어 중지:** `hc server stop`을 하면 붙어 있던 스트림이 CLOSE `server_stop`을 받는다. 코어가 다시 뜨면 약 2초 뒤 keep 터미널은 같은 주소에 로그인 셸로 돌아오고, keep이 아닌 터미널은 `finished`로 남는다.
+
 ### 2.4 현재 환경 (2026-11-09)
 
 - 호스트: `macmini`(macOS arm64, 개발 머신), `ikhyeon-desktop`·`ikhyeon-labtop`(Windows). 클라이언트에는 iPhone이 있다.
@@ -149,8 +156,20 @@ herdr 제품군에는 두 계열이 있다.
 | 44 | 터미널 읽기 | 목록과 overview는 캐시로 답한다. 코어가 없어도 200이다(마지막으로 안 목록, 처음엔 `[]`). 한 터미널은 캐시에 없으면 `terminal.get`을 부른다 | 캐시만 봄 · 코어가 없으면 503 | 코어가 잠깐 없어도 화면은 마지막 목록을 보여 줘야 한다. 방금 만든 터미널의 `created` 이벤트는 아직 안 왔을 수 있고, 코어는 이름으로도 찾는다 |
 | 45 | hc 결과 전달 | send·keys·interrupt·read·put의 결과는 hc가 준 그대로 돌려준다. 터미널 레코드를 주는 run·get·label·kill은 `folder_id` 등을 더한 레코드로 바꾼다 | 모두 Mori 형식으로 다시 씀 | 이 결과들에는 Mori가 더할 것이 없다. hc가 필드를 늘려도 Mori를 고치지 않는다 |
 | 46 | hc 찾기 | `--hc`를 주면 시작할 때 한 번 찾고, 없으면 연결할 때마다 찾는다(PATH, 다음 `~/.local/bin/hc`). `--hc-session`으로 코어 세션을 고른다. Windows에서는 첫 연결이 실패하면 `hc server start`를 한 번 부른다 | 시작할 때만 찾음 | hc 업데이트가 실행 파일을 옮겨도 Mori를 다시 띄우지 않고 이어 붙는다. Windows의 `hc connect`가 코어를 띄우는지는 아직 모른다(§15) |
-| 47 | 종료 순서 | 신호를 받으면 관리 소켓과 코어 관리자를 멈추고 HTTP 서버를 닫은 뒤 `hc connect`가 끝나기를 기다린다. 모두 합쳐 5초까지다. 코어와 세션은 그대로 산다 | 관리자를 기다리지 않고 끝냄 | 관리자가 `hc connect`의 stdin을 닫고 그 프로세스가 끝나는 것을 보게 한다. 기다리지 않으면 프로세스가 먼저 끝나 그 정리가 중간에 끊긴다 |
+| 47 | 종료 순서 | 신호를 받으면 관리 소켓을 멈추고, WS를 1001로 닫고(2초까지, 결정 59), HTTP 서버를 닫고, 코어 관리자를 멈춘 뒤 `hc connect`가 끝나기를 기다린다. 모두 합쳐 5초까지다. 코어와 세션은 그대로 산다 | 관리자를 기다리지 않고 끝냄 · 관리자를 먼저 멈춤 | 관리자가 `hc connect`의 stdin을 닫고 그 프로세스가 끝나는 것을 보게 한다. 기다리지 않으면 프로세스가 먼저 끝나 그 정리가 중간에 끊긴다. 관리자를 먼저 멈추면 붙어 있던 브라우저가 4503을 듣고 오지 않을 코어를 기다린다 |
 | 48 | 관리 소켓 경로 길이 | 열기 전에 경로 길이를 잰다. OS 한도(macOS·BSD 103바이트, 그 밖 107바이트)를 넘으면 `--home`이나 `MORI_HOME`을 짧게 하라는 오류로 끝낸다. `mori` 명령도 같은 확인을 한다 | OS 오류를 그대로 보여 줌 | OS는 `bind: invalid argument`라고만 하고, 명령 쪽은 "서버가 돌고 있지 않습니다"로 보여 원인을 알 수 없다 |
+| 49 | attach 닫는 코드 | 스트림이 CLOSE로 끝나면 §6.8대로 고른다(keep이고 `exited`·`killed`가 아니면 4409, 아니면 `closed` 뒤 1000). CLOSE 없이 코어 연결이 끊기면 4503, 그 밖의 오류는 로그를 남기고 1011이다. 거절은 kind로 고른다: `not_found`·`machine_unknown` 4404, `unavailable` 4409, `invalid_params` 4400, 코어 없음 4503, `finished`는 결정 58 | 모든 끝을 1000으로 닫고 이유만 보냄 | 브라우저가 할 일(다시 붙기, 복구 대기, 포기)이 코드 하나로 정해진다 |
+| 50 | attach 쿼리 오류 | 업그레이드를 받은 뒤 4400으로 닫고, 닫는 이유에 오류 메시지를 담는다 | 업그레이드 전에 HTTP 400 | 브라우저의 WebSocket API로는 업그레이드가 거절된 이유를 볼 수 없다. 닫는 코드와 이유는 볼 수 있다 |
+| 51 | attach의 컨텍스트 | 브라우저에서 읽기와 ping은 요청 컨텍스트를 쓴다. 출력과 크기 쓰기는 브라우저가 끝나면 함께 끝나는 컨텍스트를 쓴다 | 컨텍스트 하나 | coder/websocket은 진행 중인 읽기·쓰기의 컨텍스트가 끝나면 소켓을 닫는다. 스트림이 끝난 이유를 말할 때까지 소켓이 열려 있어야 한다 |
+| 52 | 폴더 변경 알림 | `FoldersChanged`가 오면 `folders`를 보내고, 소켓마다 보낸 적 있는 터미널 중 소속(`folder_id`·`worktree`)이 바뀐 것만 `terminal`로 다시 보낸다 | 터미널 전체를 다시 보냄(계획의 처음 안) | 폴더를 고칠 때마다 터미널 수만큼 메시지가 가지 않는다. 소켓이 보낸 레코드를 기억하므로 비교가 싸다 |
+| 53 | 구독 다음 attach | attach는 코어 관리자를 먼저 구독하고 `terminal.attach`를 부른다. 구독이 밀리면 다시 구독하고 캐시의 크기를 보낸다 | attach한 뒤 구독 | 그 사이에 온 `size` 이벤트를 놓치면 브라우저가 다른 뷰어가 바꾼 크기를 모른 채 그린다 |
+| 54 | 관찰자 입력 | 관찰자의 키·`resize`·`display`는 서버가 버리고 `focus`만 받는다 | 코어에 넘기고 코어가 무시하게 함 | 코어가 무시하는 것은 확인했지만(§2.3) 거기에 기대지 않는다. 보기 전용 화면이 터미널을 바꿀 길을 아예 없앤다. 포커스는 알림을 줄이는 데만 쓰므로 받는다 |
+| 55 | 포커스 기록 | 서버가 `presence.Registry`에 attach 소켓마다 뷰어 ID로 포커스를 적고, 소켓이 끝나면 지운다. 알림기는 `Deps.Presence`로 같은 것을 받는다(없으면 서버가 만든다) | 알림기가 소켓을 직접 앎 | 알림기는 누가 보고 있는지만 알면 된다. 서버와 알림기가 서로를 몰라도 된다 |
+| 56 | 닫는 이유 | WS 닫는 이유는 한국어로 쓰고(결정 31), 123바이트를 넘으면 UTF-8 문자 경계에서 자른다 | 그대로 넘김 | 닫기 프레임의 이유는 123바이트까지다. 넘으면 닫기 프레임을 보내지 못한다. hc의 메시지를 담으면 넘을 수 있다 |
+| 57 | keepalive | 두 WS 모두 30초마다 WebSocket ping을 보내고, 10초 안에 pong이 없으면 끊는다 | JSON `ping`만 보냄 | 네트워크에서 사라진 휴대폰은 아무 말 없이 사라진다. TCP가 알아채기까지 몇 분이 걸리고, 그동안 그 뷰어의 포커스가 남아 알림을 막는다 |
+| 58 | 끝난 터미널에 붙기 | 코어가 `finished`로 거절하면 `terminal.get`으로 레코드를 읽고(실패하면 캐시) `closed`를 보낸 뒤 1000으로 닫는다. 이유를 모르면 `finished`다 | 4404로 닫음 · 캐시만 봄 | 브라우저는 끝난 세션의 마지막 상태를 보여 줘야 한다. 캐시는 `finished` 이벤트보다 늦을 수 있다 |
+| 59 | WS 닫기 | `CloseSockets`는 모든 WS를 1001로 닫고 새 WS도 1001로 거절한 뒤, 핸들러가 다 끝나거나 시간이 다 될 때까지 기다린다 | `http.Server.Shutdown`에 맡김 | `Shutdown`은 하이재킹된 연결을 닫지도 기다리지도 않는다 |
+| 60 | 이벤트 WS 밀림 | 보낼 변화가 1024개 넘게 밀리면 1013으로 닫는다. 브라우저는 다시 붙어 새 스냅숏을 받는다 | 밀린 것을 버리고 계속 · 무한 버퍼 | 몇 개를 버리면 브라우저의 목록이 말없이 틀어진다. 다시 붙으면 스냅숏이 맞는 목록을 준다 |
 
 ## 4. 구조
 
@@ -253,7 +272,7 @@ herdr 제품군에는 두 계열이 있다.
 ### 6.8 프로그램 손실과 복구(`keep`)
 `lost` 이벤트가 오면 attach 스트림이 닫힌다. Mori는 CLOSE 이유로 닫는 방법을 고른다.
 
-- `keep` 터미널이고 이유가 `exited`·`killed`가 아니면(시그널이면 `signaled`, holder 손실 등, §2.3) attach WS를 코드 4409로 닫는다. UI는 "복구 대기"를 보여 주고, `restarted` 이벤트가 오면 다시 붙는다. 그 전의 attach는 `unavailable`로 거절된다.
+- `keep` 터미널이고 이유가 `exited`·`killed`가 아니면(시그널이면 `signaled`, holder 손실 등, §2.3) attach WS를 코드 4409로 닫는다. UI는 "복구 대기"를 보여 주고, `restarted`로 바뀐 레코드가 이벤트 WS의 `terminal`로 오면 다시 붙는다. 그 전의 attach는 `unavailable`로 거절된다.
 - 그 밖에는 `{type: "closed", reason, exit_code, signal}`을 보낸 뒤 1000으로 닫는다. 종료 코드가 있는 정상 종료와 명시적 kill은 `keep`이어도 최종이기 때문이다.
 
 ## 7. API
@@ -297,18 +316,30 @@ herdr 제품군에는 두 계열이 있다.
 
 ### 7.2 이벤트 WS `/ws/events` (서버 → 브라우저, JSON)
 
-- 접속 직후: `{type: "snapshot", core, folders, terminals}`
-- `{type: "terminal", terminal}` — 만들어졌거나 바뀐 터미널 레코드 전체(소속 정보 포함)
-- `{type: "removed", address}`
-- `{type: "folders", folders}` · `{type: "core", connected, version, name}`
-- 30초마다 `{type: "ping"}`
+- 접속 직후: `{type: "snapshot", core, folders, terminals}`. `core`는 `{connected, version, name, error}`다. `terminals`는 `GET /api/terminals`처럼 살아 있는 것과 24시간 안에 끝난 것이고, 코어가 없으면 마지막으로 안 목록이다(결정 44).
+- `{type: "terminal", terminal}` — 만들어졌거나 바뀐 터미널 레코드 전체(소속 정보 포함). 이 소켓에 보낸 적 없는 터미널은 24시간 안에 끝난 것까지만 보낸다. 보낸 적 있는 터미널은 오래전에 끝났어도 바뀌면 보낸다.
+- `{type: "removed", address}` — 보낸 적 있는 터미널이 지워졌을 때
+- `{type: "folders", folders}` — 폴더가 바뀌었을 때. 뒤이어 소속이 바뀐 터미널만 `terminal`로 온다(결정 52).
+- `{type: "core", connected, version, name, error}` — 코어 연결이 바뀌었을 때. 다시 연결되면 이 메시지가 먼저 오고, 그 사이의 변화가 `terminal`·`removed`로 뒤따른다.
+- 30초마다 `{type: "ping"}`. 서버는 WebSocket ping도 보낸다(결정 57).
+- 브라우저는 아무것도 보내지 않는다. 데이터 메시지를 보내면 서버가 1008로 닫는다.
+- 닫는 코드: 1001 서버 종료, 1013 보낼 변화가 밀림(다시 붙는다, 결정 60), 4401 인증 없음·철회
 
 ### 7.3 attach WS `/ws/attach`
 
-- 쿼리: `t`, `cols`, `rows`, `history`(기본값 1000, 최대 10000), `observe`, `resumed`
-- 서버 → 브라우저: 처음에 `{type: "attached", terminal, cols, rows}`, 이후 이진 출력, `{type: "size", cols, rows}`, 끝에 `{type: "closed", reason, exit_code, signal}`
-- 브라우저 → 서버: 이진 입력, `{type: "resize", cols, rows}`, `{type: "focus", focused}`, `{type: "display", fg, bg, cursor, cell}`
-- 닫는 코드: 1000 정상 종료(이유는 `closed` 메시지), 4401 인증 없음·철회, 4404 터미널 없음, 4409 사용 불가(복구 대기 등), 4503 코어 연결 끊김(`resumed=1`로 다시 붙기)
+- 쿼리: `t`(주소나 이름, 필수), `cols`, `rows`(10~1000으로 맞추고, 없으면 80×24), `history`(기본값 1000, 10000을 넘으면 10000), `observe`, `resumed`(`1`·`0`)
+- 서버 → 브라우저: 처음에 `{type: "attached", terminal, cols, rows}`, 이후 이진 출력, `{type: "size", cols, rows}`, 끝에 `{type: "closed", reason, exit_code, signal}`. `attached`의 크기는 코어가 알려 준 PTY 크기다.
+- `size`는 두 곳에서 온다. 관찰자는 출력 사이의 RESIZE로, 다른 뷰어는 코어 관리자가 받은 `size` 이벤트로 안다(§2.3, 결정 53). 브라우저가 이미 아는 크기는 다시 보내지 않는다.
+- 브라우저 → 서버: 이진 입력, `{type: "resize", cols, rows}`, `{type: "focus", focused}`, `{type: "display", fg, bg, cursor, cell}`. 메시지 하나는 1 MiB까지다. 읽을 수 없는 JSON과 모르는 `type`은 버린다.
+- 관찰자(`observe=1`)의 입력·`resize`·`display`는 서버가 버린다. `focus`는 알림 판정(§6.5)에 쓰려고 받는다(결정 54).
+- 서버는 WebSocket ping을 보내고, 답이 없으면 끊는다. 그러면 그 뷰어의 포커스도 풀린다(결정 57).
+- 닫는 코드(결정 49):
+  - 1000 정상 종료. 이유는 앞선 `closed` 메시지에 있다. 이미 끝난 터미널에 붙어도 `closed`를 보내고 1000으로 닫는다(결정 58).
+  - 1001 서버 종료, 1011 서버 내부 오류
+  - 4400 쿼리가 틀림(결정 50), 4401 인증 없음·철회, 4404 터미널 없음
+  - 4409 사용 불가(복구 대기 등, §6.8). 코어가 멈추며 keep 터미널의 스트림을 `server_stop`으로 닫을 때도 4409다.
+  - 4503 코어 연결 끊김(`resumed=1`로 다시 붙기)
+- 닫는 이유는 한국어이고 123바이트에서 자른다(결정 56).
 
 ### 7.4 오류 형식
 `{error: {kind, message, hint?}}`. hc의 `kind`는 그대로 전달하고 HTTP 상태는 이렇게 정한다.
@@ -347,6 +378,9 @@ Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limit
 | `hc` 실행 파일 없음 | 시작은 하되 연결하지 않는다. `mori doctor`가 원인을 알려 준다 | "herdr-core가 설치되지 않음" |
 | 이벤트가 밀림(`missed`) | 새 스냅숏으로 캐시를 바꾸고, 바뀐 것만 방송한다 | 없음 |
 | attach 중 프로그램 손실 | WS를 4409로 닫는다 | "복구 대기", `restarted` 뒤 자동으로 다시 붙음 |
+| 이벤트 WS가 밀림 | 1024개 넘게 밀리면 1013으로 닫는다 | 잠깐 끊긴 뒤 새 스냅숏으로 다시 그려짐 |
+| Mori 종료·업데이트 | WS를 1001로 닫는다. 세션은 코어에 산다 | "서버 재시작 중", 다시 붙으면 그대로 |
+| 응답 없는 브라우저(잠긴 휴대폰 등) | ping에 답이 없으면 끊고 포커스를 푼다 | 없음. 다시 열면 다시 붙는다 |
 | 브라우저 네트워크 끊김 | 채널을 CLOSE한다 | 재접속하면 `resumed=1`로 크기를 뺏지 않는다 |
 | 느린 브라우저 | 크레딧을 늦게 보낸다. 4 MiB 넘게 밀리면 코어가 새 화면을 보낸다 | 잠깐 멈춘 뒤 화면이 새로 그려짐 |
 | git 명령 실패 | 422 `git_failed` + stderr 앞부분 | 오류 메시지 |

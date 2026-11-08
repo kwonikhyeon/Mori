@@ -112,8 +112,12 @@ func runServe(args []string) error {
 	defer shutdown()
 	served := make(chan error, 1)
 	go func() { served <- hs.Serve(ln) }()
+	// The manager has a context of its own: it stops after the sockets have
+	// closed, or attached browsers would hear that the core is lost.
+	coreCtx, stopCore := context.WithCancel(context.Background())
+	defer stopCore()
 	coreDone := make(chan struct{})
-	go func() { cm.Run(ctx); close(coreDone) }()
+	go func() { cm.Run(coreCtx); close(coreDone) }()
 	go admin.Serve(ctx, adminLn, adminHandler{auth: au, publicURL: pub, shutdown: shutdown, status: func() any {
 		return map[string]any{
 			"version": version.Version, "pid": os.Getpid(), "listen": addr, "home": home,
@@ -131,11 +135,16 @@ func runServe(args []string) error {
 	shutdown()
 	sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	// http.Server.Shutdown does not wait for WebSockets, so they go first.
+	wctx, wcancel := context.WithTimeout(sctx, 2*time.Second)
+	srv.CloseSockets(wctx)
+	wcancel()
 	if serveErr == nil {
 		if err := hs.Shutdown(sctx); !errors.Is(err, context.DeadlineExceeded) {
 			serveErr = err
 		}
 	}
+	stopCore()
 	select {
 	case <-coreDone: // hc connect has ended; the core and its sessions live on
 	case <-sctx.Done():

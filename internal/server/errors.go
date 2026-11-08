@@ -50,16 +50,25 @@ func statusFor(kind string) int {
 }
 
 func writeError(w http.ResponseWriter, err error) {
-	var ae *apiError
-	if !errors.As(err, &ae) {
-		ae = toAPIError(err)
-	}
+	ae := asAPIError(err)
 	body := map[string]any{"kind": ae.Kind, "message": ae.Message}
 	if ae.Hint != "" {
 		body["hint"] = ae.Hint
 	}
 	writeJSON(w, ae.Status, map[string]any{"error": body})
 }
+
+// asAPIError is err as the API reports it.
+func asAPIError(err error) *apiError {
+	var ae *apiError
+	if errors.As(err, &ae) {
+		return ae
+	}
+	return toAPIError(err)
+}
+
+// errMessage is the message the API would show for err.
+func errMessage(err error) string { return asAPIError(err).Message }
 
 // toAPIError classifies errors from the layers below the API. The core's
 // kinds pass through as they are (spec §7.4).

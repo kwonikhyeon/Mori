@@ -46,7 +46,7 @@ func newTestEnv(t *testing.T, opts ...func(*Deps)) *testEnv {
 	s := New(d)
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
-	return &testEnv{t: t, srv: srv, s: s, auth: a, store: st}
+	return &testEnv{t: t, srv: srv, s: s, auth: d.Auth, store: d.Store}
 }
 
 // do sends a request with the device cookie (if paired) and a same-origin

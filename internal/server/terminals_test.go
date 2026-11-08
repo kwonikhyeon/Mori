@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,14 +34,29 @@ func withManager(m *core.Manager) func(*Deps) {
 // is connected.
 func withCore(t *testing.T, c *hctest.Core) func(*Deps) {
 	t.Helper()
-	m := core.New(core.Options{HC: c.HC, Env: c.Env, MinBackoff: 100 * time.Millisecond, MaxBackoff: 500 * time.Millisecond,
+	m, _ := runManager(t, c)
+	return withManager(m)
+}
+
+// runManager runs a core manager on c and waits until it is connected. stop
+// ends it, as the end of the test does.
+func runManager(t *testing.T, c *hctest.Core) (m *core.Manager, stop func()) {
+	t.Helper()
+	m = core.New(core.Options{HC: c.HC, Env: c.Env, MinBackoff: 100 * time.Millisecond, MaxBackoff: 500 * time.Millisecond,
 		Logger: slog.New(slog.DiscardHandler)})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { m.Run(ctx); close(done) }()
-	t.Cleanup(func() { cancel(); <-done })
+	stop = sync.OnceFunc(func() { cancel(); <-done })
+	t.Cleanup(stop)
 	waitUntil(t, "core connected", func() bool { return m.Status().Connected })
-	return withManager(m)
+	return m, stop
+}
+
+// withStore makes the server use st, as a restarted Mori finds the state
+// file the last one left.
+func withStore(st *store.Store) func(*Deps) {
+	return func(d *Deps) { d.Store, d.Auth = st, auth.New(st, auth.Options{}) }
 }
 
 func waitUntil(t *testing.T, what string, f func() bool) {

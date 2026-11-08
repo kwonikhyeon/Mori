@@ -5,10 +5,12 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync/atomic"
 
 	"github.com/kwonikhyeon/mori/internal/auth"
 	"github.com/kwonikhyeon/mori/internal/core"
 	"github.com/kwonikhyeon/mori/internal/hc"
+	"github.com/kwonikhyeon/mori/internal/presence"
 	"github.com/kwonikhyeon/mori/internal/store"
 )
 
@@ -27,14 +29,20 @@ type Deps struct {
 	// Resolve tells which folder and worktree a terminal belongs to. The
 	// default trusts the folder label alone.
 	Resolve func(hc.Terminal) (folderID, worktree string)
+
+	// Presence learns from attached browsers which terminals a viewer has
+	// in focus, for the notifier to read. New makes one when it is nil.
+	Presence *presence.Registry
 }
 
 // Server routes requests. Build it with New and serve Handler().
 type Server struct {
-	d   Deps
-	log *slog.Logger
-	mux *http.ServeMux
-	hub *hub
+	d       Deps
+	log     *slog.Logger
+	mux     *http.ServeMux
+	hub     *hub
+	folders signal       // fired by FoldersChanged
+	viewers atomic.Int64 // numbers attach sockets for Presence
 }
 
 func New(d Deps) *Server {
@@ -52,6 +60,9 @@ func New(d Deps) *Server {
 	}
 	if d.Resolve == nil {
 		d.Resolve = func(t hc.Terminal) (string, string) { return t.Labels[core.LabelFolder], "" }
+	}
+	if d.Presence == nil {
+		d.Presence = presence.New()
 	}
 	s := &Server{d: d, log: d.Logger, mux: http.NewServeMux(), hub: newHub()}
 	d.Auth.OnRevoke(s.hub.closeDevice)
@@ -89,6 +100,7 @@ func (s *Server) routes() {
 	api.HandleFunc("GET /api/hosts", s.handleGetHosts)
 	api.HandleFunc("PUT /api/hosts", s.handlePutHosts)
 	api.HandleFunc("GET /ws/events", s.handleEventsWS)
+	api.HandleFunc("GET /ws/attach", s.handleAttachWS)
 	notFound := func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, errorf(http.StatusNotFound, "not_found", "없는 API입니다: %s %s", r.Method, r.URL.Path))
 	}

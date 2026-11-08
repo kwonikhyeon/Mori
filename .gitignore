@@ -1,0 +1,10 @@
+.DS_Store
+.dev/
+/bin/
+/dist/
+internal/webui/dist/*
+!internal/webui/dist/.gitkeep
+web/node_modules/
+web/dist/
+*.test
+coverage.out

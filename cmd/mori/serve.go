@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -146,9 +147,11 @@ func runServe(args []string) error {
 	go func() { cm.Run(coreCtx); close(coreDone) }()
 	go fr.Run(ctx, worktreeRefresh, logger)
 	go admin.Serve(ctx, adminLn, adminHandler{auth: au, publicURL: pub, shutdown: shutdown, status: func() any {
-		return map[string]any{
-			"version": version.Version, "pid": os.Getpid(), "listen": addr, "home": home,
-			"public_url": pub(), "devices": len(au.Devices()), "core": cm.Status(),
+		cs := cm.Status()
+		return admin.Status{
+			Version: version.Version, PID: os.Getpid(), Listen: addr, Home: home,
+			PublicURL: pub(), Devices: len(au.Devices()),
+			Core: admin.CoreStatus{Connected: cs.Connected, Version: cs.Version, Name: cs.Name, Error: cs.Error},
 		}
 	}})
 	logger.Info("listening", "addr", addr, "public_url", pub(), "home", home, "version", version.Version)
@@ -268,7 +271,9 @@ func (h adminHandler) Revoke(id string) error {
 func (h adminHandler) Status() any { return h.status() }
 func (h adminHandler) Shutdown()   { h.shutdown() }
 
-// openLogger logs to stderr, or appends to path when one is given.
+// openLogger logs to stderr, or appends to path when one is given. A panic
+// or fatal error is then written there as well: moriw.exe, which the
+// Windows service runs, has no stderr to write it to.
 func openLogger(path string) (*slog.Logger, func(), error) {
 	var w io.Writer = os.Stderr
 	closeFn := func() {}
@@ -276,6 +281,10 @@ func openLogger(path string) (*slog.Logger, func(), error) {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {
 			return nil, nil, fmt.Errorf("로그 파일을 열지 못했습니다: %w", err)
+		}
+		if err := debug.SetCrashOutput(f, debug.CrashOptions{}); err != nil { // it keeps a duplicate of f
+			f.Close()
+			return nil, nil, fmt.Errorf("로그 파일에 크래시 출력을 연결하지 못했습니다: %w", err)
 		}
 		w, closeFn = f, func() { f.Close() }
 	}

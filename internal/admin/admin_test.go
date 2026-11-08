@@ -137,3 +137,31 @@ func TestLongSocketPathExplained(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+type statusHandler struct {
+	*fakeHandler
+	status any
+}
+
+func (h statusHandler) Status() any { return h.status }
+
+func TestClientStatus(t *testing.T) {
+	path := socketPath(t)
+	want := Status{Version: "v1", PID: 42, Listen: "127.0.0.1:7761", Home: "/h", PublicURL: "https://macmini.example.ts.net",
+		Devices: 2, Core: CoreStatus{Connected: true, Version: "0.1.19", Name: "mori"}}
+	serve(t, path, statusHandler{&fakeHandler{}, want})
+	if got, err := (Client{Path: path}).Status(); err != nil || got != want {
+		t.Fatal(got, err)
+	}
+
+	odd := socketPath(t)
+	serve(t, odd, statusHandler{&fakeHandler{}, "not a status"})
+	if _, err := (Client{Path: odd}).Status(); err == nil || !strings.Contains(err.Error(), "서버 상태") {
+		t.Fatal(err)
+	}
+
+	_, err := (Client{Path: filepath.Join(filepath.Dir(path), "none.sock")}).Status()
+	if !errors.Is(err, ErrNotRunning) || !strings.Contains(err.Error(), "mori service install") {
+		t.Fatal(err)
+	}
+}

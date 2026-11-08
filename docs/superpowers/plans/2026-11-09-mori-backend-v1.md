@@ -2024,72 +2024,117 @@ subject는 `https://github.com/kwonikhyeon/Mori`(`cmd/mori`의 `pushSubject`).
 ### Task 14: 배포 — service, doctor, 릴리스, README (단계 8)
 
 **Files:**
-- Create: `internal/service/service.go`, `internal/service/launchd.go`, `internal/service/runkey_windows.go`, `internal/service/runkey_other.go`, `cmd/mori/doctor.go`, `cmd/mori/servicecmd.go`, `README.md`
-- Test: `internal/service/service_test.go`
+- Create: `internal/procutil/quote.go`, `internal/service/service.go`(옵션, 설치·제거·읽기, 이전 서버 멈추기, 기다리기), `internal/service/launchagent.go`(plist, `AgentEnv`, launchctl 단계), `internal/service/runkey.go`(Run 키 명령, `reg.exe` 단계, `splitWinArgs`), `internal/service/sys_windows.go`(레지스트리 읽기, pid 기다리기, 로그인 환경, 분리 실행), `internal/service/sys_other.go`, `cmd/mori/doctor.go`, `cmd/mori/servicecmd.go`, `README.md`
+- Modify: `internal/admin/admin.go`(`Status`, `Client.Status`), `cmd/mori/serve.go`(`status` 응답, `--log`의 크래시 출력), `cmd/mori/main.go`(`doctor`, `service`, 버전 줄)
+- Test: `internal/procutil/quote_test.go`, `internal/service/service_test.go`, `internal/admin/admin_test.go`, `cmd/mori/doctor_test.go`, `cmd/mori/servicecmd_test.go`
 
 **Interfaces:**
+- Consumes: `admin.Listen`·`Serve`·`Client`(Task 8), `paths.Home`·`State`·`Socket`·`Log`, `hc.Locate`, `tailscale.Find`·`DNSName`·`ServeStatus`·`ProxiesTo`(Task 8), `store.DefaultPresets`(Task 2)
 - Produces:
 ```go
-type Options struct { Exe, Home, LogPath string; Args []string; Env map[string]string; DryRun bool; Out io.Writer }
+// internal/admin
+type Status struct {
+	Version, Listen, Home, PublicURL string
+	PID, Devices                     int
+	Core                             CoreStatus
+}
+type CoreStatus struct { Connected bool; Version, Name, Error string }
+func (c Client) Status() (Status, error)
+
+// internal/service
+const Label = "dev.mori"
+type Options struct {
+	Exe, Home string            // 절대 경로
+	Args      []string          // Exe 뒤. 기본은 serve --home Home
+	Env       map[string]string // LaunchAgent의 환경. Windows 서버는 로그인 환경을 받는다
+	LogPath   string            // 기본 paths.Log(Home)
+	DryRun    bool
+	Out       io.Writer         // 단계를 알리는 곳. 기본 io.Discard
+}
+type Installation struct {
+	Where string            // plist 경로, 또는 Run 키와 값 이름
+	Args  []string          // 실행 파일이 맨 앞
+	Env   map[string]string // LaunchAgent의 환경
+}
+func (in Installation) Flag(name string) string  // --name v, --name=v, -name v
+func (in Installation) AgentPath() string        // plist의 PATH. 없으면 launchd의 기본값
+var ErrNotInstalled, ErrUnsupported error
+func Supported() bool                            // darwin, windows
 func Install(o Options) error
 func Uninstall(o Options) error
-func Installed() (bool, string)                          // 설치 여부와 위치(plist 경로 또는 Run 키)
+func Installed() (Installation, error)
 func LaunchdPlist(label, exe string, args []string, env map[string]string, logPath string) []byte
-func RunKeyCommand(exe string, args []string) string     // Windows Run 키 값(따옴표 처리)
-const Label = "dev.mori"
-```
-macOS: `~/Library/LaunchAgents/dev.mori.plist`(RunAtLoad, KeepAlive, ProcessType Interactive, StandardOutPath·StandardErrorPath = mori.log, EnvironmentVariables에 설치할 때의 `PATH` — LaunchAgent의 PATH는 최소라 `claude`·`codex`를 못 찾는다), `launchctl bootout gui/<uid>/dev.mori`(오류 무시) → `launchctl bootstrap gui/<uid> <plist>`. Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`의 `Mori` = `"<moriw.exe>" serve --log "<home>\mori.log"`(`reg add … /f`), 그리고 지금 한 번 분리 실행. 제거: macOS `bootout` + plist 삭제, Windows `reg delete … /f` + 관리 소켓 `shutdown`. `--dry-run`은 쓸 파일 내용과 실행할 명령을 Out에 쓰고 아무것도 바꾸지 않는다.
+func RunKeyCommand(exe string, args []string) string
+func AgentEnv(environ []string) map[string]string
 
-doctor(§11): 줄마다 `✓`/`✗`/`!`와 안내.
-1. Mori 버전, 상태 디렉터리와 `state.json` 권한(0700/0600)
-2. Mori 서버 동작 여부(관리 소켓 `status` → 코어 연결·버전)
-3. hc 경로·`hc --version`, 서버가 꺼져 있으면 `hc server status`
-4. git 경로·버전
-5. tailscale 경로, `DNSName`, `ServeStatus`가 `http://127.0.0.1:<port>`로 프록시하는지. 아니면 `tailscale serve --bg http://127.0.0.1:7761` 안내(실행하지 않는다)
-6. 서비스 설치 여부
-7. 프리셋 실행 파일(`claude`, `codex`)이 PATH에 있는지(정보)
+// internal/procutil
+func QuoteArg(s string) string    // POSIX 셸
+func QuoteWinArg(s string) string // C 런타임·Go의 명령줄 나누기
+```
+
+규칙(스펙 §11, 결정 89~102):
+- **CLI:** `mori service install [--home] [--listen] [--public-url] [--hc] [--hc-session] [--dry-run]`은 `serveArgs`로 `serve --home <home> --listen <주소>`를 만들고 `--public-url`(끝의 `/`를 뗀다)·`--hc`·`--hc-session`(기본은 셸의 `HC_SESSION`)은 줄 때만 더한다. `--hc` 없이 hc를 찾지 못하면 경고만 한다(결정 91). `mori service uninstall [--home] [--dry-run]`은 `--home`이 없으면 설치된 서비스의 `--home`을 쓴다(결정 97).
+- **공통:** `Install`은 실행 파일이 `os.TempDir()`·`/tmp`·`/var/tmp`(실제 경로로 비교. `/`나 홈 폴더인 항목은 뺀다) 안에 있으면 거절한다(결정 93). 이 상태 디렉터리와 설치된 서비스의 `--home`의 관리 소켓에 `shutdown`을 보내고 그 pid가 끝나기를 10초까지 기다린다. 새 서버가 `status`에 답하기를 300ms 간격으로 20초까지 기다린다(결정 92). 단계마다 번호를 붙여 `Out`에 알리고, `DryRun`이면 같은 검사 뒤 알리기만 하며 plist 내용도 보여 준다(결정 96).
+- **macOS:** 상태 디렉터리 → `launchctl bootout gui/<uid>/dev.mori`(먼저 pid를 묻는다. 없으면 넘어간다) → 이전 서버 멈추기 → plist 쓰기(0644) → `launchctl enable` → `launchctl bootstrap gui/<uid> <plist>`(5번까지, 0.5초 간격) → 기다리기. 제거는 `bootout` → plist 지우기 → 멈추기. uid 0이면 거절한다. plist의 키는 `Label`, `ProgramArguments`, `EnvironmentVariables`(정렬), `RunAtLoad`, `KeepAlive`, `ProcessType Interactive`, `StandardOutPath`·`StandardErrorPath` = 로그. `AgentEnv`는 앞에 나온 값을 쓰고, `PATH`의 절대 경로 항목(한 번씩), 비지 않은 `LANG`·`LC_*`, 절대 경로인 `XDG_CONFIG_HOME`·`XDG_DATA_HOME`·`XDG_STATE_HOME`·`XDG_CACHE_HOME`·`XDG_RUNTIME_DIR`만 남긴다(결정 89).
+- **Windows:** `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`의 `Mori` = `RunKeyCommand(moriw.exe, args + --log <home>\mori.log)`. `moriw.exe`가 `mori.exe` 옆에 없으면 거절한다. 상태 디렉터리 → 멈추기 → `%SystemRoot%\System32\reg.exe add … /t REG_SZ /d <값> /f` → 분리 실행(`DETACHED_PROCESS`, `CREATE_NEW_PROCESS_GROUP`, 되면 `CREATE_BREAKAWAY_FROM_JOB`. 작업 디렉터리는 상태 디렉터리, 환경은 `CreateEnvironmentBlock`의 로그인 환경) → 기다리기. 값이 UTF-16 260단위를 넘으면 경고한다(결정 94). `Installed`는 값을 `splitWinArgs`(Go `os/exec_windows.go`와 같은 규칙)로 나눈다. 제거는 `reg delete … /v Mori /f`(값이 없으면 넘어간다) → 멈추기.
+- **보여 주는 명령:** `QuoteArg`·`QuoteWinArg`는 글자·숫자·`._=:/-`만 있고 맨 앞이 `=`가 아니면 그대로 둔다(결정 98). `RunKeyCommand`는 실행 파일을 늘 따옴표로 감싸고 인자는 `QuoteWinArg`로 감싼다.
+- **serve:** 관리 소켓 `status`는 `admin.Status`다(결정 99). `--log`를 주면 `debug.SetCrashOutput`으로 패닉도 그 파일에 쓴다(결정 100). `mori version`은 `mori <버전> (<OS>/<아키텍처>, <Go 버전>)`이다(결정 102).
+
+doctor(§11, 결정 90·95·101): 줄마다 `✓`·`!`·`✗`와 들여 쓴 안내, 끝에 `실패 N개, 주의 M개` 또는 `모두 정상입니다`. `✗`가 있으면 `errReported`(종료 코드 1). 부르는 외부 명령은 `hc --version`, `git --version`, `tailscale status --json`, `tailscale serve status --json`뿐이다. `hc server status`는 코어를 띄우므로 부르지 않는다(§2.3).
+1. Mori 버전, OS·아키텍처, Go 버전
+2. 상태 디렉터리 0700, `state.json` 0600. 없으면 `!`, 넓으면 `✗`와 `chmod` 안내(Windows는 있는지만)
+3. 서버(관리 소켓 `status`): pid, 수신 주소, 기기 수. 버전이 다르면 `!`, 코어가 연결되지 않았으면 `✗`. 서버가 없으면 `✗`이고, 서비스가 설치되어 있으면 그 로그를 가리킨다
+4. hc: `--hc`, 다음 설치된 서비스의 `--hc`, 다음 서버의 찾는 순서. 없으면 `✗`, 0.1.19 미만이면 `!`
+5. git: 없거나 2.36 미만이면 `!`
+6. Tailscale: 없거나 이름을 모르면 `!`. `tailscale serve`가 서버의 수신 주소(`serveTargets`: `localhost`는 127.0.0.1, 루프백이면 `http://localhost:<포트>`도)로 넘겨 주지 않으면 `!`와 `tailscale serve --bg <대상>` 안내. 서버가 없으면 설치된 서비스의 `--listen`이나 7761을 본다
+7. 서비스: 없으면 `!`, 실행할 파일이 없으면 `✗`, 다른 상태 디렉터리를 쓰면 `!`와 `mori doctor --home <그곳>` 안내
+8. 프리셋(`state.json`, 없으면 기본 프리셋)의 실행 파일. 없으면 `!`, `state.json`을 읽지 못하면 `✗`
+
+macOS에서 서비스가 설치되어 있으면 hc·git·프리셋을 plist의 `PATH`에서 찾는다(`lookIn`).
 
 - [ ] **Step 1: 실패하는 테스트**
 
+`internal/service/service_test.go`:
+- `TestLaunchdPlist` — 키와 순서, 정렬된 환경, 로그 경로. 올바른 XML이고 `parsePlist`로 같은 명령과 환경을 되읽는다.
+- `TestPlistEscapesXML` — `&`, `<`, `>`, 따옴표를 이스케이프하고 그대로 되읽는다.
+- `TestParsePlistRefusesOthers` — XML이 아님, plist가 아님, 명령 없음, 빈 명령을 거절한다.
+- `TestRunKeyCommand`, `TestRunKeyCommandRoundTrip` — 공백, 빈 인자, 따옴표, 끝의 `\`, 한글, `%`, `^&|<>`, UNC 경로가 `splitWinArgs`로 그대로 돌아온다.
+- `TestSplitWinArgs` — Microsoft 문서의 예와, Go가 지금의 C 런타임과 갈리는 `a"b"" c d`.
+- `TestAgentEnv` — 빈·상대 `PATH` 항목과 중복을 빼고, 빈 `LC_ALL`, 상대 XDG 경로, 토큰, `HOME`, `HC_SESSION`, `TERM`, `=` 없는 항목을 버린다.
+- `TestCheckExe`, `TestInstallRefusesTemporaryExe` — 디렉터리·없는 파일·임시 디렉터리 안의 파일(링크를 거쳐도)을 거절한다.
+- `TestGuiExe` — `moriw.exe`가 없으면 거절하고, 있으면 그것을 쓴다.
+- `TestInstallationFlag` — `--name v`, `-name=v`, 값 없는 끝 플래그.
+- `TestDarwinPlan`, `TestWindowsPlan` — 단계의 순서와 명령, plist 단계가 쓰는 내용, 260자 경고.
+- `TestInstallDryRunChangesNothing` — 시험 실행의 설치·제거 뒤 상태 디렉터리가 없고 `Installed()`가 그대로다.
+- `TestRunningStop`, `TestRunningStopWaitsForThePID`, `TestWaitUp` — 가짜 관리 소켓과 잠자는 자식 프로세스로 멈추기와 기다리기.
+
+`internal/admin/admin_test.go`: `TestClientStatus` — 정해진 필드를 되읽고, 다른 모양이면 오류, 서버가 없으면 `ErrNotRunning`과 `mori service install` 안내.
+
+`internal/procutil/quote_test.go`: `TestQuoteArg`, `TestQuoteWinArg`.
+
+`cmd/mori/doctor_test.go`: `TestDoctorMarksAndResult`, `TestDoctorStateDir`, `TestDoctorServer`(가짜 관리 소켓: 없음, 설치된 서비스의 로그, 정상, 다른 버전, 코어 없음), `TestFirstVersion`, `TestVersionAtLeast`, `TestServeTargets`, `TestReadPresets`, `TestDoctorPresets`, `TestLookIn`.
+
+`cmd/mori/servicecmd_test.go`: `TestServeArgs`.
+
 ```go
-func TestLaunchdPlist(t *testing.T) {
-	b := string(LaunchdPlist(Label, "/Users/u/bin/mori", []string{"serve", "--log", "/Users/u/Library/Application Support/Mori/mori.log"},
-		map[string]string{"PATH": "/opt/homebrew/bin:/usr/bin"}, "/Users/u/Library/Application Support/Mori/mori.log"))
-	for _, want := range []string{
-		"<key>Label</key>\n\t<string>dev.mori</string>",
-		"<string>/Users/u/bin/mori</string>\n\t\t<string>serve</string>",
-		"<key>RunAtLoad</key>\n\t<true/>", "<key>KeepAlive</key>\n\t<true/>",
-		"<key>PATH</key>\n\t\t<string>/opt/homebrew/bin:/usr/bin</string>",
-		"<key>StandardErrorPath</key>",
+func TestServeTargets(t *testing.T) {
+	for listen, want := range map[string][]string{
+		"127.0.0.1:7761": {"http://127.0.0.1:7761", "http://localhost:7761"},
+		"localhost:7761": {"http://127.0.0.1:7761", "http://localhost:7761"},
+		"[::1]:7761":     {"http://[::1]:7761", "http://localhost:7761"},
+		"127.0.0.2:80":   {"http://127.0.0.2:80"},
+		"nonsense":       nil,
 	} {
-		if !strings.Contains(b, want) { t.Errorf("missing %q in\n%s", want, b) }
+		if got := serveTargets(listen); !slices.Equal(got, want) {
+			t.Errorf("%s: %q want %q", listen, got, want)
+		}
 	}
-	if err := xml.Unmarshal([]byte(b), new(any)); err != nil { t.Fatal(err) } // 올바른 XML
-}
-
-func TestPlistEscapesXML(t *testing.T) {
-	b := string(LaunchdPlist(Label, "/a&b/mori", nil, nil, "/l"))
-	if !strings.Contains(b, "/a&amp;b/mori") { t.Fatal(b) }
-}
-
-func TestRunKeyCommand(t *testing.T) {
-	got := RunKeyCommand(`C:\Users\u\Mori\moriw.exe`, []string{"serve", "--log", `C:\Users\u\AppData\Roaming\Mori\mori.log`})
-	want := `"C:\Users\u\Mori\moriw.exe" serve --log "C:\Users\u\AppData\Roaming\Mori\mori.log"`
-	if got != want { t.Fatalf("%s", got) }
-}
-
-func TestInstallDryRunChangesNothing(t *testing.T) {
-	var out bytes.Buffer
-	home := t.TempDir()
-	if err := Install(Options{Exe: "/x/mori", Home: home, LogPath: filepath.Join(home, "mori.log"), Args: []string{"serve"}, DryRun: true, Out: &out}); err != nil { t.Fatal(err) }
-	if runtime.GOOS == "darwin" && (!strings.Contains(out.String(), "launchctl bootstrap gui/") || !strings.Contains(out.String(), "<plist")) { t.Fatal(out.String()) }
-	if ok, _ := Installed(); ok && runtime.GOOS == "darwin" { t.Log("already installed on this machine; dry-run must not have changed it") }
 }
 ```
 
-- [ ] **Step 2: 실패 확인** — `go test ./internal/service/` → 컴파일 실패.
-- [ ] **Step 3: 구현** — 위 규칙. plist는 `text/template` + `html.EscapeString` 또는 `xml.EscapeText`. README에는 설치(릴리스 파일 놓기, `mori service install`, `tailscale serve --bg http://127.0.0.1:7761`), 페어링(`mori pair`), 개발(`make test`, `make test-clean`), 보안 요약을 적는다.
-- [ ] **Step 4: 통과 확인** — `go test ./... && make release` → PASS. macmini에서 `go run ./cmd/mori doctor`가 7개 항목을 모두 보고하고, `go run ./cmd/mori service install --dry-run`이 plist와 `launchctl` 명령을 낸다.
+- [ ] **Step 2: 실패 확인** — `go test ./internal/service/ ./internal/procutil/ ./internal/admin/ ./cmd/mori/` → 컴파일 실패.
+- [ ] **Step 3: 구현** — 위 규칙. 테스트는 `Install`을 `DryRun: false`로 부르지 않고, 실제 LaunchAgent와 Run 키를 건드리지 않는다. README에는 요구 사항, 설치(파일 놓기, `mori service install`, `tailscale serve --bg http://127.0.0.1:7761`, `mori doctor`), 기기 페어링, 업데이트와 제거, 알아 둘 것(상태 디렉터리, macOS의 PATH, Run 키, herdr-core의 환경, 로그), 명령, 보안, 개발을 적는다.
+- [ ] **Step 4: 통과 확인** — `gofmt -l .`이 비고, `go vet ./...`, `GOOS=windows go vet ./...`, `go test -race ./...`, `make release`, `make vuln` → PASS. macmini에서 격리 코어로 `mori serve`를 띄워 `mori doctor --home <그 상태 디렉터리>`가 8개 항목을 모두 보고하는지, `mori service install --dry-run`이 plist와 `launchctl` 명령을 내는지 본다. 실제 설치는 하지 않는다.
 - [ ] **Step 5: 커밋 후 단계 8 푸시** — `git commit -m "feat: service install, doctor, 릴리스 빌드, README"` → `git push`.
 
 ---
@@ -2104,6 +2149,7 @@ func TestInstallDryRunChangesNothing(t *testing.T) {
 - §6.2(Task 8): `mori pair --name`의 이름은 코드에 붙는다. 기기가 이름을 보내지 않으면 그 이름을 쓴다. 관리 소켓 동작은 pair, devices, revoke, status, shutdown이다.
 - §2.3, §15.6(Task 13): OSC 7501 보고는 `ESC ] 7501 ; 키=값:키=값 BEL`이고 `msg`·`title`은 base64다. 상태가 `working`을 벗어나면 `status` 다음에 `turn`이 오고, 끝나면 `status: null` 다음에 `finished`가 온다. §7.1에 알림 API를 네 줄로, §7.4에 `push_failed`(502)를, §5에 `OnChange` 계약을 적었다. 결정 78~87.
 - §3 #88(Task 13 뒤): govulncheck가 go1.26.5 표준 라이브러리에서 Mori가 부르는 취약점 16건을 보고해, go.mod에 `toolchain go1.26.10`을 두고 `make vuln`을 더했다.
+- §2.3, §3 #89~102, §5, §10, §11(Task 14): `hc server status`는 코어를 띄우고, 코어는 처음 띄운 쪽의 환경을 세션에 물려준다. 그래서 doctor는 코어에 닿는 hc 명령을 부르지 않고, 서비스는 정해진 환경(macOS: `PATH`·로캘·XDG, Windows: 로그인 환경)으로 서버를 띄운다. Run 키 명령은 260자까지만 보장된다.
 
 ## Self-Review
 

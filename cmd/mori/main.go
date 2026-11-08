@@ -15,9 +15,11 @@ const usage = `사용법: mori <명령> [옵션]
 
 명령:
   serve     서버를 실행합니다
+  service   로그인할 때 서버를 띄우도록 설치하거나 제거합니다 (install, uninstall)
   pair      새 기기를 페어링할 코드와 QR을 만듭니다
   devices   페어링된 기기를 봅니다
   revoke    기기의 페어링을 철회합니다
+  doctor    설치와 연결 상태를 점검합니다
   version   버전을 출력합니다
   help      이 도움말을 출력합니다
 
@@ -27,6 +29,10 @@ const usage = `사용법: mori <명령> [옵션]
 // errUsage means the user has already been told what was wrong with the
 // command line; main only sets the exit code.
 var errUsage = errors.New("usage")
+
+// errReported means the command has told the user what failed, as doctor
+// does; main only sets the exit code.
+var errReported = errors.New("reported")
 
 func main() {
 	if len(os.Args) < 2 {
@@ -38,14 +44,18 @@ func main() {
 	switch cmd {
 	case "serve":
 		err = runServe(args)
+	case "service":
+		err = runService(args)
 	case "pair":
 		err = runPair(args)
 	case "devices":
 		err = runDevices(args)
 	case "revoke":
 		err = runRevoke(args)
+	case "doctor":
+		err = runDoctor(args)
 	case "version", "-v", "--version":
-		fmt.Printf("mori %s (%s/%s)\n", version.Version, runtime.GOOS, runtime.GOARCH)
+		fmt.Printf("mori %s (%s/%s, %s)\n", version.Version, runtime.GOOS, runtime.GOARCH, runtime.Version())
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 	default:
@@ -56,6 +66,8 @@ func main() {
 	case err == nil, errors.Is(err, flag.ErrHelp):
 	case errors.Is(err, errUsage):
 		os.Exit(2)
+	case errors.Is(err, errReported):
+		os.Exit(1)
 	default:
 		fmt.Fprintln(os.Stderr, "mori:", err)
 		os.Exit(1)

@@ -117,6 +117,16 @@ herdr 제품군에는 두 계열이 있다.
 - **이벤트:** 보고마다 `status` 이벤트(`{records: {}, reported: true, status: {…}}`)가 온다. 같은 보고를 되풀이해도 온다. Mori의 캐시는 레코드가 그대로면 변경으로 치지 않으므로 알림기에도 넘기지 않는다. 상태가 `working`을 벗어나면 `status` 다음에 `turn` 이벤트 `{state: <새 상태>, turn: N}`이 온다. `idle`에서 `idle`로 가면 `turn`이 없다.
 - **끝날 때:** 프로그램이 끝나면 `status: null`인 `status` 이벤트가 먼저 오고, 그다음 `finished`(`{exit_code, finished_ms, reason: "exited", signal}`)가 온다.
 
+아래는 단계 8에서 확인한 것이다(2026-11-09). 서비스 설치와 점검(§11, 결정 89~102)이 이 동작에 기댄다.
+
+- **`hc server status`도 코어를 띄운다:** 코어가 없으면 이 명령이 코어를 띄운다. 그래서 `mori doctor`는 이 명령을 부르지 않는다(결정 90). `hc --version`은 코어에 닿지 않고 `hc 0.1.19`만 출력한다.
+- **코어의 환경:** 코어는 처음 자신을 띄운 클라이언트의 환경을 그대로 갖는다. 세션은 그 환경에 `terminal.run`의 `env`(Mori는 `TERM`, `COLORTERM`, `TERM_PROGRAM`)를 더해 받는다. 로그인 때 코어를 띄우는 것은 대개 서비스의 서버다. 그래서 서버의 환경이 모든 세션의 `PATH`와 로캘이 된다(결정 89·94).
+- **코어 프로세스:** `hc`가 띄운 코어는 부모 PID가 1이고 자기 프로세스 그룹에 있다. 띄운 서버가 끝나거나 그 터미널이 닫혀도 코어는 산다.
+- **hc의 경로 변수:** hc는 `HC_SESSION`, `HC_SOCKET`, `XDG_STATE_HOME`·`XDG_CONFIG_HOME`·`XDG_RUNTIME_DIR`을 따른다. 같은 세션이라도 XDG 디렉터리가 다르면 다른 코어다.
+- **Run 키(Windows):** Microsoft 문서에 따르면 값은 260자 이하의 명령줄이고, 안전 모드에서는 무시되며, 로그인 뒤 늦게 실행될 수 있다([Run and RunOnce Registry Keys](https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys)). 끝난 프로그램을 다시 띄우는 기능은 없다.
+- **Windows 명령줄 나누기:** Go 프로그램은 따옴표 안의 `""`를 2008년 이전 C 런타임 규칙으로 읽는다. 지금의 C 런타임과 다르다. 그래서 Mori는 Run 키 값을 Go의 `os/exec_windows.go`와 같은 코드로 나누고, `RunKeyCommand`는 그런 `""`를 쓰지 않는다.
+- **`net.Listen`과 `localhost`:** Go는 `localhost:7761`을 첫 IPv4 주소, 즉 127.0.0.1에서 듣는다(결정 101).
+
 ### 2.4 현재 환경 (2026-11-09)
 
 - 호스트: `macmini`(macOS arm64, 개발 머신), `ikhyeon-desktop`·`ikhyeon-labtop`(Windows). 클라이언트에는 iPhone이 있다.
@@ -214,6 +224,20 @@ herdr 제품군에는 두 계열이 있다.
 | 86 | 알림 API | `GET /api/push/key`(VAPID 공개 키), `GET/POST/DELETE /api/push/subscriptions`(이 기기의 구독만 다룬다. 목록에는 키를 넣지 않는다. 삭제 본문은 `{endpoint?}`이고 비우면 이 기기 전부다), `GET/PUT /api/push/settings` `{children}`(호스트 전체 설정)이다. 알림기가 없는 서버에서는 모두 503 `unavailable`이다 | 구독 ID를 경로에 · 기기마다 설정 | 기기는 제 구독만 보고 바꾼다. 엔드포인트를 URL에 넣지 않는다. 부모 있는 터미널의 알림 여부는 호스트의 알림기가 판정할 때 읽는 값이다 |
 | 87 | Web Push 라이브러리 | `github.com/SherClockHolmes/webpush-go` v1.4.0을 쓴다. 그것이 요구하는 `golang-jwt/jwt/v5` v5.2.1과 `golang.org/x/crypto` v0.31.0에는 알려진 취약점이 있어(govulncheck: jwt 헤더 파싱의 메모리 과다 할당, x/crypto 21건), 최신인 v5.3.1과 v0.58.0으로 올린다. v0.58.0에 남은 GO-2026-5932는 Mori가 쓰지 않는 `openpgp` 패키지 건이다 | RFC 8291·8292를 직접 구현 | 검증된 구현이 새로 짠 암호 코드보다 낫다. 테스트가 가짜 푸시 서비스로 받은 메시지를 RFC대로 풀고 서명을 확인하므로 라이브러리를 바꿔도 같은 기준으로 잰다 |
 | 88 | Go 툴체인 | go.mod에 `toolchain go1.26.10`을 둔다. `go` 줄은 1.26.5 그대로다. 표준 라이브러리와 의존성의 알려진 취약점은 `make vuln`(govulncheck)으로 확인한다 | 개발 머신의 go1.26.5로 빌드 · `go` 줄을 올림 · Go 1.27로 올림 | go1.26.5의 표준 라이브러리에는 Mori가 부르는 `net/http`·`crypto/tls`·`crypto/x509`·`net/url`·`encoding/asn1` 코드에 govulncheck가 보고하는 취약점이 16건 있고, go1.26.10에서 모두 고쳐졌다(2026-11-09 확인). `GOTOOLCHAIN=auto`(기본)면 go 명령이 이 툴체인을 받아 쓰므로 `make release`가 개발 머신의 Go 버전에 매이지 않는다. `go` 줄을 올리면 `GOTOOLCHAIN=local`로 일부러 다른 Go를 고른 빌드까지 막는다. 1.27은 언어와 라이브러리가 바뀌는 업그레이드라 따로 정한다 |
+| 89 | 서비스 환경(macOS) | plist의 `EnvironmentVariables`에는 설치하는 셸의 `PATH`(절대 경로 항목만, 한 번씩), 로캘 변수(`LANG`, `LC_*`), 절대 경로인 XDG 디렉터리 변수만 넣는다. `HOME`·`USER`·`TMPDIR`은 launchd가 준다. `HC_SOCKET`, 토큰과 키를 비롯한 나머지는 넣지 않는다 | 셸 환경 전체 · `PATH`만 | 서버가 띄운 코어는 그 환경을 모든 세션에 물려준다(§2.3). 환경 전체를 넣으면 셸의 토큰이 남이 읽을 수 있는 plist(0644)와 모든 세션에 들어간다. `PATH`만 넣으면 세션의 한글이 깨지고, XDG 디렉터리를 바꾼 사용자의 hc는 다른 코어를 찾는다. 빈 항목이나 상대 경로 항목은 서버의 작업 디렉터리를 뒤진다. `HC_SOCKET`은 격리 코어를 시험할 때나 쓰는 값이라, 그런 셸에서 설치하면 서비스가 기본 코어를 떠난다 |
+| 90 | doctor의 외부 명령 | 읽기만 하는 `hc --version`, `git --version`, `tailscale status --json`, `tailscale serve status --json`만 부른다. 코어는 돌고 있는 서버의 관리 소켓 `status`로만 본다. Tailscale 설정은 바꾸지 않고 명령만 알려 준다 | `hc server status`로 코어를 직접 확인 · `tailscale serve`를 대신 켬 | `hc server status`는 코어가 없으면 띄운다(§2.3). 점검하는 셸의 환경으로 기본 코어가 뜨면 그 뒤 모든 세션이 그 환경을 물려받는다. 점검이 상태를 바꾸면 다시 점검해도 같은 답이 나오지 않는다 |
+| 91 | 서비스의 serve 인자 | 항상 `--home`과 `--listen`을 넣고, `--public-url`·`--hc`·`--hc-session`은 주었을 때만 넣는다. `--hc-session`의 기본값은 설치하는 셸의 `HC_SESSION`이다. `--hc`가 없으면 hc를 고정하지 않고, 지금 찾지 못하면 경고만 한다 | 설치할 때 찾은 hc 경로를 고정 · 인자 없이 서버 기본값에 맡김 · hc가 없으면 설치 거절 | 로그인 때 뜨는 서버는 설치한 셸의 `MORI_HOME`을 모른다. hc는 업데이트로 자리를 옮길 수 있어 서버가 연결할 때마다 찾는다(§11). hc 없이도 서버는 떠서 doctor와 페어링은 된다. 셸에서 다른 herdr 세션을 쓰는 사용자는 같은 코어를 원한다 |
+| 92 | 서비스 교체 순서 | 설치는 이 상태 디렉터리와 설치된 서비스의 상태 디렉터리에서 도는 서버를 관리 소켓으로 멈추고, 그 pid가 끝나기를 10초까지 기다린 뒤 새 서비스를 올린다. macOS는 `bootout` 전에 pid를 먼저 묻는다. `bootstrap`이 거절되면 0.5초 간격으로 5번까지 다시 한다. 새 서버가 관리 소켓에 답하기를 20초까지 기다리고, 답이 없으면 로그 위치를 알려 주며 실패한다. root(uid 0)로는 설치하지 않는다 | 멈추지 않고 덮어씀 · 소켓이 사라지기만 기다림 | 이전 서버가 포트와 관리 소켓을 쥐고 있으면 새 서버가 뜨지 못하고, KeepAlive가 그 실패를 되풀이한다. launchd가 내린 서버는 소켓을 닫은 뒤에도 프로세스가 잠깐 남는다. launchd가 이전 작업을 내리는 동안 `bootstrap`은 잠깐 거절한다. root의 `gui/0` 도메인에는 사용자의 로그인 세션이 없다 |
+| 93 | 임시 디렉터리의 실행 파일 | 실행 파일이 `os.TempDir()`, `/tmp`, `/var/tmp` 안에 있으면(실제 경로로 비교) 설치를 거절한다. 그 값이 `/`나 홈 폴더면 그 항목은 보지 않는다 | 허용 | `go run`이 만든 바이너리처럼 지워질 파일을 가리키는 서비스는 언젠가 로그인할 때 뜨지 않는다. `TMPDIR=/`이면 모든 곳이 거절된다 |
+| 94 | Windows 서버 시작 | Run 키는 `mori.exe` 옆의 `moriw.exe`를 띄운다(없으면 거절). 명령 끝에 `--log <home>\mori.log`를 더한다. 설치할 때 서버를 바로 한 번 띄우는데, 콘솔 없이 분리하고(가능하면 이 터미널의 작업 개체에서도 떼어 낸다), 작업 디렉터리는 상태 디렉터리, 환경은 `CreateEnvironmentBlock`으로 만든 이 사용자의 로그인 환경이다. 레지스트리 쓰기는 `reg.exe`로 한다. 명령이 260자를 넘으면 경고하고 설치는 한다 | `mori.exe`를 띄움 · 이 셸의 환경으로 띄움 · `golang.org/x/sys/windows/registry` · 260자를 넘으면 거절 | `mori.exe`는 콘솔 프로그램이라 로그인할 때 창이 뜬다. `moriw.exe`에는 stderr가 없어 로그를 파일로 보낸다. 이 셸의 환경으로 띄우면 그 서버가 띄운 코어가 그 환경을 모든 세션에 물려주고, 다음 로그인의 서버와 다르게 돈다(§2.3). 터미널이 닫힐 때 작업 개체가 서버를 함께 끝낼 수 있다. `syscall`은 레지스트리를 읽기만 하므로, 쓰기를 위해 의존성을 늘리지 않는다. 260자는 보장의 한도이지 실패가 확실한 길이는 아니다(§2.3) |
+| 95 | doctor 표시 | 한 줄에 한 항목이고 고칠 방법을 그 아래에 들여 쓴다. `✓`는 정상, `!`는 주의(일부 기능이 빠지거나 이 컴퓨터에서만 열린다), `✗`는 실패(Mori가 일하지 못하거나 다른 사용자가 상태를 읽을 수 있다)다. `✗`가 있을 때만 1로 끝난다. hc·git 버전이 모자라면 `!`다. macOS에서 서비스가 설치되어 있으면 hc, git, 프리셋을 plist의 `PATH`에서 찾는다. hc는 서버와 같은 순서(`--hc`, 다음 `PATH`, 그다음 `~/.local/bin/hc`)로 찾는다 | 이 셸의 `PATH`로 찾음 · 주의도 실패로 침 | 서비스의 서버가 실제로 찾는 곳을 봐야 점검이 맞다. Tailscale이 꺼졌거나 프리셋 하나가 없어도 Mori는 일한다. 스크립트는 종료 코드로 실패만 가려낸다 |
+| 96 | 시험 실행 | `--dry-run`은 실제 설치·제거와 같은 검사를 한 뒤, 할 일을 번호를 붙여 보여 주고 쓸 plist 내용까지 보여 준다. 아무것도 바꾸지 않는다 | 검사 없이 출력만 | 시험 실행이 통과하면 실제 설치가 같은 검사에서 막히지 않는다 |
+| 97 | 제거의 상태 디렉터리 | `mori service uninstall`은 `--home`이 없으면 설치된 서비스의 `--home`을 쓴다. 서비스가 없으면 돌고 있는 서버만 멈춘다. 상태 디렉터리와 herdr-core, 그 세션은 남긴다 | 이 셸의 `MORI_HOME` · 상태 디렉터리까지 지움 | 다른 셸에서 설치한 서비스의 서버도 멈춰야 한다. 상태 디렉터리에는 페어링한 기기와 VAPID 키가 있어, 지우면 모든 기기를 다시 페어링하고 알림을 다시 켜야 한다 |
+| 98 | 보여 주는 명령 | 사람에게 보여 주는 명령은 그 OS의 셸에 그대로 붙여 넣을 수 있게 인용한다. POSIX는 작은따옴표(`procutil.QuoteArg`), Windows는 C 런타임이 나누는 규칙(`procutil.QuoteWinArg`)이다. 글자·숫자와 `._=:/-`만 있고 맨 앞이 `=`가 아니면 그대로 둔다 | 인용 없이 이어 붙임 · 항상 인용 | 기본 상태 디렉터리(`~/Library/Application Support/Mori`)에 공백이 있다. zsh는 맨 앞의 `=`를 명령 경로로 펼친다. 흔한 인자까지 감싸면 읽기 어렵다 |
+| 99 | 관리 소켓 `status` | `status`는 정해진 타입 `admin.Status{Version, PID, Listen, Home, PublicURL, Devices, Core}`로 답하고 `Client.Status()`가 읽는다 | `map[string]any` | doctor와 서비스 설치가 같은 필드를 읽는다. 이름이 어긋나면 컴파일이 잡는다 |
+| 100 | 크래시 출력 | `--log`를 주면 패닉과 런타임 치명 오류도 `debug.SetCrashOutput`으로 그 파일에 쓴다 | stderr만 | `moriw.exe`에는 stderr가 없다. 서버가 죽은 이유가 doctor가 가리키는 로그에 남아야 한다 |
+| 101 | 프록시 대상 비교 | doctor와 설치 안내는 서버의 수신 주소를 `http://<IP>:<포트>`로 바꿔 `tailscale serve` 설정과 비교한다. `localhost`는 127.0.0.1로 본다. 루프백 주소면 `http://localhost:<포트>`도 맞는 것으로 친다 | 주소 문자열 그대로 비교 | Go는 `localhost`를 127.0.0.1에서 듣는다(§2.3). `tailscale serve --bg http://localhost:7761`로 켠 사용자도 있다 |
+| 102 | 버전 출력 | `mori version`과 doctor의 첫 줄은 `<버전> (<OS>/<아키텍처>, <Go 버전>)`이다 | 버전만 | 표준 라이브러리의 취약점은 빌드한 Go 버전에 달렸다(결정 88) |
 
 ## 4. 구조
 
@@ -254,8 +278,8 @@ herdr 제품군에는 두 계열이 있다.
 | `internal/gitx` | git CLI 실행과 출력 파싱 | `Runner.Status`, `Worktrees`, `Branches`, `Diff`, `AddWorktree`, `RemoveWorktree`; `IsRepo`, `WorktreePath`, `SafeRelPath` | `git` 실행 파일 |
 | `internal/push` | VAPID 키, 구독, 알림 판정, 발송 | `Decide(change, children) → Kind`(결정 78); `EnsureVAPID(store)`, `NewWebPush(vapid, subject) → Sender`, `New(opts) → *Notifier`; `Notifier.OnChange(change)`(바뀌기 전과 후의 레코드, 원인 이벤트), `Subscribe`, `Unsubscribe`, `Subscriptions`, `Test`, `Wait` | `internal/store`, `internal/core`, webpush 라이브러리 |
 | `internal/server` | 라우팅, REST 핸들러, 이벤트 WS, attach WS 브리지 | `http.Handler` | 위 전부 |
-| `internal/admin` | 관리 소켓(Unix 도메인 소켓, Windows 10 이상 포함)과 그 클라이언트 | `Listen(path)`, `Serve(ctx, ln, h)`, `Client.Do(req)` | `internal/auth` |
-| `internal/service` | LaunchAgent·Run 키 설치와 제거 | `Install(opts)`, `Uninstall()` | OS 도구(`launchctl`, `reg`) |
+| `internal/admin` | 관리 소켓(Unix 도메인 소켓, Windows 10 이상 포함)과 그 클라이언트 | `Listen(path)`, `Serve(ctx, ln, h)`, `Client.Do(req)`, `Client.Status() → Status`(결정 99) | `Handler` 인터페이스. `cmd/mori`가 `internal/auth`와 코어 관리자로 채운다 |
+| `internal/service` | LaunchAgent·Run 키 설치·제거·읽기 | `Install(opts)`, `Uninstall(opts)`, `Installed() → (Installation, error)`(`Flag(name)`, `AgentPath()`), `Supported()`, `LaunchdPlist`, `RunKeyCommand`, `AgentEnv(environ)`; `ErrNotInstalled`, `ErrUnsupported` | OS 도구(`launchctl`, `reg.exe`), `internal/admin`(이전 서버 멈추기, 새 서버 기다리기) |
 | `internal/webui` | 빌드된 UI 임베드. 없으면 자리표시 페이지 | `Handler()` | `web/` 빌드 결과 |
 | `cmd/mori` | CLI: `serve`, `pair`, `devices`, `revoke`, `doctor`, `service install/uninstall`, `version` | — | 위 전부 |
 
@@ -444,26 +468,39 @@ Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limit
 - **파일:**
   - `state.json`: 폴더, 호스트 링크, 프리셋, 알림 설정, 기기(토큰 해시), 푸시 구독, VAPID 키, 스키마 버전
   - `mori.sock`: 관리 소켓
-  - `mori.log`: 서비스로 돌 때의 로그
+  - `mori.log`: 서비스로 돌 때의 로그. 덧붙이기만 하고 돌려 쓰지 않는다
 - **쓰기:** 메모리 사본을 잠금으로 보호한다. 바꿀 때마다 임시 파일에 쓰고 fsync한 뒤 rename한다.
 - 페어링 코드와 터미널 캐시는 메모리에만 둔다.
 
 ## 11. 배포·운영
 
-- **빌드:** `make build`가 UI(`web/`)를 빌드해 `internal/webui/dist`에 넣는다. 그다음 Go 바이너리를 만든다. UI가 없어도 Go 빌드는 된다(자리표시 페이지). `make release`는 darwin/arm64, darwin/amd64, windows/amd64, windows/arm64, linux/amd64용 바이너리를 만든다. Windows는 `mori.exe`(콘솔)와 `moriw.exe`(콘솔 창 없음)를 만든다.
-- **설치:** `mori service install`
-  - macOS: `~/Library/LaunchAgents/dev.mori.plist`(RunAtLoad, KeepAlive)를 쓰고 `launchctl bootstrap gui/<uid>`로 올린다. LaunchAgent의 기본 `PATH`에는 `/opt/homebrew/bin`이나 `~/.local/bin`이 없다. 그래서 설치할 때의 `PATH`를 plist의 `EnvironmentVariables`에 넣는다. 그래야 `hc`, `git`, `claude`, `codex`를 찾는다.
-  - Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`에 `Mori` 값(`"<moriw.exe>" serve --log "<home>\mori.log"`)을 쓰고 바로 한 번 띄운다. 관리자 권한이 필요 없다.
-  - 제거: `mori service uninstall`. LaunchAgent나 Run 키를 지우고 관리 소켓으로 서버를 멈춘다.
+- **빌드:** `make build`는 Go 바이너리 `bin/mori`를 만든다. 지금은 자리표시 페이지를 임베드하고, UI(`web/`)를 빌드해 `internal/webui/dist`에 넣는 일은 단계 10에서 더한다. `make release`는 darwin/arm64, darwin/amd64, windows/amd64, windows/arm64, linux/amd64용 바이너리를 `dist/mori-<os>-<arch>/`에 만든다. `-trimpath`와 `CGO_ENABLED=0`으로 빌드하고, 버전은 `git describe --tags --always --dirty`다. Windows는 `mori.exe`(콘솔)와 `moriw.exe`(`-H=windowsgui`, 콘솔 창 없음)를 만든다. `make vuln`은 govulncheck로 코드가 닿는 알려진 취약점을 찾는다(결정 88).
+- **설치:** `mori service install [--home] [--listen] [--public-url] [--hc] [--hc-session] [--dry-run]`. 서비스는 `<mori> serve --home <home> --listen <주소>`에 준 옵션을 더해 띄운다(결정 91).
+  - 공통: 실행 파일이 임시 디렉터리 안에 있으면 거절한다(결정 93). 이 상태 디렉터리와 설치된 서비스의 상태 디렉터리에서 도는 서버를 멈추고 끝나기를 10초까지 기다린다. 새 서비스를 올린 뒤에는 새 서버가 관리 소켓에 답하기를 20초까지 기다린다(결정 92).
+  - macOS: `~/Library/LaunchAgents/dev.mori.plist`를 쓴다. 키는 `Label`, `ProgramArguments`, `EnvironmentVariables`, `RunAtLoad`, `KeepAlive`, `ProcessType`(`Interactive`), `StandardOutPath`·`StandardErrorPath`(`<home>/mori.log`)다.
+    - 순서: 상태 디렉터리 만들기 → `launchctl bootout gui/<uid>/dev.mori`(없으면 넘어간다) → 이전 서버 멈추기 → plist 쓰기(0644) → `launchctl enable` → `launchctl bootstrap gui/<uid> <plist>` → 기다리기. root로는 설치하지 않는다.
+    - LaunchAgent의 기본 `PATH`에는 `/opt/homebrew/bin`이나 `~/.local/bin`이 없다. 그래서 설치하는 셸의 `PATH`와 로캘, XDG 디렉터리 변수를 `EnvironmentVariables`에 넣는다(결정 89). 그래야 서버와 세션이 `hc`, `git`, `claude`, `codex`를 찾는다.
+  - Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`에 `Mori` 값을 쓰고 서버를 바로 한 번 띄운다. 관리자 권한이 필요 없다.
+    - 값: `"<moriw.exe>" serve --home "<home>" --listen 127.0.0.1:7761 --log "<home>\mori.log"`. 실행 파일은 늘, 인자는 필요할 때만 따옴표로 감싼다(결정 98)
+    - 지금 띄우는 서버는 콘솔 없이 분리하고 이 사용자의 로그인 환경으로 띄운다(결정 94). 명령이 260자를 넘으면 경고한다(§2.3).
+  - `--dry-run`은 같은 검사를 한 뒤 할 일과 plist 내용을 보여 주고 아무것도 바꾸지 않는다(결정 96).
+  - 제거: `mori service uninstall [--home] [--dry-run]`. LaunchAgent를 내리고 plist를 지우거나 Run 키 값을 지운 뒤, 서버를 관리 소켓으로 멈춘다. 상태 디렉터리와 코어, 그 세션은 남긴다(결정 97).
+  - 업데이트: 제거 → 실행 파일 바꾸기 → 설치. Windows는 돌고 있는 `moriw.exe`를 덮어쓸 수 없으므로 이 순서를 지킨다.
 - **HTTPS:** `tailscale serve --bg http://127.0.0.1:7761`. tailnet 관리 콘솔에서 MagicDNS와 HTTPS 인증서가 켜져 있어야 한다. `mori doctor`가 설정 여부를 확인하고 명령을 알려 준다. Mori가 Tailscale 설정을 직접 바꾸지는 않는다.
-- **점검:** `mori doctor`는 다음을 보고한다.
-  - hc 경로·버전, 코어 연결
-  - git 경로
-  - 상태 디렉터리 권한
-  - tailscale serve 설정과 호스트 DNS 이름
-  - 서비스 설치 여부
+- **점검:** `mori doctor [--home] [--hc]`는 한 줄에 한 항목씩 `✓`·`!`·`✗`로 보고하고, 고칠 방법을 그 아래에 적는다. `✗`가 있을 때만 1로 끝난다(결정 95). 읽기만 하는 명령을 부르고, 코어는 띄우지 않는다(결정 90). 항목은 이 순서다.
+  1. Mori 버전, OS·아키텍처, Go 버전(결정 102)
+  2. 상태 디렉터리 0700, `state.json` 0600(Windows는 있는지만 본다)
+  3. 돌고 있는 서버(관리 소켓 `status`): pid, 수신 주소, 기기 수, 이 `mori`와 버전이 같은지, 코어 연결과 코어 버전
+  4. hc 경로와 버전(0.1.19 이상). 찾지 못하면 `✗`
+  5. git 경로와 버전(2.36 이상). 찾지 못하면 `!`
+  6. Tailscale: 이 호스트의 DNS 이름, `tailscale serve`가 서버의 수신 주소로 넘겨 주는지(결정 101). 아니면 켤 명령을 알려 준다
+  7. 서비스: 설치된 곳, 실행할 파일이 있는지, 다른 상태 디렉터리를 쓰는지
+  8. 프리셋의 실행 파일(`claude`, `codex` 등)
+
+  macOS에서 서비스가 설치되어 있으면 hc, git, 프리셋을 plist의 `PATH`에서 찾는다(결정 95). 서버가 돌지 않으면 설치된 서비스의 `--listen`이나 기본 포트로 6을 본다.
 - **hc 찾기:** `--hc`를 먼저 보고, 다음은 `PATH`, 그다음 `~/.local/bin/hc(.exe)`다. 코어 세션은 `--hc-session`(기본값은 사용자의 기본 세션, 공식 Herdr 앱과 같은 코어)이다.
 - **포트:** 기본값 7761(`--listen`으로 바꾼다).
+- **로그:** 서비스로 돌 때 `<home>/mori.log`에 덧붙인다. 패닉과 런타임 치명 오류도 남긴다(결정 100). 돌려 쓰지 않는다.
 
 ## 12. 단계
 
@@ -521,6 +558,7 @@ Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limit
    - `hc connect`가 코어를 띄우는지
    - ConPTY의 `CSI ?9001h`(win32-input-mode)와 xterm.js 입력이 문제없는지
    - Run 키로 띄운 `moriw.exe`가 콘솔 창 없이 뜨는지
+   - 설치할 때 띄운 서버가 작업 개체에서 떨어져 터미널을 닫은 뒤에도 사는지, 로그인 환경을 받는지(결정 94)
 5. `tailscale serve`가 원래 `Host` 헤더를 넘기는지, `X-Forwarded-Host`를 붙이는지(§8)
 6. ~~OSC 7501 보고 문법. hc 바이너리에는 `]7501;`, `state=`, 질의 응답 `]7501;?:states=idle,working,done,blocked,error:kinds=permission,question,auth`가 있다. 보고 형식은 `ESC ] 7501 ; state=blocked:kind=permission … BEL`로 보이지만 단계 7 통합 테스트에서 확인한다~~ 확인함(2026-11-09, §2.3): 쌍은 `:`로 잇고 `msg`·`title`은 base64다. `working`을 벗어나면 `turn` 이벤트가 따라온다.
 7. ~~`terminal.kill`이 attach CLOSE에 주는 이유 문자열(`killed`로 가정, §6.8). 단계 5 통합 테스트에서 확인한다~~ 확인함(2026-11-09, §2.3): `killed`, signal 1(hangup)이다. 시그널로 프로그램을 잃은 `keep` 터미널은 `signaled`다.

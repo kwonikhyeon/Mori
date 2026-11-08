@@ -34,6 +34,25 @@ type Response struct {
 	Status    json.RawMessage `json:"status,omitempty"`
 }
 
+// Status is what a server says about itself.
+type Status struct {
+	Version   string     `json:"version"`
+	PID       int        `json:"pid"`
+	Listen    string     `json:"listen"`
+	Home      string     `json:"home"`
+	PublicURL string     `json:"public_url"`
+	Devices   int        `json:"devices"`
+	Core      CoreStatus `json:"core"`
+}
+
+// CoreStatus is the server's connection to the herdr core.
+type CoreStatus struct {
+	Connected bool   `json:"connected"`
+	Version   string `json:"version,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
 type DeviceInfo struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
@@ -173,7 +192,7 @@ func (c Client) Do(req Request) (Response, error) {
 	}
 	conn, err := net.DialTimeout("unix", c.Path, clientTimeout)
 	if err != nil {
-		return Response{}, fmt.Errorf("%w. mori serve를 먼저 실행하세요(%s에 연결하지 못했습니다)", ErrNotRunning, c.Path)
+		return Response{}, fmt.Errorf("%w. mori serve나 mori service install로 서버를 먼저 띄우세요(%s에 연결하지 못했습니다)", ErrNotRunning, c.Path)
 	}
 	defer conn.Close()
 	conn.SetDeadline(time.Now().Add(clientTimeout))
@@ -188,4 +207,17 @@ func (c Client) Do(req Request) (Response, error) {
 		return res, errors.New(res.Error)
 	}
 	return res, nil
+}
+
+// Status asks the server for its Status.
+func (c Client) Status() (Status, error) {
+	res, err := c.Do(Request{Op: "status"})
+	if err != nil {
+		return Status{}, err
+	}
+	var st Status
+	if err := json.Unmarshal(res.Status, &st); err != nil {
+		return Status{}, fmt.Errorf("서버 상태를 읽지 못했습니다: %w", err)
+	}
+	return st, nil
 }

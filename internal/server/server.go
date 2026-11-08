@@ -5,14 +5,21 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/kwonikhyeon/mori/internal/auth"
+	"github.com/kwonikhyeon/mori/internal/store"
 )
 
-// Deps are the parts the server is assembled from.
+// Deps are the parts the server is assembled from. Auth and Store are
+// required.
 type Deps struct {
-	Version  string
-	HostName string
-	UI       http.Handler
-	Logger   *slog.Logger
+	Version   string
+	HostName  string
+	Auth      *auth.Auth
+	Store     *store.Store
+	PublicURL func() string // where devices reach this server, for pairing links
+	UI        http.Handler
+	Logger    *slog.Logger
 }
 
 // Server routes requests. Build it with New and serve Handler().
@@ -20,16 +27,24 @@ type Server struct {
 	d   Deps
 	log *slog.Logger
 	mux *http.ServeMux
+	hub *hub
 }
 
 func New(d Deps) *Server {
+	if d.Auth == nil || d.Store == nil {
+		panic("server: Deps.Auth and Deps.Store are required")
+	}
+	if d.PublicURL == nil {
+		d.PublicURL = func() string { return "" }
+	}
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
 	if d.UI == nil {
 		d.UI = http.NotFoundHandler()
 	}
-	s := &Server{d: d, log: d.Logger, mux: http.NewServeMux()}
+	s := &Server{d: d, log: d.Logger, mux: http.NewServeMux(), hub: newHub()}
+	d.Auth.OnRevoke(s.hub.closeDevice)
 	s.routes()
 	return s
 }
@@ -37,21 +52,27 @@ func New(d Deps) *Server {
 // Handler is the root handler with security headers on every response.
 func (s *Server) Handler() http.Handler { return securityHeaders(s.mux) }
 
+// routes puts every API and WebSocket behind requireDevice; the web UI
+// itself is public.
 func (s *Server) routes() {
-	s.mux.HandleFunc("GET /api/hello", s.handleHello)
-	s.mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, errorf(http.StatusNotFound, "not_found", "no such endpoint: %s %s", r.Method, r.URL.Path))
-	})
-	s.mux.Handle("/", s.d.UI)
-}
+	api := http.NewServeMux()
+	api.HandleFunc("GET /api/hello", s.handleHello)
+	api.HandleFunc("POST /api/pair", s.handlePair)
+	api.HandleFunc("POST /api/logout", s.handleLogout)
+	api.HandleFunc("GET /api/devices", s.handleDevices)
+	api.HandleFunc("DELETE /api/devices/{id}", s.handleRevokeDevice)
+	api.HandleFunc("POST /api/pair-codes", s.handlePairCode)
+	api.HandleFunc("GET /ws/events", s.handleEventsWS)
+	notFound := func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, errorf(http.StatusNotFound, "not_found", "없는 API입니다: %s %s", r.Method, r.URL.Path))
+	}
+	api.HandleFunc("/api/", notFound)
+	api.HandleFunc("/ws/", notFound)
 
-func (s *Server) handleHello(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"app":     "mori",
-		"version": s.d.Version,
-		"host":    s.d.HostName,
-		"paired":  false,
-	})
+	guarded := s.requireDevice(api)
+	s.mux.Handle("/api/", guarded)
+	s.mux.Handle("/ws/", guarded)
+	s.mux.Handle("/", s.d.UI)
 }
 
 func securityHeaders(next http.Handler) http.Handler {

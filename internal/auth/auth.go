@@ -109,7 +109,7 @@ func (a *Auth) Pair(code, name, userAgent string) (string, store.Device, error) 
 	}
 	tok := newToken()
 	dev := store.Device{
-		ID:         store.NewID("d"),
+		ID:         store.NewID("d_"),
 		Name:       cmp.Or(cleanName(name), c.Name, defaultName),
 		CreatedMs:  now.UnixMilli(),
 		LastSeenMs: now.UnixMilli(),

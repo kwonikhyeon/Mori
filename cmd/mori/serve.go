@@ -3,20 +3,24 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/kwonikhyeon/mori/internal/admin"
+	"github.com/kwonikhyeon/mori/internal/auth"
 	"github.com/kwonikhyeon/mori/internal/paths"
 	"github.com/kwonikhyeon/mori/internal/server"
+	"github.com/kwonikhyeon/mori/internal/store"
+	"github.com/kwonikhyeon/mori/internal/tailscale"
 	"github.com/kwonikhyeon/mori/internal/version"
 	"github.com/kwonikhyeon/mori/internal/webui"
 )
@@ -24,14 +28,18 @@ import (
 const defaultListen = "127.0.0.1:7761"
 
 func runServe(args []string) error {
-	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
-	homeFlag := fs.String("home", "", "상태 디렉터리 (기본: MORI_HOME, 없으면 사용자 설정 디렉터리/Mori)")
+	fs := newFlagSet("serve", "[옵션]")
+	homeFlag := fs.String("home", "", homeUsage)
 	listen := fs.String("listen", defaultListen, "수신 주소. 루프백만 허용합니다")
+	publicFlag := fs.String("public-url", "", "기기가 이 서버에 닿는 주소, 페어링 링크에 씁니다 (기본: Tailscale 이름으로 https://<이름>)")
 	logPath := fs.String("log", "", "로그 파일 (기본: 표준 오류)")
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	if err := checkLoopback(*listen); err != nil {
+		return err
+	}
+	if err := checkPublicURL(*publicFlag); err != nil {
 		return err
 	}
 	home, err := paths.Home(*homeFlag)
@@ -48,16 +56,33 @@ func runServe(args []string) error {
 	defer closeLog()
 	slog.SetDefault(logger)
 
-	srv := server.New(server.Deps{
-		Version:  version.Version,
-		HostName: hostName(),
-		UI:       webui.Handler(),
-		Logger:   logger,
-	})
+	// The admin socket comes first: while it is open, no second server can
+	// start on this state directory.
+	adminLn, err := admin.Listen(paths.Socket(home))
+	if err != nil {
+		return err
+	}
+	defer adminLn.Close()
+	st, err := store.Open(paths.State(home))
+	if err != nil {
+		return fmt.Errorf("상태 파일을 열지 못했습니다: %w", err)
+	}
+	au := auth.New(st, auth.Options{})
 	ln, err := net.Listen("tcp", *listen)
 	if err != nil {
 		return fmt.Errorf("%s에서 수신하지 못했습니다: %w", *listen, err)
 	}
+	addr := ln.Addr().String()
+	pub := publicURL(*publicFlag, addr, tailscale.DNSName)
+	srv := server.New(server.Deps{
+		Version:   version.Version,
+		HostName:  hostName(tailscale.DNSName),
+		Auth:      au,
+		Store:     st,
+		PublicURL: pub,
+		UI:        webui.Handler(),
+		Logger:    logger,
+	})
 	hs := &http.Server{
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
@@ -67,9 +92,17 @@ func runServe(args []string) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	ctx, shutdown := context.WithCancel(ctx)
+	defer shutdown()
 	served := make(chan error, 1)
 	go func() { served <- hs.Serve(ln) }()
-	logger.Info("listening", "addr", ln.Addr().String(), "home", home, "version", version.Version)
+	go admin.Serve(ctx, adminLn, adminHandler{auth: au, publicURL: pub, shutdown: shutdown, status: func() any {
+		return map[string]any{
+			"version": version.Version, "pid": os.Getpid(), "listen": addr, "home": home,
+			"public_url": pub(), "devices": len(au.Devices()),
+		}
+	}})
+	logger.Info("listening", "addr", addr, "public_url", pub(), "home", home, "version", version.Version)
 
 	select {
 	case err := <-served:
@@ -101,6 +134,71 @@ func checkLoopback(addr string) error {
 	return fmt.Errorf("--listen %q: 루프백 주소(127.0.0.1, ::1, localhost)만 허용합니다. 외부 접속은 tailscale serve로 엽니다", addr)
 }
 
+// checkPublicURL accepts an http or https origin. Pairing links go under
+// it, and the UI expects to live at its root.
+func checkPublicURL(v string) error {
+	if v == "" {
+		return nil
+	}
+	u, err := url.Parse(v)
+	if err != nil || u.Scheme != "https" && u.Scheme != "http" || u.Host == "" ||
+		strings.Trim(u.Path, "/") != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+		return fmt.Errorf("--public-url %q: https://호스트[:포트] 꼴이어야 합니다", v)
+	}
+	return nil
+}
+
+// publicURL is where devices reach this server, for pairing links: the
+// flag, else this machine's Tailscale name, looked up each time because
+// Tailscale may come up later, else the listen address, which only this
+// machine can open.
+func publicURL(flagValue, listen string, dnsName func(context.Context) (string, error)) func() string {
+	if flagValue != "" {
+		v := strings.TrimRight(flagValue, "/")
+		return func() string { return v }
+	}
+	return func() string {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if name, err := dnsName(ctx); err == nil {
+			return "https://" + name
+		}
+		return "http://" + listen
+	}
+}
+
+// adminHandler answers the mori commands through the admin socket.
+type adminHandler struct {
+	auth      *auth.Auth
+	publicURL func() string
+	status    func() any
+	shutdown  func()
+}
+
+func (h adminHandler) PairCode(name string) (string, string, time.Time) {
+	c := h.auth.NewCode(name)
+	return c.Code, server.PairLink(h.publicURL(), c.Code), c.Expires
+}
+
+func (h adminHandler) Devices() []admin.DeviceInfo {
+	var out []admin.DeviceInfo
+	for _, d := range h.auth.Devices() {
+		out = append(out, admin.DeviceInfo{ID: d.ID, Name: d.Name, UserAgent: d.UserAgent, CreatedMs: d.CreatedMs, LastSeenMs: d.LastSeenMs})
+	}
+	return out
+}
+
+func (h adminHandler) Revoke(id string) error {
+	err := h.auth.Revoke(id)
+	if errors.Is(err, auth.ErrNotFound) {
+		return fmt.Errorf("%q: 그런 기기가 없습니다. mori devices로 ID를 확인하세요", id)
+	}
+	return err
+}
+
+func (h adminHandler) Status() any { return h.status() }
+func (h adminHandler) Shutdown()   { h.shutdown() }
+
 // openLogger logs to stderr, or appends to path when one is given.
 func openLogger(path string) (*slog.Logger, func(), error) {
 	var w io.Writer = os.Stderr
@@ -115,9 +213,16 @@ func openLogger(path string) (*slog.Logger, func(), error) {
 	return slog.New(slog.NewTextHandler(w, nil)), closeFn, nil
 }
 
-// hostName is how this host introduces itself: the first label of the OS
-// host name, lowercased to match Tailscale machine names.
-func hostName() string {
+// hostName is how this host introduces itself: its Tailscale machine name,
+// which the user chose for the tailnet, else the first label of the OS host
+// name, lowercased as Tailscale does. On macOS the OS name comes from the
+// computer name and often differs.
+func hostName(dnsName func(context.Context) (string, error)) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if name, err := dnsName(ctx); err == nil {
+		return firstLabel(name)
+	}
 	h, err := os.Hostname()
 	if err != nil || h == "" {
 		return "mori"

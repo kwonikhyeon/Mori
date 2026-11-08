@@ -122,6 +122,10 @@ herdr 제품군에는 두 계열이 있다.
 | 28 | 캐시 레코드 복사 | 레코드를 제자리에서 바꾸지 않는다. 바뀐 필드만 다른 얕은 복사본을 새로 넣고, 안의 맵·슬라이스는 공유한 채 읽기만 한다. 이미 가진 값이 다시 오면 바뀐 것이 없다고 본다 | 이벤트마다 JSON 왕복으로 깊은 복사 | foreground 이벤트는 터미널마다 1초에 두 번쯤 온다. 깊은 복사는 그때마다 레코드 전체를 직렬화한다. 같은 값을 걸러야 브라우저에 헛된 갱신이 가지 않는다 |
 | 29 | 이벤트 채널 오류 | 연결이 살아 있으면 이벤트 채널만 다시 구독해 새 스냅숏을 받는다. 연달아 3번 넘게 실패하면 연결을 다시 맺는다 | 오류마다 `hc connect`부터 다시 연결 | 연결을 다시 맺으면 그 위의 attach가 모두 끊겨 브라우저의 터미널이 전부 4503으로 닫힌다. 깨진 줄 하나(결정 24) 때문에 그럴 까닭이 없다 |
 | 30 | Watch의 시작 상태 | `Watch`는 시작 시점의 터미널 목록과 연결 상태를 함께 준다. 방송과 같은 잠금 안에서 잡고, 방송도 그 잠금 안에서 막히지 않게 보낸다. `OnChange`만 잠금 밖에서 부른다 | `Watch`와 `Terminals`를 따로 부름 · 방송을 잠금 밖에서 보냄 | 따로 부르면 그 사이의 변경이 빠지거나 두 번 온다. 잠금 밖에서 보내면 시작 상태보다 오래된 업데이트가 뒤에 올 수 있다 |
+| 31 | API 오류 메시지 | Mori가 만든 `message`는 한국어로 쓴다. hc가 준 `message`는 그대로 넘긴다 | 모두 영어로 두고 UI가 kind로 번역 · hc 메시지까지 번역 | 한 kind(`invalid_params` 등)에 이유가 여럿이라 kind만으로는 무엇이 틀렸는지 말할 수 없다. hc 메시지는 종류를 다 알 수 없어 번역표를 만들 수 없다 |
+| 32 | 상태 디렉터리 하나에 서버 하나 | `serve`는 무엇보다 먼저 관리 소켓을 연다. 그 소켓에서 다른 서버가 응답하면 시작하지 않는다. 응답이 없으면 죽은 서버가 남긴 파일로 보고 지운다 | 따로 잠금 파일(flock) · 확인하지 않음 | 두 서버가 같은 `state.json`을 쓰면 서로의 변경을 덮는다. flock은 Windows에서 따로 만들어야 하고, 죽은 서버가 남긴 잠금도 풀어야 한다. 관리 소켓은 어차피 열고, 죽은 서버의 소켓은 연결을 받지 않는다 |
+| 33 | 호스트 이름 | Tailscale 머신 이름(MagicDNS 이름의 첫 라벨). 없으면 OS 호스트 이름의 첫 라벨을 소문자로 | OS 호스트 이름만 | macOS의 호스트 이름은 컴퓨터 이름("…의 Mac mini")에서 만들어져 tailnet의 이름과 다르다. 호스트 목록(결정 2)에는 사용자가 tailnet에서 붙인 이름이 보여야 한다 |
+| 34 | 철회와 열린 WS | `server.New`가 `Auth.OnRevoke`에 WS 허브를 잇는다. WS는 수락한 뒤 허브에 등록하고, 등록한 다음 기기가 아직 있는지 다시 본다 | `serve`에서 잇기 · 수락과 철회를 한 잠금으로 묶기 | 쿠키를 확인한 뒤 허브에 등록하기 전에 철회되면 그 WS는 열린 채 남는다. 등록한 뒤에 다시 보면 철회와 재확인 중 하나가 반드시 닫는다. 한 잠금으로 묶으려면 auth가 서버의 WS를 알아야 한다. `New`에서 이으면 테스트 서버도 똑같이 동작한다 |
 
 ## 4. 구조
 
@@ -162,7 +166,7 @@ herdr 제품군에는 두 계열이 있다.
 | `internal/gitx` | git CLI 실행과 출력 파싱 | `Status`, `Worktrees`, `Branches`, `Diff`, `AddWorktree`, `RemoveWorktree` | `git` 실행 파일 |
 | `internal/push` | VAPID 키, 구독, 알림 판정, 발송 | `Notifier.OnChange(change)`(바뀌기 전과 후의 레코드, 원인 이벤트), `Subscribe`, `Test` | `internal/store`, `internal/core`, webpush 라이브러리 |
 | `internal/server` | 라우팅, REST 핸들러, 이벤트 WS, attach WS 브리지 | `http.Handler` | 위 전부 |
-| `internal/admin` | 관리 소켓(Unix 도메인 소켓, Windows 10 이상 포함)과 그 클라이언트 | `Serve(path)`, `Client.Pair()`, `Client.Devices()` | `internal/auth` |
+| `internal/admin` | 관리 소켓(Unix 도메인 소켓, Windows 10 이상 포함)과 그 클라이언트 | `Listen(path)`, `Serve(ctx, ln, h)`, `Client.Do(req)` | `internal/auth` |
 | `internal/service` | LaunchAgent·Run 키 설치와 제거 | `Install(opts)`, `Uninstall()` | OS 도구(`launchctl`, `reg`) |
 | `internal/webui` | 빌드된 UI 임베드. 없으면 자리표시 페이지 | `Handler()` | `web/` 빌드 결과 |
 | `cmd/mori` | CLI: `serve`, `pair`, `devices`, `revoke`, `doctor`, `service install/uninstall`, `version` | — | 위 전부 |
@@ -170,8 +174,8 @@ herdr 제품군에는 두 계열이 있다.
 ## 6. 데이터 흐름
 
 ### 6.1 Mori 시작
-1. `state.json`을 읽는다. 없으면 VAPID 키를 만들어 새로 쓴다.
-2. 관리 소켓을 연다(남은 소켓 파일은 지운다).
+1. 관리 소켓을 연다. 다른 Mori 서버가 그 소켓에서 응답하면 시작하지 않는다. 응답이 없는 소켓 파일은 지운다(결정 32).
+2. `state.json`을 읽는다. 없으면 VAPID 키를 만들어 새로 쓴다.
 3. 코어 관리자가 `hc connect`를 띄운다. 그다음 `hello {framed: true, generation: 1}`을 보낸다. 이어서 `events.subscribe {}`로 스냅숏을 받아 캐시를 채운다. 실패하면 Windows에서는 한 번 `hc server start`를 실행한다. 이후 0.5초에서 10초까지 늘어나는 간격으로 다시 시도한다.
 4. HTTP 서버가 127.0.0.1:7761에서 듣는다.
 5. 시작할 때의 상태로는 알림을 보내지 않는다. 알림은 시작 뒤의 변화에만 반응한다.
@@ -290,7 +294,7 @@ herdr 제품군에는 두 계열이 있다.
 | 503 | `unavailable`, `core_unavailable` |
 | 500 | 나머지 |
 
-Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limited`(429), `git_failed`(422)가 있다.
+Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limited`(429), `too_large`(413), `git_failed`(422)가 있다. Mori가 만든 `message`는 한국어이고, hc가 준 `message`는 그대로 넘긴다(결정 31).
 
 ## 8. 보안
 

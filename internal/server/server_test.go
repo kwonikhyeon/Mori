@@ -2,16 +2,15 @@ package server
 
 import (
 	"encoding/json"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
 func TestHelloIsPublicAndHasSecurityHeaders(t *testing.T) {
-	s := New(Deps{Version: "v-test", HostName: "macmini", UI: http.NotFoundHandler()})
+	e := newTestEnv(t, func(d *Deps) { d.Version, d.HostName = "v-test", "macmini" })
 	rec := httptest.NewRecorder()
-	s.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/api/hello", nil))
+	e.s.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/api/hello", nil))
 	if rec.Code != 200 {
 		t.Fatalf("status %d", rec.Code)
 	}
@@ -45,11 +44,13 @@ func TestCSPListsOwnHostForWebSockets(t *testing.T) {
 }
 
 func TestUnknownAPIPathIsJSON404(t *testing.T) {
-	s := New(Deps{})
-	rec := httptest.NewRecorder()
-	s.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/api/nope", nil))
-	if rec.Code != 404 || !strings.Contains(rec.Body.String(), `"kind":"not_found"`) {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
+	e := newTestEnv(t)
+	e.pair()
+	for _, path := range []string{"/api/nope", "/api/pair", "/ws/nope"} { // GET /api/pair: wrong method
+		r := e.do("GET", path, nil)
+		if r.StatusCode != 404 || decode[errorBody](t, r).Error.Kind != "not_found" {
+			t.Fatalf("%s: %d", path, r.StatusCode)
+		}
 	}
 }
 

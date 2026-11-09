@@ -121,6 +121,20 @@ a.btn-danger:hover {
   color: var(--pressed-text);
 }
 
+/* A finger needs 44 px on a phone: the small sizes grow there. */
+@media (max-width: 767px) {
+  .btn,
+  .btn-sm,
+  .btn-xs {
+    height: 44px;
+  }
+
+  .btn-icon,
+  .btn-icon.btn-sm {
+    width: 44px;
+  }
+}
+
 /* The state of a terminal. */
 .chip {
   display: inline-flex;
@@ -236,6 +250,12 @@ a.btn-danger:hover {
   box-shadow: var(--shadow-seg);
   color: var(--text);
   font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .seg-btn {
+    height: 44px;
+  }
 }
 
 /* The host's dot. */
@@ -421,6 +441,13 @@ html.is-resizing * {
 @media (max-width: 767px) {
   .toasts {
     bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Out to the toast's edges: 44 px, and the toast no taller. */
+  .toast-close {
+    width: 44px;
+    height: 44px;
+    margin: -8px -8px -8px 0;
   }
 }
 

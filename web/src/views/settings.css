@@ -535,4 +535,8 @@ label.st-row:has(input:disabled) {
     width: 44px;
     height: 44px;
   }
+
+  .st-task {
+    min-height: 44px;
+  }
 }

@@ -507,7 +507,16 @@
 }
 
 .cs-meta a {
+  position: relative;
   font-size: 12px;
+}
+
+/* A parent in a sentence: 44 px tall to a finger, the line as it was. Not
+   wider: two parents sit side by side. */
+.cs-meta a::after {
+  content: "";
+  position: absolute;
+  inset: -14px 0;
 }
 
 .cs-files {

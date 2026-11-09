@@ -330,6 +330,17 @@ a.host-pop-link:hover {
   font-size: 13px;
 }
 
+/* A link in a sentence: 44 px to a finger, the line as it was. */
+.host-pop-none a {
+  position: relative;
+}
+
+.host-pop-none a::after {
+  content: "";
+  position: absolute;
+  inset: -14px -11px;
+}
+
 .tabbar {
   display: flex;
   flex: none;

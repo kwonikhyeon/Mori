@@ -132,4 +132,8 @@
     height: 44px;
     font-size: 16px;
   }
+
+  .fp-hidden {
+    min-height: 44px;
+  }
 }

@@ -92,8 +92,9 @@ func New(d Deps) *Server {
 // Handler is the root handler with security headers on every response.
 func (s *Server) Handler() http.Handler { return securityHeaders(s.mux) }
 
-// routes puts every API and WebSocket behind requireDevice; the web UI
-// itself is public.
+// routes puts every API and WebSocket behind requireDevice, but for the
+// relay endpoint, whose secret path is its credential; the web UI itself is
+// public.
 func (s *Server) routes() {
 	api := http.NewServeMux()
 	api.HandleFunc("GET /api/hello", s.handleHello)
@@ -160,6 +161,7 @@ func (s *Server) routes() {
 	s.mux.Handle("/api/", guarded)
 	s.mux.Handle("/ws/", guarded)
 	s.mux.Handle("/h/", guarded)
+	s.mux.HandleFunc("POST /api/relay/{secret}", s.handleRelay) // outside requireDevice: a push service has no cookie
 	s.mux.Handle("/", s.d.UI)
 }
 

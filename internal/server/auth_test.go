@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"io"
@@ -22,15 +23,23 @@ import (
 )
 
 type testEnv struct {
-	t     *testing.T
-	srv   *httptest.Server
-	s     *Server
-	auth  *auth.Auth
-	store *store.Store
-	token string // the paired device's cookie, once pair has run
+	t          *testing.T
+	srv        *httptest.Server
+	s          *Server
+	auth       *auth.Auth
+	store      *store.Store
+	token      string       // the paired device's cookie, once pair has run
+	httpClient *http.Client // nil: http.DefaultClient; an https env's trusts its certificate
 }
 
 func newTestEnv(t *testing.T, opts ...func(*Deps)) *testEnv {
+	t.Helper()
+	return startTestEnv(t, httptest.NewUnstartedServer(nil), false, opts...)
+}
+
+// startTestEnv serves a new server on srv, over TLS when useTLS is set. srv
+// has not started, so a test knows its address before the server is made.
+func startTestEnv(t *testing.T, srv *httptest.Server, useTLS bool, opts ...func(*Deps)) *testEnv {
 	t.Helper()
 	st, err := store.Open(filepath.Join(t.TempDir(), "state.json"))
 	if err != nil {
@@ -44,9 +53,16 @@ func newTestEnv(t *testing.T, opts ...func(*Deps)) *testEnv {
 		o(&d)
 	}
 	s := New(d)
-	srv := httptest.NewServer(s.Handler())
-	t.Cleanup(srv.Close)
-	return &testEnv{t: t, srv: srv, s: s, auth: d.Auth, store: d.Store}
+	srv.Config.Handler = s.Handler()
+	t.Cleanup(srv.Close) // after TempDir's, so it runs first: the server stops before its state goes
+	e := &testEnv{t: t, srv: srv, s: s, auth: d.Auth, store: d.Store}
+	if useTLS {
+		srv.StartTLS()
+		e.httpClient = srv.Client()
+	} else {
+		srv.Start()
+	}
+	return e
 }
 
 // do sends a request with the device cookie (if paired) and a same-origin
@@ -80,7 +96,7 @@ func (e *testEnv) doFrom(origin, method, path string, body any) *http.Response {
 	if e.token != "" {
 		req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: e.token})
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := cmp.Or(e.httpClient, http.DefaultClient).Do(req)
 	if err != nil {
 		e.t.Fatal(err)
 	}
@@ -123,7 +139,7 @@ func (e *testEnv) tryWS(origin, path string) (*websocket.Conn, *http.Response, e
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	return websocket.Dial(ctx, "ws"+strings.TrimPrefix(e.srv.URL, "http")+path, &websocket.DialOptions{HTTPHeader: h})
+	return websocket.Dial(ctx, "ws"+strings.TrimPrefix(e.srv.URL, "http")+path, &websocket.DialOptions{HTTPHeader: h, HTTPClient: e.httpClient})
 }
 
 // readUntilClosed reads until the server closes c and returns the code.

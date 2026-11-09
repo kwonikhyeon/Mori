@@ -5,6 +5,7 @@ import (
 	"crypto/ecdh"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"slices"
 	"strings"
@@ -19,6 +20,7 @@ import (
 type recordSender struct {
 	mu     sync.Mutex
 	sent   []string // endpoints
+	bodies [][]byte // what was sent, before encryption
 	status int
 }
 
@@ -26,10 +28,27 @@ func (r *recordSender) Send(ctx context.Context, sub store.PushSub, payload []by
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.sent = append(r.sent, sub.Endpoint)
+	r.bodies = append(r.bodies, payload)
 	if r.status != 0 {
 		return r.status, nil
 	}
 	return 201, nil
+}
+
+// payloads are the notifications sent so far, decoded.
+func (r *recordSender) payloads(t *testing.T) []push.Payload {
+	t.Helper()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var ps []push.Payload
+	for _, b := range r.bodies {
+		var p push.Payload
+		if err := json.Unmarshal(b, &p); err != nil {
+			t.Fatal(err)
+		}
+		ps = append(ps, p)
+	}
+	return ps
 }
 
 func (r *recordSender) answer(status int) {

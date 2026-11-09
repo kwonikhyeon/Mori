@@ -30,5 +30,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['test/setup.ts'],
+    // Stylesheets are emptied in tests; one asked for as text stays as it is (styles.test.ts).
+    css: { include: [/\.css\?raw$/] },
   },
 })

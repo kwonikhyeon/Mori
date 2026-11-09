@@ -98,6 +98,7 @@ a.host-link:hover {
 }
 
 .pc-list {
+  position: relative;
   flex: 1;
   min-height: 0;
   margin: -2px;
@@ -116,6 +117,7 @@ a.host-link:hover {
 
 .pc-main,
 .pc-aside {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -191,6 +193,11 @@ a.host-link:hover {
   font-size: 13px;
 }
 
+.ph-sub b {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .fab,
 a.fab,
 a.fab:hover {
@@ -219,6 +226,7 @@ a.fab:hover {
 }
 
 .ph-scroll {
+  position: relative;
   flex: 1;
   min-height: 0;
   padding: 8px calc(16px + env(safe-area-inset-right, 0px)) 24px calc(16px + env(safe-area-inset-left, 0px));
@@ -369,29 +377,4 @@ a.tab[aria-current="page"] {
   font-weight: 700;
   line-height: 18px;
   text-align: center;
-}
-
-/* ---------- a screen still to come ---------- */
-.pending {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.pending-head {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px 8px;
-}
-
-.pending-head h1 {
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.pending .empty {
-  flex: 1;
-  justify-content: center;
 }

@@ -21,6 +21,9 @@ export const effectiveTheme = computed<Mode>(() =>
 
 const isPref = (v: unknown): v is ThemePref => v === 'system' || v === 'light' || v === 'dark'
 
+/** What each choice is called on the header button and in Settings. */
+export const THEME_LABEL: Record<ThemePref, string> = { system: '시스템', light: '밝게', dark: '어둡게' }
+
 export function setTheme(t: ThemePref): void {
   theme.value = t
   save(KEY, t)

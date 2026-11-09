@@ -347,6 +347,7 @@ a.term-note-link:hover {
 
 /* ---------- quick keys (phone) ---------- */
 .term-keys {
+  position: relative;
   display: flex;
   flex: none;
   gap: 6px;

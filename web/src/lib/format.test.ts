@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { folder, status, term, worktree } from '../../test/fixtures'
-import { appName, askText, branchLine, branchOf, changeGroups, chip, commitItems, endText, fileParts, fileTotals, finishedLine, homeWorktree, place, shortHash, shortPath, splitMessage } from './format'
+import { appName, askText, branchLine, branchOf, changeGroups, chip, commitItems, endText, fileParts, fileTotals, finishedLine, homeWorktree, place, shortHash, shortPath, splitMessage, versionText } from './format'
 import type { Change, Commit, CommitFile, Preset } from './types'
 
 const presets: Preset[] = [
@@ -73,6 +73,15 @@ describe('homeWorktree', () => {
     expect(homeWorktree(folder({ path: '/Users/me/dev/elsewhere' }), [gone, sub])).toBe(sub)
     expect(homeWorktree(folder({ path: gone.path }), [gone])).toBeUndefined()
     expect(homeWorktree(folder(), [])).toBeUndefined()
+  })
+})
+
+describe('versionText', () => {
+  it('writes v before a released version and leaves a build of a commit as it is', () => {
+    expect(versionText('0.1.0')).toBe('v0.1.0')
+    expect(versionText('v0.1.0')).toBe('v0.1.0')
+    expect(versionText('3f6187f-dirty')).toBe('3f6187f-dirty')
+    expect(versionText('dev')).toBe('dev')
   })
 })
 

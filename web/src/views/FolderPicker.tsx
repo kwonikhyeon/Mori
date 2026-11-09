@@ -1,5 +1,6 @@
 // Picks where a new session runs: a registered folder, or any directory of
 // this computer (GET /api/fs, spec §3 #74), which is registered on the way.
+// Settings opens it on browsing only, to add a folder.
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Icon } from '../components/Icon'
 import { Sheet, SheetHead } from '../components/Sheet'
@@ -16,6 +17,8 @@ export interface FolderPickerProps {
   value?: string
   onPick: (f: FolderView) => void
   onClose: () => void
+  /** Only browse, to register a folder: no list to pick from. */
+  browse?: boolean
 }
 
 export function FolderPicker({ open, ...p }: FolderPickerProps) {
@@ -31,14 +34,18 @@ type PickerProps = Omit<FolderPickerProps, 'open'> & { id: string }
 
 function Picker(p: PickerProps) {
   // With nothing registered yet there is nothing to pick from.
-  const [adding, setAdding] = useState(() => folders.peek().length === 0)
+  const [adding, setAdding] = useState(() => !!p.browse || folders.peek().length === 0)
   // The button that switched is gone; the new title takes the focus.
   const first = useRef(true)
   useEffect(() => {
     if (first.current) first.current = false
     else document.getElementById(p.id)?.focus()
   }, [adding])
-  return adding ? <Browse {...p} onList={folders.value.length > 0 ? () => setAdding(false) : undefined} /> : <List {...p} onAdd={() => setAdding(true)} />
+  return adding ? (
+    <Browse {...p} onList={!p.browse && folders.value.length > 0 ? () => setAdding(false) : undefined} />
+  ) : (
+    <List {...p} onAdd={() => setAdding(true)} />
+  )
 }
 
 function List({ id, value, onPick, onClose, onAdd }: PickerProps & { onAdd: () => void }) {
@@ -88,7 +95,7 @@ function startDir(f: FolderView | undefined): string {
 // Windows does not tell case apart in a path.
 const samePath = (a: string, b: string) => (/^[A-Za-z]:\\|^\\\\/.test(a) ? a.toLowerCase() === b.toLowerCase() : a === b)
 
-function Browse({ id, value, onPick, onClose, onList }: PickerProps & { onList?: () => void }) {
+function Browse({ id, value, onPick, onClose, onList, browse }: PickerProps & { onList?: () => void }) {
   const [listing, setListing] = useState<FsListing | null>(null)
   const [path, setPath] = useState('')
   const [hidden, setHidden] = useState(false)
@@ -120,7 +127,7 @@ function Browse({ id, value, onPick, onClose, onList }: PickerProps & { onList?:
   const here = listing?.path
   const known = here ? folders.value.find((f) => samePath(f.path, here)) : undefined
   const register = async () => {
-    if (!here || saving) return
+    if (!here || saving || (browse && known)) return
     if (known) {
       onPick(known)
       return
@@ -211,8 +218,8 @@ function Browse({ id, value, onPick, onClose, onList }: PickerProps & { onList?:
           />
           숨긴 폴더 보기
         </label>
-        <button type="button" class="btn btn-primary" disabled={!here || saving} onClick={() => void register()}>
-          {known ? '이 폴더 고르기' : '이 폴더 등록'}
+        <button type="button" class="btn btn-primary" disabled={!here || saving || (browse && !!known)} onClick={() => void register()}>
+          {known ? (browse ? '등록된 폴더입니다' : '이 폴더 고르기') : '이 폴더 등록'}
         </button>
       </footer>
     </>

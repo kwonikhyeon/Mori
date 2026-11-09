@@ -1,5 +1,6 @@
 /* The pairing screen: one card in the middle, in B's style. */
 .pair {
+  position: relative;
   display: grid;
   place-items: center;
   height: 100%;

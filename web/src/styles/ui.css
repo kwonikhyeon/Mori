@@ -679,6 +679,7 @@ dialog.sheet::backdrop {
 }
 
 .sheet-body {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   padding: 12px 16px;

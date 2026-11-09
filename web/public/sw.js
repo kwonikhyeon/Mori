@@ -43,3 +43,29 @@ self.addEventListener('notificationclick', (e) => {
     })(),
   )
 })
+
+// A push service may replace a subscription by itself (Firefox does). The
+// new one goes to the server with the kinds this device chose. A device the
+// server holds nothing for stays off: it was turned off, or the server
+// forgot an expired subscription, and Settings says so.
+self.addEventListener('pushsubscriptionchange', (e) => {
+  e.waitUntil(
+    (async () => {
+      const get = (path) => fetch(path, { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : null))
+      const mine = await get('/api/push/subscriptions')
+      if (!Array.isArray(mine) || mine.length === 0) return
+      let sub = e.newSubscription
+      if (!sub) {
+        const k = await get('/api/push/key')
+        if (!k || typeof k.key !== 'string') return
+        sub = await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: k.key })
+      }
+      await fetch('/api/push/subscriptions', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub.toJSON(), kinds: mine[0].kinds }),
+      })
+    })(),
+  )
+})

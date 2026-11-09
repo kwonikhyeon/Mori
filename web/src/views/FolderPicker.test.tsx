@@ -126,6 +126,30 @@ describe('FolderPicker', () => {
     expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0)
   })
 
+  it('opens on browsing to add a folder, with no list to go back to', async () => {
+    folders.value = [mori(), site]
+    render(<FolderPicker open browse onPick={pick} onClose={close} />)
+    expect(screen.getByRole('dialog', { name: '폴더 추가' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '등록된 폴더로' })).toBeNull()
+    await listOf('~')
+    expect(fsAsked()).toEqual([['', '']])
+
+    // A registered folder cannot be added again.
+    await goTo('/Users/me/dev/site')
+    await screen.findByText('하위 폴더가 없습니다')
+    const known = screen.getByRole('button', { name: '등록된 폴더입니다' }) as HTMLButtonElement
+    expect(known.disabled).toBe(true)
+    fireEvent.click(known)
+    expect(pick).not.toHaveBeenCalled()
+
+    await goTo('/Users/me/dev')
+    await listOf('~/dev')
+    const newer = folder({ id: 'f9', name: 'dev', path: '/Users/me/dev', repo: false, worktrees: [] })
+    reply = (c) => (c.path === '/api/folders' && c.method === 'POST' ? Response.json(newer, { status: 201 }) : fs(c))
+    fireEvent.click(screen.getByRole('button', { name: '이 폴더 등록' }))
+    await vi.waitFor(() => expect(pick).toHaveBeenCalledWith(newer))
+  })
+
   it('says what went wrong and keeps the folder it showed', async () => {
     folders.value = [mori()]
     open('f1')

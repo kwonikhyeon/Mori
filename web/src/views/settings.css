@@ -1,0 +1,538 @@
+/* 설정 (the B-Pair board): one column of cards, on a phone and a PC alike. */
+
+.st {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.st-head {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.st-head h1 {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.st-sub {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-sub b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.st-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg);
+}
+
+.st-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.st-pc .st-col {
+  gap: 16px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 24px 32px;
+}
+
+/* ---------- cards ---------- */
+.st-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+/* A card of rows: the rows reach closer to its edge. */
+.st-card.st-list {
+  gap: 0;
+  padding: 8px 8px 12px;
+}
+
+.st-h2 {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.st-list > .st-h2 {
+  padding: 8px 8px 4px;
+}
+
+.st-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.st-card-head .st-h2 {
+  flex: 1;
+}
+
+.st-list > .st-card-head {
+  min-height: 46px;
+  padding: 4px 8px;
+}
+
+.st-text {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.st-hint {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.st-list > .st-hint,
+.st-list > .st-none,
+.st-list > .form-error {
+  margin: 4px 8px 0;
+}
+
+.st-none {
+  padding: 10px 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+/* ---------- rows ---------- */
+.st-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 6px 8px;
+}
+
+label.st-row {
+  cursor: pointer;
+}
+
+label.st-row:has(input:disabled) {
+  cursor: default;
+}
+
+.st-row-icon {
+  flex: none;
+  color: var(--text-2);
+}
+
+.st-row-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.st-row-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.st-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-row-sub {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-row-sub.is-wrap {
+  overflow: visible;
+  white-space: normal;
+}
+
+.st-check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.st-div {
+  flex: none;
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--divider);
+}
+
+.st-div.is-tight {
+  margin: 0 8px;
+}
+
+.st-acts {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+
+.st-pill {
+  flex: none;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--selected);
+  color: var(--pressed-text);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.st-revoke {
+  flex: none;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+/* ---------- 알림 ---------- */
+.st-preview {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--chip);
+}
+
+.st-preview-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.st-preview-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.st-preview-app {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.st-preview-title {
+  font-weight: 700;
+}
+
+.st-preview-body {
+  color: var(--text-4);
+  font-size: 13px;
+}
+
+.st-kinds {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.st-kinds legend {
+  padding: 6px 8px 2px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.st-kind {
+  min-height: 48px;
+  padding: 4px 8px;
+}
+
+.st-kind-name {
+  flex: 1;
+}
+
+.st-kinds:disabled .st-kind-name {
+  color: var(--text-3);
+}
+
+.st-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.st-dot-blocked {
+  background: var(--dot-blocked);
+}
+
+.st-dot-waiting {
+  background: var(--dot-waiting);
+}
+
+.st-dot-error {
+  background: var(--dot-error);
+}
+
+.st-dot-exited {
+  border: 2px solid var(--dot-exited);
+}
+
+.st-note {
+  margin: 4px 8px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+/* ---------- 새 기기 페어링 ---------- */
+.st-pair {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.qr {
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #FFFFFF;
+}
+
+.st-pair-code {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.st-pair-label {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.st-pair-value {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: .06em;
+}
+
+.st-pair-left {
+  color: var(--text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.st-link {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The whole link, wrapped: one tap selects it. */
+.st-link-text {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.st-link .btn {
+  flex: none;
+  align-self: flex-start;
+}
+
+/* ---------- 화면 ---------- */
+.st-theme .seg {
+  max-width: 360px;
+}
+
+/* ---------- 폴더, 다른 호스트, 프리셋 ---------- */
+.st-rename {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.st-rename .input {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.st-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 8px 0;
+}
+
+.st-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.st-item .input {
+  background: var(--surface);
+}
+
+.st-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px -4px -4px 0;
+}
+
+.st-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-item-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.st-pc .st-item-fields.is-pair {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.st-pc .st-item-fields.is-host {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+}
+
+.st-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.st-task .st-check {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+
+.st-task-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.st-task-name {
+  font-weight: 600;
+}
+
+.st-add {
+  align-self: flex-start;
+}
+
+.st-edit-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---------- 정보 ---------- */
+.st-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.st-facts > div {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.st-facts dt {
+  flex: none;
+  width: 96px;
+  color: var(--text-2);
+}
+
+.st-facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The board's sizes for a finger. */
+@media (max-width: 767px) {
+  .st-btn {
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  .st-acts .btn-icon {
+    width: 44px;
+    height: 44px;
+  }
+}

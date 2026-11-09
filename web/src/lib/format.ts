@@ -56,6 +56,11 @@ export function shortHash(h: string): string {
 
 const HOME = /^(\/Users\/(?!Shared(?:\/|$))[^/]+|\/home\/[^/]+|[A-Za-z]:\\Users\\[^\\]+)(?=$|[/\\])/
 
+/** A version as people read it: v before a bare 1.2.3; a commit's hash or "dev" as it is. */
+export function versionText(v: string): string {
+  return /^\d+\.\d+/.test(v) ? 'v' + v : v
+}
+
 /** A path with the home folder written as ~. */
 export function shortPath(p: string): string {
   return p.replace(HOME, '~')

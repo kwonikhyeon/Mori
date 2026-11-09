@@ -58,6 +58,21 @@ function withHistory() {
   )
 }
 
+/** A server for 설정: this device alone, and no notifications set. */
+function settingsServer() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (u: string) => {
+      const path = new URL(u, 'http://mori.test').pathname
+      if (path === '/api/devices') return Response.json([{ id: 'me', name: 'Mac · Chrome', user_agent: '', created_ms: 1, last_seen_ms: 1, current: true }])
+      if (path === '/api/push/subscriptions') return Response.json([])
+      if (path === '/api/push/key') return Response.json({ key: 'K' })
+      if (path === '/api/push/settings') return Response.json({ children: false })
+      return Response.json({})
+    }),
+  )
+}
+
 beforeEach(() => {
   FakeWebSocket.reset()
   vi.stubGlobal('WebSocket', FakeWebSocket)
@@ -197,6 +212,29 @@ describe('PC', () => {
     expect(within(nav).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['https://desk.example.ts.net'])
   })
 
+  it('opens the settings in the main area', async () => {
+    settingsServer()
+    at(1440, { name: 'settings' })
+    render(<Shell />)
+    const main = screen.getByRole('main')
+    expect(within(main).getByRole('heading', { level: 1, name: '설정' })).toBeTruthy()
+    const sub = main.querySelector('.st-sub')!
+    expect(sub.textContent).toBe('macmini · 이 호스트의 알림과 기기')
+    expect(sub.querySelector('b')!.textContent).toBe('macmini')
+    expect(await within(main).findByRole('heading', { name: '기기 1' })).toBeTruthy()
+    expect(within(main).getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      '이렇게 알립니다',
+      '알림',
+      '기기 1',
+      '새 기기 페어링',
+      '화면',
+      '폴더 1',
+      '다른 호스트',
+      '프리셋 0',
+      '정보',
+    ])
+  })
+
   it('cycles the theme from the header', () => {
     at(1440, { name: 'queue' })
     render(<Shell />)
@@ -236,9 +274,23 @@ describe('phone', () => {
     expect(screen.getByText('다른 호스트')).toBeTruthy()
     const pop = document.getElementById(btn.getAttribute('aria-controls')!)!
     expect(within(pop).getByRole('link', { name: '설정' }).getAttribute('href')).toBe('#/settings')
+    expect(pop.querySelector('.host-pop-ver')!.textContent).toBe('연결됨 · v0.1.0')
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(btn.getAttribute('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(btn)
+  })
+
+  it('opens the settings tab, with the host it is about in place of the host menu', async () => {
+    settingsServer()
+    at(390, { name: 'settings' })
+    render(<Shell />)
+    const tabs = within(screen.getByRole('navigation', { name: '주 메뉴' })).getAllByRole('link')
+    expect(tabs.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, 'page'])
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('설정')
+    expect(document.querySelector('.ph-sub')!.textContent).toBe('macmini · 이 호스트의 알림과 기기')
+    expect(screen.queryByRole('button', { name: /macmini/ })).toBeNull()
+    expect(await screen.findByRole('heading', { name: '기기 1' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '화면' })).toBeTruthy()
   })
 
   it('gives a session the whole screen', () => {

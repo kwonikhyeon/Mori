@@ -10,20 +10,21 @@ import { Segmented } from '../components/Segmented'
 import { Splitter } from '../components/Splitter'
 import { needs } from '../lib/badge'
 import { hello, hostLabel } from '../lib/boot'
+import { versionText } from '../lib/format'
 import { hostState } from '../lib/health'
 import { otherHosts } from '../lib/hosts'
 import { isPhone, viewportWidth } from '../lib/media'
 import { ASIDE, layout, loadWidth, saveWidth, SIDEBAR, type Pane } from '../lib/resize'
 import { href, navigate, route, type Route } from '../lib/router'
 import { conn, core, host, hosts, terminals } from '../lib/store'
-import { setTheme, theme, type ThemePref } from '../lib/theme'
+import { setTheme, theme, THEME_LABEL, type ThemePref } from '../lib/theme'
 import { CommitPanel } from './Commit'
 import { FolderList } from './Folders'
 import { GitPanel, GitScreen, gitFrom } from './Git'
 import { GraphScreen } from './Graph'
 import { NewSession } from './NewSession'
-import { Pending } from './Pending'
 import { QueueList } from './Queue'
+import { Settings } from './Settings'
 import { Terminal } from './Terminal'
 import './shell.css'
 
@@ -45,7 +46,7 @@ function pcMain(r: Route): ComponentChildren {
     case 'folders':
       return <PcEmpty />
     case 'settings':
-      return <Pending title="설정" />
+      return <Settings variant="pc" />
     case 'new':
       return <NewSession key={href(r)} variant="pc" folder={r.folder} wt={r.wt} />
     case 'terminal':
@@ -267,7 +268,6 @@ function PcEmpty() {
 
 /* ---------- the theme ---------- */
 
-export const THEME_LABEL: Record<ThemePref, string> = { system: '시스템', light: '밝게', dark: '어둡게' }
 const THEME_ICON: Record<ThemePref, IconName> = { system: 'monitor', light: 'sun', dark: 'moon' }
 const THEME_NEXT: Record<ThemePref, ThemePref> = { system: 'light', light: 'dark', dark: 'system' }
 
@@ -303,8 +303,17 @@ function PhoneShell() {
       )
     case 'settings':
       return (
-        <PhoneTab key="settings" tab="settings" title="설정" sub={`${thisHost()} · 이 호스트의 알림과 기기`}>
-          <Pending title="설정" />
+        <PhoneTab
+          key="settings"
+          tab="settings"
+          title="설정"
+          sub={
+            <>
+              <b>{thisHost()}</b> · 이 호스트의 알림과 기기
+            </>
+          }
+        >
+          <Settings variant="phone" />
         </PhoneTab>
       )
     default:
@@ -316,7 +325,7 @@ interface PhoneTabProps {
   tab: Tab
   title: string
   /** A line under the title in place of the host button. */
-  sub?: string
+  sub?: ComponentChildren
   fab?: boolean
   children: ComponentChildren
 }
@@ -388,7 +397,7 @@ function HostMenu() {
           <p class="host-pop-cur">
             <span class={`dot dot-${hs.dot}`} aria-hidden="true" />
             <b>{thisHost()}</b>
-            <span class="host-pop-ver">{[hs.text, version && `v${version}`].filter(Boolean).join(' · ')}</span>
+            <span class="host-pop-ver">{[hs.text, version && versionText(version)].filter(Boolean).join(' · ')}</span>
           </p>
           <p class="host-pop-title">다른 호스트</p>
           {others.length > 0 ? (

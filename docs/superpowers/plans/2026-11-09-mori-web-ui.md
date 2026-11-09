@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 후보 B(알림함)로 폰과 PC에서 실제로 일할 수 있는 웹 UI를 만든다. 다크 모드와 너비를 바꿀 수 있는 사이드바를 더한다(결정 113~134).
+**Goal:** 후보 B(알림함)로 폰과 PC에서 실제로 일할 수 있는 웹 UI를 만든다. 다크 모드와 너비를 바꿀 수 있는 사이드바를 더한다(결정 113~134, 구현 중에 정한 것은 141~157).
 
 **Architecture:** `web/`의 Preact 앱을 Vite로 빌드해 `internal/webui/dist`에 넣고, Go 바이너리가 그것을 임베드해 준다. 화면 상태는 `/ws/events` 하나가 채우는 signals 저장소에 있고, 터미널 화면마다 `/ws/attach` 하나와 xterm.js 하나를 둔다. 나머지는 REST다. 화면 경로는 URL 해시에 있다.
 
 **Tech Stack:** Preact 10.29.8, `@preact/signals` 2.11.3, TypeScript 6.0.3, Vite 8.3.5, Vitest 5.0.5 + jsdom 30.1.3 + `@testing-library/preact` 3.2.6, `@xterm/xterm` 6.0.0(+ fit 0.11.0, unicode11 0.9.0, web-links 0.12.0), `uqr` 0.1.3, `@fontsource/inter`·`@fontsource/jetbrains-mono` 5.3.0.
 
-**Spec:** `docs/superpowers/specs/2026-11-08-mori-design.md` (§6.2~6.8, §7, §9, 결정 113~134)
+**Spec:** `docs/superpowers/specs/2026-11-08-mori-design.md` (§6.2~6.8, §7, §9, 결정 113~157)
 
 ## Global Constraints
 

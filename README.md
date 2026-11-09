@@ -6,7 +6,25 @@ herdr-core(`hc`) 위에서 도는 원격 작업 웹앱입니다. 터미널 세�
 - **호스트마다 Mori 하나:** 세션을 돌릴 컴퓨터마다 Mori를 설치합니다. 한 호스트가 꺼져도 나머지는 계속 돕니다.
 - **tailnet 안에서만:** Mori는 127.0.0.1에서만 듣습니다. 다른 기기에서는 `tailscale serve`가 주는 `https://<호스트>.<tailnet>.ts.net`으로 엽니다.
 
-> 지금은 백엔드 v1입니다. 웹 화면은 자리표시 페이지이고, UI는 [설계](docs/superpowers/specs/2026-11-08-mori-design.md) §12의 단계 9~10에서 만듭니다.
+> 단계 10(웹 UI)까지 만들었습니다. 실제 기기에서 확인할 것(iPhone 홈 화면 앱의 입력과 알림, Windows 호스트, 에이전트의 상태 보고)은 [설계](docs/superpowers/specs/2026-11-08-mori-design.md) §13과 §15에 남아 있습니다.
+
+## 화면
+
+폰과 PC가 같은 주소를 엽니다. 창의 폭이 768px보다 좁으면 폰 배치, 그 이상이면 PC 배치입니다.
+
+- **폰:** 한 번에 한 화면입니다. 아래 탭으로 지금 볼 것, 폴더, 설정을 오가고, 지금 볼 것과 폴더의 오른쪽 위 + 버튼으로 새 세션을 엽니다. 세션을 누르면 터미널 화면이 열립니다. 제목 아래의 호스트 이름을 누르면 다른 호스트로 갈 수 있습니다.
+- **PC:** 왼쪽 사이드바(지금 볼 것, 폴더), 가운데 본문(터미널, 새 세션, 설정), 오른쪽 패널(Git, 커밋)입니다. 사이드바와 패널의 너비는 그 사이의 손잡이를 끌거나 방향키로 바꾸고, 손잡이를 두 번 누르면 기본 너비로 돌아갑니다. 너비는 기기마다 기억합니다. 헤더에는 다른 호스트로 가는 링크, 새 세션, 화면 테마, 설정이 있습니다.
+- **다크 모드:** 시스템, 밝게, 어둡게 중에서 고르고 기기마다 기억합니다. PC 헤더의 버튼이나 설정의 "화면"에서 바꿉니다. 터미널은 두 모드 모두 어둡습니다.
+
+| 화면 | 하는 일 |
+|---|---|
+| 지금 볼 것 | 살아 있는 세션을 승인 대기, 오류, 입력 대기, 작업 중으로 묶고, 묶음 안에서는 방금 바뀐 세션이 위에 옵니다. 숫자 배지는 승인 대기, 오류, 입력 대기를 더한 것입니다 |
+| 폴더 | 등록한 폴더별 세션. 폴더마다 새 세션을 열고 Git 화면으로 갑니다 |
+| 터미널 | 직접 입력합니다. 빠른 키(Esc, Tab, 화살표, Ctrl+C 등), 여러 줄 보내기, 파일 올리기(끌어다 놓기, 붙여넣기), 승인 대기의 응답 키, 보기 전용이 있습니다 |
+| 새 세션 | 폴더와 프리셋(Claude Code, Codex, 셸)을 고르고, 있는 워크트리나 새 브랜치(새 워크트리를 만듭니다)에서 엽니다 |
+| Git | 브랜치, 워크트리, 바뀐 파일과 diff. 워크트리를 고르거나 지웁니다 |
+| 커밋 그래프 | 브랜치와 병합이 보이는 기록. 커밋을 누르면 상세와 diff를 봅니다. Git 화면에서 엽니다 |
+| 설정 | 알림, 기기, 새 기기 페어링(QR, 코드, 링크), 화면 테마, 폴더, 다른 호스트, 프리셋, 정보 |
 
 ## 요구 사항
 
@@ -19,7 +37,7 @@ herdr-core(`hc`) 위에서 도는 원격 작업 웹앱입니다. 터미널 세�
 
 ## 설치
 
-1. **실행 파일 놓기.** 소스에서 빌드하려면 Go 1.26.5 이상이 필요합니다. go 명령이 go.mod의 툴체인(go1.26.10)을 받아 씁니다.
+1. **실행 파일 놓기.** 소스에서 빌드하려면 Go 1.26.5 이상과 Node.js 22.12 이상(npm 포함)이 필요합니다. go 명령이 go.mod의 툴체인(go1.26.10)을 받아 씁니다. `make release`와 `make build`는 웹 UI를 먼저 빌드해 실행 파일에 넣습니다. `npm ci`는 처음이나 `web/package-lock.json`이 바뀌었을 때만 돕니다.
 
    ```sh
    make release   # dist/mori-<os>-<arch>/
@@ -61,6 +79,7 @@ mori revoke <기기 ID>       # 페어링 철회. 그 기기의 열린 연결이
 ```
 
 - 새 기기에서 QR을 찍거나 링크를 엽니다. 코드는 5분 동안 한 번만 쓸 수 있습니다.
+- 페어링한 기기가 있으면 설정의 "새 기기 페어링"에서 "코드 만들기"를 눌러도 됩니다. 코드, 링크, QR이 나오고, 새 기기가 연결되면 알려 줍니다. 링크의 주소는 `mori pair`와 같습니다(`--public-url`, 없으면 이 컴퓨터의 Tailscale 이름). 설정의 "기기"에서 기기의 연결을 해제합니다.
 - 호스트마다 주소(origin)가 다르므로 페어링, 홈 화면 추가, 알림 켜기도 호스트마다 따로 합니다.
 - iPhone·iPad에서 알림을 받으려면 Safari의 "홈 화면에 추가"로 설치한 앱에서 열어야 합니다.
 
@@ -110,13 +129,17 @@ mori revoke <기기 ID>       # 페어링 철회. 그 기기의 열린 연결이
 ## 개발
 
 ```sh
-make build       # bin/mori
+make build       # 웹 UI를 빌드한 뒤 bin/mori
+make web         # 웹 UI만 internal/webui/dist에 빌드합니다
 make test        # go test ./...
+make test-web    # 웹 UI 테스트(Vitest, jsdom)
 make vet         # go vet ./...
-make release     # darwin/arm64, darwin/amd64, windows/amd64, windows/arm64, linux/amd64
+make release     # 웹 UI를 빌드한 뒤 darwin/arm64, darwin/amd64, windows/amd64, windows/arm64, linux/amd64
 make vuln        # govulncheck: 코드가 닿는 알려진 취약점
 make test-clean  # 통합 테스트가 남긴 격리 코어를 멈추고 지웁니다
 ```
 
 - 통합 테스트는 실제 `hc`로 테스트마다 격리 코어를 띄웁니다. 세션은 `mori-test-<id>`이고, 소켓과 XDG 디렉터리는 저장소의 `.dev/test/<id>`에 둡니다. 사용자의 기본 코어는 건드리지 않습니다. hc가 없으면 그 테스트는 건너뜁니다. 다른 hc로 시험하려면 `MORI_TEST_HC`에 경로를 줍니다.
-- 설계는 [docs/superpowers/specs/2026-11-08-mori-design.md](docs/superpowers/specs/2026-11-08-mori-design.md), 구현 계획은 [docs/superpowers/plans/2026-11-09-mori-backend-v1.md](docs/superpowers/plans/2026-11-09-mori-backend-v1.md)에 있습니다.
+- 웹 UI는 `web/`의 Preact·TypeScript 앱입니다. Vite가 `internal/webui/dist`에 빌드하고, 실행 파일이 그 파일을 품습니다. 빌드 결과는 커밋하지 않습니다. `make web` 없이 `go build`만 하면 자리표시 페이지가 뜹니다. 그 페이지는 서버 정보를 보여 주고, `mori pair`의 링크로 연 기기만 페어링합니다.
+- UI를 고칠 때는 `mori serve`(127.0.0.1:7761)를 띄워 두고 `cd web && npm run dev`를 실행한 뒤 Vite가 알려 주는 주소(`http://localhost:5173`)를 엽니다. `/api`와 `/ws`는 서버로 넘어갑니다. 페어링은 `mori pair`의 코드를 페이지에 입력합니다.
+- 설계는 [docs/superpowers/specs/2026-11-08-mori-design.md](docs/superpowers/specs/2026-11-08-mori-design.md), 구현 계획은 [백엔드](docs/superpowers/plans/2026-11-09-mori-backend-v1.md)와 [웹 UI](docs/superpowers/plans/2026-11-09-mori-web-ui.md)에 있습니다.

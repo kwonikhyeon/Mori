@@ -24,9 +24,11 @@ export default defineConfig({
     },
   ],
   server: {
+    // The Host header stays the dev server's: the server takes a change only
+    // when Origin names its Host (spec §8). The string form rewrites Host.
     proxy: {
-      '/api': 'http://127.0.0.1:7761',
-      '/ws': { target: 'ws://127.0.0.1:7761', ws: true },
+      '/api': { target: 'http://127.0.0.1:7761', changeOrigin: false },
+      '/ws': { target: 'ws://127.0.0.1:7761', ws: true, changeOrigin: false },
     },
   },
   test: {

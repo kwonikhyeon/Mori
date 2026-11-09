@@ -34,8 +34,22 @@ export interface ScreenOptions {
 }
 
 // The stack of --font-mono: JetBrains Mono for Latin, the system's
-// monospace and Hangul fonts for the rest (spec §3 #117).
-const FONT = "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', monospace"
+// monospace and Hangul fonts for the rest (spec §3 #117). Between them, the
+// Nerd Fonts that shell prompts draw their arrows and icons with: one the
+// device has fills those in, else they stay boxes.
+const FONT = [
+  "'JetBrains Mono'",
+  "'Symbols Nerd Font Mono'",
+  "'Symbols Nerd Font'",
+  "'MesloLGS NF'",
+  "'JetBrainsMono Nerd Font Mono'",
+  "'JetBrainsMono Nerd Font'",
+  "'Hack Nerd Font Mono'",
+  "'FiraCode Nerd Font Mono'",
+  "'CaskaydiaCove Nerd Font Mono'",
+  "'D2CodingLigature Nerd Font Mono'",
+  "ui-monospace, 'SF Mono', Menlo, Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', monospace",
+].join(', ')
 
 // xterm measures its cells once: wait for the web font, but not for long.
 async function fontsReady(size: number): Promise<void> {

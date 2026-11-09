@@ -162,6 +162,8 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
   const showFit = useLater(differs, FIT_LATE)
   const note = broken ? BROKEN : finished ? null : attachNote(st, reason)
   const title = t ? titleOf(t) : addr
+  // Git opens for a session in a folder that is a repository.
+  const repo = !!t?.folder_id && !!folders.value.find((f) => f.id === t.folder_id)?.repo
   const sub = t ? `${appName(t, presets.value)} · ${place(t, folders.value)}` : ''
 
   const fail = (what: string) => (e: unknown) => toastError(e, what)
@@ -351,7 +353,7 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
                 보기 전용
               </button>
             )}
-            {t?.folder_id && (
+            {repo && (
               <button
                 type="button"
                 class="btn btn-sm"
@@ -416,7 +418,7 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
             </div>
           )}
         </div>
-        {t?.folder_id && !renaming && (
+        {t && repo && !renaming && (
           <a class="btn btn-ghost term-git" href={href({ name: 'git', folder: t.folder_id, path: t.worktree || undefined })}>
             <Icon name="git" size={18} />
             Git

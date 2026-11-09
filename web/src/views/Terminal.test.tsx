@@ -180,8 +180,12 @@ describe('Terminal on a PC', () => {
     expect(route.value).toEqual({ name: 'terminal', addr: 't1', git: false })
   })
 
-  it('has no Git toggle for a terminal outside the folders', async () => {
-    await mount(term({ folder_id: '', worktree: '' }))
+  it('has no Git toggle for a terminal outside the folders or in a folder without Git', async () => {
+    const { unmount } = await mount(term({ folder_id: '', worktree: '' }))
+    expect(screen.queryByRole('button', { name: 'Git' })).toBeNull()
+    unmount()
+    folders.value = [folder({ repo: false, worktrees: [] })]
+    await mount(term({ worktree: '' }))
     expect(screen.queryByRole('button', { name: 'Git' })).toBeNull()
   })
 

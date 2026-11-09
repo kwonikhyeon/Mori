@@ -1,0 +1,407 @@
+/* 새 세션 (the B-New board). */
+
+.ns,
+.ns-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ns {
+  height: 100%;
+}
+
+.ns-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: env(safe-area-inset-top, 0px) calc(16px + env(safe-area-inset-right, 0px)) 0 calc(4px + env(safe-area-inset-left, 0px));
+}
+
+.ns-head h1 {
+  flex: 1;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.ns-back {
+  width: 44px;
+  height: 44px;
+}
+
+.ns-host {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ns-pc .ns-head {
+  min-height: 0;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ns-pc .ns-head h1 {
+  font-size: 16px;
+}
+
+.ns-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ns-pc .ns-scroll {
+  background: var(--bg);
+}
+
+.ns-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px calc(16px + env(safe-area-inset-right, 0px)) 24px calc(16px + env(safe-area-inset-left, 0px));
+}
+
+.ns-pc .ns-col {
+  gap: 16px;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 20px 24px 32px;
+}
+
+/* ---------- cards ---------- */
+.ns-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.ns-h2 {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ns-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ns-label {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+legend.ns-label,
+legend.ns-h2 {
+  margin-bottom: 8px;
+}
+
+.ns-opt {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+/* ---------- the folder ---------- */
+.ns-folder {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+}
+
+.ns-folder:hover {
+  border-color: var(--pressed-border);
+}
+
+.ns-folder-icon {
+  flex: none;
+  color: var(--text-2);
+}
+
+.ns-folder-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ns-folder-name {
+  font-weight: 700;
+}
+
+.ns-folder-path {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ns-folder-go {
+  flex: none;
+  color: var(--text-3);
+}
+
+/* ---------- radio rows ---------- */
+.ns-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ns-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.ns-choice input[type="radio"] {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.ns-choice:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 .5px var(--accent);
+  background: var(--choice-bg);
+}
+
+.ns-choice:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.ns-choice.is-off {
+  cursor: default;
+  opacity: .55;
+}
+
+.ns-choice-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ns-branch {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ns-path {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ns-name {
+  font-weight: 700;
+}
+
+.ns-sub {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.ns-count,
+.ns-note {
+  flex: none;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+/* ---------- 새 브랜치 ---------- */
+.ns-new {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.ns-new.is-on {
+  padding-bottom: 14px;
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 .5px var(--accent);
+  background: var(--choice-bg);
+}
+
+.ns-new .ns-choice,
+.ns-new .ns-choice:has(input:checked) {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: none;
+}
+
+.ns-new-row {
+  display: flex;
+  gap: 10px;
+}
+
+.ns-new-name {
+  flex: 2 1 0;
+  min-width: 0;
+}
+
+.ns-new-base {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.ns-new .input {
+  background: var(--surface);
+}
+
+.ns-select {
+  position: relative;
+  display: block;
+}
+
+.ns-select select {
+  padding-right: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  appearance: none;
+}
+
+.ns-select select:disabled {
+  color: var(--text-3);
+}
+
+.ns-select-icon {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  color: var(--text-3);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.ns-hint {
+  color: var(--text-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ns-hint .mono {
+  color: var(--text);
+}
+
+.ns-hint.is-bad,
+.ns-hint.is-bad .mono {
+  color: var(--danger);
+}
+
+/* ---------- 작업 and 이름 ---------- */
+.ns-task {
+  min-height: 84px;
+  max-height: 40vh;
+  border-radius: 12px;
+  background: var(--surface-2);
+  field-sizing: content;
+}
+
+.ns-title {
+  height: 48px;
+  border-radius: 12px;
+}
+
+/* ---------- the footer ---------- */
+.ns-foot {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px calc(16px + env(safe-area-inset-right, 0px)) calc(10px + max(16px, env(safe-area-inset-bottom, 0px))) calc(16px + env(safe-area-inset-left, 0px));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.ns-sum {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 12px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ns-go {
+  width: 100%;
+  height: 52px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.ns-pc .ns-foot {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 20px;
+}
+
+.ns-pc .ns-foot .form-error {
+  flex-basis: 100%;
+}
+
+.ns-pc .ns-sum {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  text-align: left;
+}
+
+.ns-pc .ns-go {
+  width: auto;
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+/* Mono at the size of the rest; the phone keeps 16 px for iOS. */
+@media (min-width: 768px) {
+  .ns-new .input.mono {
+    font-size: 13px;
+  }
+}

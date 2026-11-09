@@ -18,6 +18,7 @@ import { href, navigate, route, type Route } from '../lib/router'
 import { conn, core, host, hosts } from '../lib/store'
 import { setTheme, theme, type ThemePref } from '../lib/theme'
 import { FolderList } from './Folders'
+import { NewSession } from './NewSession'
 import { Pending } from './Pending'
 import { QueueList } from './Queue'
 import { Terminal } from './Terminal'
@@ -43,7 +44,7 @@ function pcMain(r: Route): ComponentChildren {
     case 'settings':
       return <Pending title="설정" />
     case 'new':
-      return <Pending title="새 세션" />
+      return <NewSession key={href(r)} variant="pc" folder={r.folder} wt={r.wt} />
     case 'terminal':
       return <Terminal key={r.addr} addr={r.addr} git={r.git} variant="pc" />
     case 'git':
@@ -68,7 +69,7 @@ function pcAside(r: Route): AsideView | null {
 function phoneFull(r: Route): ComponentChildren {
   switch (r.name) {
     case 'new':
-      return <Pending title="새 세션" back="#/" />
+      return <NewSession key={href(r)} variant="phone" folder={r.folder} wt={r.wt} back={phoneBack.value} />
     case 'terminal':
       return <Terminal key={r.addr} addr={r.addr} variant="phone" back={phoneBack.value} />
     case 'git':

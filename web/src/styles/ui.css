@@ -617,3 +617,108 @@ dialog.confirm::backdrop {
   gap: 8px;
   margin-top: 12px;
 }
+
+/* ---------- sheet ---------- */
+/* A modal panel: in the middle on a PC, from the bottom on a phone. */
+dialog.sheet {
+  width: min(520px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(720px, calc(100dvh - 64px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+}
+
+dialog.sheet[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+dialog.sheet::backdrop {
+  background: var(--scrim, rgba(28, 27, 25, .32));
+}
+
+.sheet-box {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sheet-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: 8px 8px 8px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet-head.has-back {
+  padding-left: 8px;
+}
+
+.sheet-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* It takes the focus when the sheet changes what it shows. */
+.sheet-title:focus {
+  outline: none;
+}
+
+.sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 12px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet-foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 767px) {
+  dialog.sheet {
+    width: 100%;
+    max-width: 100%;
+    max-height: 85dvh;
+    margin: auto 0 0;
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: var(--shadow-sheet);
+  }
+
+  .sheet-box::before {
+    content: "";
+    flex: none;
+    width: 36px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: 2px;
+    background: var(--grabber);
+  }
+
+  .sheet-head {
+    min-height: 48px;
+    border-bottom: 0;
+  }
+
+  .sheet-foot {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+}

@@ -1,6 +1,6 @@
 // Values for tests: a whole object with only what a test cares about set.
 
-import type { FolderView, Status, TerminalView, Worktree } from '../src/lib/types'
+import type { FolderView, Host, Status, TerminalView, Worktree } from '../src/lib/types'
 
 export function term(over: Partial<TerminalView> = {}): TerminalView {
   return {
@@ -73,4 +73,8 @@ export function folder(over: Partial<FolderView> = {}): FolderView {
     worktrees: [worktree()],
     ...over,
   }
+}
+
+export function linkedHost(over: Partial<Host> = {}): Host {
+  return { id: 'h_desk0001', name: 'desk', url: 'https://desk.example.ts.net', linked: true, version: '0.1.0', relay: true, ...over }
 }

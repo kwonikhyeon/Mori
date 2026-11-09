@@ -11,6 +11,7 @@ import (
 	"github.com/kwonikhyeon/mori/internal/core"
 	"github.com/kwonikhyeon/mori/internal/folders"
 	"github.com/kwonikhyeon/mori/internal/gitx"
+	"github.com/kwonikhyeon/mori/internal/peer"
 	"github.com/kwonikhyeon/mori/internal/presence"
 	"github.com/kwonikhyeon/mori/internal/push"
 	"github.com/kwonikhyeon/mori/internal/store"
@@ -41,6 +42,10 @@ type Deps struct {
 	// Push keeps the devices' notification subscriptions and sends the
 	// test notification. Without it the push APIs answer 503.
 	Push *push.Notifier
+	// Links links this hub to other hosts' Mori and finds them for the
+	// proxy and the relay (spec §3 #158). Without it the hosts are listed
+	// but cannot be linked.
+	Links *peer.Manager
 }
 
 // Server routes requests. Build it with New and serve Handler().
@@ -120,7 +125,10 @@ func (s *Server) routes() {
 	api.HandleFunc("GET /api/presets", s.handleGetPresets)
 	api.HandleFunc("PUT /api/presets", s.handlePutPresets)
 	api.HandleFunc("GET /api/hosts", s.handleGetHosts)
-	api.HandleFunc("PUT /api/hosts", s.handlePutHosts)
+	api.HandleFunc("POST /api/hosts", s.needLinks(s.handleLinkHost))
+	api.HandleFunc("PATCH /api/hosts/{id}", s.needLinks(s.handleRenameHost))
+	api.HandleFunc("DELETE /api/hosts/{id}", s.needLinks(s.handleUnlinkHost))
+	api.HandleFunc("POST /api/hosts/{id}/relay", s.needLinks(s.handleHostRelay))
 	api.HandleFunc("GET /api/push/key", s.needPush(s.handlePushKey))
 	api.HandleFunc("GET /api/push/subscriptions", s.needPush(s.handlePushSubs))
 	api.HandleFunc("POST /api/push/subscriptions", s.needPush(s.handleSubscribe))

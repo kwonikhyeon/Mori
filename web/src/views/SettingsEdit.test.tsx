@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { folder } from '../../test/fixtures'
+import { folder, linkedHost } from '../../test/fixtures'
 import { folders, hosts, presets, resetStore } from '../lib/store'
 import { toasts } from '../lib/toast'
-import type { FolderView, Host, Preset } from '../lib/types'
+import type { FolderView, Preset } from '../lib/types'
 import { FoldersCard, HostsCard, PresetsCard } from './SettingsEdit'
 
 interface Call {
@@ -160,89 +160,28 @@ describe('FoldersCard', () => {
 })
 
 describe('HostsCard', () => {
-  const desk: Host = { name: 'desk', url: 'https://desk.example.ts.net' }
-
-  it('lists the other hosts, and marks the one this page is on', () => {
-    hosts.value = [desk, { name: 'macmini', url: location.origin }]
+  it('lists the linked hosts and how they are', () => {
+    hosts.value = [
+      linkedHost(),
+      linkedHost({ id: 'h_lab00001', name: 'lab', url: 'https://lab.example.ts.net', linked: false, version: '' }),
+      linkedHost({ id: 'h_self0001', name: 'macmini', url: location.origin }),
+    ]
     render(<HostsCard />)
-    const rows = screen.getAllByText(/^(desk|macmini)$/).map((n) => n.closest('.st-row') as HTMLElement)
-    expect(rows.map((r) => within(r).queryByText('이 호스트') !== null)).toEqual([false, true])
-    expect(screen.getByText('https://desk.example.ts.net')).toBeTruthy()
-    expect(screen.getByText('다른 컴퓨터에서 도는 Mori의 주소입니다. 화면 맨 위에서 바로 옮겨 갈 수 있습니다.')).toBeTruthy()
-    expect(button('편집')).toBeTruthy()
+    const row = (name: string) => screen.getByText(name, { selector: '.st-name' }).closest('.st-row') as HTMLElement
+    expect(within(row('desk')).getByText('https://desk.example.ts.net · 0.1.0')).toBeTruthy()
+    expect(within(row('desk')).queryByText('끊김')).toBeNull()
+    expect(within(row('lab')).getByText('끊김')).toBeTruthy()
+    expect(within(row('lab')).getByText('https://lab.example.ts.net')).toBeTruthy()
+    expect(within(row('macmini')).getByText('이 호스트')).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('starts the first one with an empty row', async () => {
+  it('says how to link one', () => {
     render(<HostsCard />)
-    expect(screen.getByText('등록된 호스트가 없습니다.')).toBeTruthy()
-    fireEvent.click(button('추가'))
-    const first = screen.getByRole('group', { name: '호스트 1' })
-    await vi.waitFor(() => expect(document.activeElement).toBe(textbox(first, '이름')))
-    expect(textbox(first, '주소').value).toBe('')
-  })
-
-  it('saves the list as a whole, without the rows left empty', async () => {
-    hosts.value = [desk]
-    const back: Host[] = [desk, { name: 'lab', url: 'https://lab.example.ts.net' }]
-    reply = (c) => (c.method === 'PUT' ? Response.json(back) : undefined)
-    render(<HostsCard />)
-    fireEvent.click(button('편집'))
-    const first = screen.getByRole('group', { name: '호스트 1' })
-    await vi.waitFor(() => expect(document.activeElement).toBe(textbox(first, '이름')))
-    expect(textbox(first, '주소').value).toBe('https://desk.example.ts.net')
-
-    fireEvent.click(button('호스트 추가'))
-    const second = screen.getByRole('group', { name: '호스트 2' })
-    await vi.waitFor(() => expect(document.activeElement).toBe(textbox(second, '이름')))
-    type(textbox(second, '이름'), ' lab ')
-    type(textbox(second, '주소'), 'https://lab.example.ts.net/ ')
-    fireEvent.click(button('호스트 추가'))
-    expect(screen.getByRole('group', { name: '호스트 3' })).toBeTruthy()
-
-    save()
-    await vi.waitFor(() => expect(toastTexts()).toEqual([['다른 호스트를 저장했습니다', 'info']]))
-    expect(sent('PUT')).toEqual([{ method: 'PUT', path: '/api/hosts', body: [desk, { name: 'lab', url: 'https://lab.example.ts.net/' }] }])
-    // What the server made of it.
-    expect(hosts.value).toEqual(back)
-    expect(screen.queryByRole('group')).toBeNull()
-    await vi.waitFor(() => expect(document.activeElement).toBe(button('편집')))
-  })
-
-  it('shows what the server said, and stays in the form', async () => {
-    hosts.value = [desk]
-    reply = (c) => (c.method === 'PUT' ? fail(400, '호스트 주소 "desk": https://호스트 꼴이어야 합니다') : undefined)
-    render(<HostsCard />)
-    fireEvent.click(button('편집'))
-    type(textbox(screen.getByRole('group', { name: '호스트 1' }), '주소'), 'desk')
-    save()
-    expect((await screen.findByRole('alert')).textContent).toBe('호스트 주소 "desk": https://호스트 꼴이어야 합니다')
-    expect(textbox(screen.getByRole('group', { name: '호스트 1' }), '주소').value).toBe('desk')
-    expect(hosts.value).toEqual([desk])
-    expect(toasts.value).toEqual([])
-  })
-
-  it('can empty the list, and says what saving it then does', async () => {
-    hosts.value = [desk]
-    reply = (c) => (c.method === 'PUT' ? Response.json([]) : undefined)
-    render(<HostsCard />)
-    fireEvent.click(button('편집'))
-    fireEvent.click(button('호스트 1 빼기'))
-    expect(screen.getByText('저장하면 다른 호스트가 목록에서 모두 빠집니다.')).toBeTruthy()
-    await vi.waitFor(() => expect(document.activeElement).toBe(button('호스트 추가')))
-    save()
-    await vi.waitFor(() => expect(sent('PUT').map((c) => c.body)).toEqual([[]]))
-    expect(await screen.findByText('등록된 호스트가 없습니다.')).toBeTruthy()
-  })
-
-  it('leaves the list as it was on 취소', async () => {
-    hosts.value = [desk]
-    render(<HostsCard />)
-    fireEvent.click(button('편집'))
-    type(textbox(screen.getByRole('group', { name: '호스트 1' }), '이름'), 'lab')
-    fireEvent.click(button('취소'))
-    await vi.waitFor(() => expect(document.activeElement).toBe(button('편집')))
-    expect(screen.getByText('desk')).toBeTruthy()
-    expect(calls).toEqual([])
+    expect(screen.getByText('이은 호스트가 없습니다.')).toBeTruthy()
+    expect(document.querySelector('.st-hint')!.textContent).toBe(
+      '다른 컴퓨터의 Mori를 이 허브에 이으려면 이 컴퓨터에서 mori hosts link 주소 코드를 실행하세요. 코드는 그 컴퓨터에서 mori pair로 받습니다.',
+    )
   })
 })
 

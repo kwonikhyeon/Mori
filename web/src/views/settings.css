@@ -461,10 +461,6 @@ label.st-row:has(input:disabled) {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
-.st-pc .st-item-fields.is-host {
-  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-}
-
 .st-task {
   display: flex;
   align-items: flex-start;

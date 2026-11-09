@@ -101,9 +101,16 @@ export interface Preset {
   task: boolean
 }
 
+/** Another host's Mori linked to this hub (spec §3 #168). */
 export interface Host {
+  id: string
   name: string
   url: string
+  linked: boolean
+  version: string
+  relay: boolean
+  relay_error?: string
+  linked_ms?: number
 }
 
 export interface Hello {

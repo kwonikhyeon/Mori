@@ -145,7 +145,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		"folders":   s.folderViews(st.Folders),
 		"terminals": s.terminalViews(false, time.Now()),
 		"presets":   st.Presets,
-		"hosts":     st.Hosts,
+		"hosts":     s.hostViews(),
 	})
 }
 

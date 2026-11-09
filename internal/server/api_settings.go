@@ -2,10 +2,8 @@ package server
 
 import (
 	"net/http"
-	"net/url"
 	"regexp"
 	"slices"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/kwonikhyeon/mori/internal/store"
@@ -67,53 +65,4 @@ func checkPresets(ps []store.Preset) error {
 		seen[p.ID] = true
 	}
 	return nil
-}
-
-func (s *Server) handleGetHosts(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.d.Store.Get().Hosts)
-}
-
-// handlePutHosts replaces the links to other hosts' Mori (spec §3 #2).
-func (s *Server) handlePutHosts(w http.ResponseWriter, r *http.Request) {
-	hs := []store.Host{}
-	if err := readJSON(w, r, &hs); err != nil {
-		writeError(w, err)
-		return
-	}
-	if hs == nil { // the body was null
-		hs = []store.Host{}
-	}
-	for i := range hs {
-		h := &hs[i]
-		h.Name = oneLine(h.Name)
-		if h.Name == "" || utf8.RuneCountInString(h.Name) > maxTitle {
-			writeError(w, invalid("호스트 이름은 1~%d자여야 합니다", maxTitle))
-			return
-		}
-		u, err := hostURL(h.URL)
-		if err != nil {
-			writeError(w, err)
-			return
-		}
-		h.URL = u
-	}
-	if err := s.d.Store.Update(func(st *store.State) error {
-		st.Hosts = hs
-		return nil
-	}); err != nil {
-		writeError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, hs)
-}
-
-// hostURL checks a link to another host: an absolute http or https URL
-// without credentials. The UI opens it as a link, so no other scheme may
-// pass.
-func hostURL(v string) (string, error) {
-	u, err := url.Parse(strings.TrimSpace(v))
-	if err != nil || u.Scheme != "https" && u.Scheme != "http" || u.Host == "" || u.User != nil {
-		return "", invalid("호스트 주소 %q: https://호스트 꼴이어야 합니다", v)
-	}
-	return strings.TrimRight(u.String(), "/"), nil
 }

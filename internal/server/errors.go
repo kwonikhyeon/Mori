@@ -12,6 +12,7 @@ import (
 	"github.com/kwonikhyeon/mori/internal/core"
 	"github.com/kwonikhyeon/mori/internal/gitx"
 	"github.com/kwonikhyeon/mori/internal/hc"
+	"github.com/kwonikhyeon/mori/internal/peer"
 	"github.com/kwonikhyeon/mori/internal/push"
 )
 
@@ -36,7 +37,7 @@ func statusFor(kind string) int {
 		return http.StatusNotFound
 	case "invalid_params":
 		return http.StatusBadRequest
-	case "blocked", "finished", "live", "name_taken", "conflict", "already_added":
+	case "blocked", "finished", "live", "name_taken", "conflict", "already_added", "host_unlinked":
 		return http.StatusConflict
 	case "unavailable", "core_unavailable":
 		return http.StatusServiceUnavailable
@@ -50,7 +51,7 @@ func statusFor(kind string) int {
 		return http.StatusUnprocessableEntity
 	case "too_large":
 		return http.StatusRequestEntityTooLarge
-	case "push_failed":
+	case "push_failed", "host_unreachable":
 		return http.StatusBadGateway
 	}
 	return http.StatusInternalServerError
@@ -94,6 +95,9 @@ func toAPIError(err error) *apiError {
 	}
 	if se := (*push.SendError)(nil); errors.As(err, &se) {
 		return &apiError{Status: http.StatusBadGateway, Kind: "push_failed", Message: se.Error()}
+	}
+	if pe := (*peer.Error)(nil); errors.As(err, &pe) {
+		return &apiError{Status: statusFor(pe.Kind), Kind: pe.Kind, Message: pe.Message}
 	}
 	switch {
 	case errors.Is(err, gitx.ErrNoCommit):

@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../../test/fakeWs'
-import { folder, status, term } from '../../test/fixtures'
+import { folder, linkedHost, status, term } from '../../test/fixtures'
 import { COMMITS, diffOf, LOG } from '../../test/history'
 import { hello } from '../lib/boot'
 import { now } from '../lib/clock'
@@ -199,10 +199,7 @@ describe('PC', () => {
   })
 
   it('says how the host is and links the other hosts', () => {
-    hosts.value = [
-      { name: 'desk', url: 'https://desk.example.ts.net' },
-      { name: 'self', url: location.origin },
-    ]
+    hosts.value = [linkedHost(), linkedHost({ id: 'h_self0001', name: 'self', url: location.origin })]
     core.value = { connected: false }
     at(1440, { name: 'queue' })
     render(<Shell />)

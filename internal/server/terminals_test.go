@@ -22,6 +22,7 @@ import (
 	"github.com/kwonikhyeon/mori/internal/auth"
 	"github.com/kwonikhyeon/mori/internal/core"
 	"github.com/kwonikhyeon/mori/internal/hctest"
+	"github.com/kwonikhyeon/mori/internal/peer"
 	"github.com/kwonikhyeon/mori/internal/store"
 )
 
@@ -350,7 +351,7 @@ func TestTerminalLifecycleOverHTTP(t *testing.T) {
 		Folders   []store.Folder
 		Terminals []TerminalView
 		Presets   []store.Preset
-		Hosts     []store.Host
+		Hosts     []peer.View
 	}
 	e.json("GET", "/api/overview", nil, 200, &ov)
 	if ov.Host.Name != "testhost" || ov.Host.Version != "test" || !ov.Core.Connected || len(ov.Folders) != 1 || len(ov.Presets) != 4 || ov.Hosts == nil || ov.Terminals == nil {
@@ -473,32 +474,4 @@ func TestPresetsValidation(t *testing.T) {
 
 func presetEqual(a, b store.Preset) bool {
 	return a.ID == b.ID && a.Name == b.Name && a.Task == b.Task && slices.Equal(a.Argv, b.Argv)
-}
-
-func TestHostsValidation(t *testing.T) {
-	e := newTestEnv(t)
-	e.pair()
-	for _, body := range []any{
-		[]map[string]any{{"name": "", "url": "https://desktop.example.com"}},
-		[]map[string]any{{"name": "x", "url": "ftp://desktop.example.com"}},
-		[]map[string]any{{"name": "x", "url": "desktop.example.com"}},
-		[]map[string]any{{"name": "x", "url": "https://"}},
-		[]map[string]any{{"name": "x", "url": "https://user:pw@desktop.example.com"}},
-		[]map[string]any{{"name": "x", "url": "javascript:alert(1)"}},
-	} {
-		if eb := e.expectError("PUT", "/api/hosts", body, 400); eb.Error.Kind != "invalid_params" {
-			t.Fatal(body, eb)
-		}
-	}
-	var got []store.Host
-	e.json("PUT", "/api/hosts", []map[string]any{{"name": " desktop ", "url": "https://desktop.example.com/"}}, 200, nil)
-	e.json("GET", "/api/hosts", nil, 200, &got)
-	if len(got) != 1 || got[0].Name != "desktop" || got[0].URL != "https://desktop.example.com" {
-		t.Fatal(got)
-	}
-	e.json("PUT", "/api/hosts", []map[string]any{}, 200, nil)
-	e.json("GET", "/api/hosts", nil, 200, &got)
-	if got == nil || len(got) != 0 {
-		t.Fatal(got)
-	}
 }

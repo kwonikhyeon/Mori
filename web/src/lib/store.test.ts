@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { folder, status, term } from '../../test/fixtures'
+import { folder, linkedHost, status, term } from '../../test/fixtures'
 import { apply, applyOverview, conn, core, folders, host, presets, ready, resetStore, terminals } from './store'
 
 beforeEach(() => resetStore())
@@ -64,7 +64,7 @@ describe('applyOverview', () => {
       folders: [folder()],
       terminals: [],
       presets: [{ id: 'shell', name: '셸', argv: [], task: false }],
-      hosts: [{ name: 'desktop', url: 'https://desktop.example.ts.net' }],
+      hosts: [linkedHost({ name: 'desktop', url: 'https://desktop.example.ts.net' })],
     })
     expect(host.value).toEqual({ name: 'macmini', version: '0.1.0' })
     expect(presets.value.map((p) => p.id)).toEqual(['shell'])

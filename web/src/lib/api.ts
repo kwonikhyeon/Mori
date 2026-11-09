@@ -167,7 +167,6 @@ export const api = {
   },
   hosts: {
     get: () => get<Host[]>('/api/hosts'),
-    put: (hs: Host[]) => request<Host[]>('PUT', '/api/hosts', hs),
   },
 
   push: {

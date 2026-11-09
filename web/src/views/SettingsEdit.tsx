@@ -1,5 +1,6 @@
 // What Settings edits for the whole host: the folders of the list (spec §3
-// #37), the other hosts' Mori (#43) and the presets a session starts (#42).
+// #37) and the presets a session starts (#42). It also shows the hosts
+// linked to this hub (#168).
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import type { RefObject } from 'preact'
 import { Confirm } from '../components/Confirm'
@@ -252,139 +253,41 @@ function isHere(url: string): boolean {
 
 /* ---------- 다른 호스트 ---------- */
 
-interface HostDraft {
-  k: number
-  name: string
-  url: string
-}
-
 const EDIT_BTN = '.st-card-head .btn'
 
+/** The hosts linked to this hub. They are linked with `mori hosts link` for now. */
 export function HostsCard() {
   const id = useId()
-  const card = useRef<HTMLElement>(null)
-  const focusAfter = useFocusAfter(card)
   const list = hosts.value
-  const [draft, setDraft] = useState<HostDraft[] | null>(null)
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-  const nextK = useRef(1)
-
-  const blank = (): HostDraft => ({ k: nextK.current++, name: '', url: '' })
-  const start = () => {
-    const d = list.length ? list.map((h) => ({ k: nextK.current++, ...h })) : [blank()]
-    setDraft(d)
-    setError('')
-    focusAfter(`[data-k="${d[0].k}"] input`)
-  }
-  const stop = () => {
-    setDraft(null)
-    setError('')
-    focusAfter(EDIT_BTN)
-  }
-  const add = () => {
-    const d = blank()
-    setDraft((ds) => [...(ds ?? []), d])
-    focusAfter(`[data-k="${d.k}"] input`)
-  }
-  const change = (k: number, field: 'name' | 'url', v: string) => setDraft((ds) => ds && ds.map((d) => (d.k === k ? { ...d, [field]: v } : d)))
-  const drop = (k: number) => {
-    setDraft((ds) => ds && ds.filter((d) => d.k !== k))
-    focusAfter('.st-add')
-  }
-  const save = async (e: Event) => {
-    e.preventDefault()
-    if (!draft || saving) return
-    // A row left empty is one nobody filled in.
-    const out = draft.map((d) => ({ name: d.name.trim(), url: d.url.trim() })).filter((h) => h.name || h.url)
-    setSaving(true)
-    setError('')
-    try {
-      hosts.value = await api.hosts.put(out)
-      stop()
-      toast('다른 호스트를 저장했습니다')
-    } catch (err) {
-      setError(errorText(err, '저장하지 못했습니다'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
-    <section ref={card} class="st-card st-list" aria-labelledby={id}>
+    <section class="st-card st-list" aria-labelledby={id}>
       <div class="st-card-head">
         <h2 id={id} class="st-h2">
           다른 호스트
         </h2>
-        {!draft && (
-          <button type="button" class="btn btn-sm" onClick={start}>
-            {list.length ? (
-              <>
-                <Icon name="pencil" size={16} />
-                편집
-              </>
-            ) : (
-              <>
-                <Icon name="plus" size={16} stroke={2} />
-                추가
-              </>
-            )}
-          </button>
-        )}
       </div>
-      {draft ? (
-        <form class="st-edit" noValidate onSubmit={save}>
-          {draft.length === 0 && <p class="st-none">저장하면 다른 호스트가 목록에서 모두 빠집니다.</p>}
-          {draft.map((d, i) => (
-            <div key={d.k} class="st-item" role="group" aria-labelledby={`${id}-h${d.k}`} data-k={d.k}>
-              <ItemHead id={`${id}-h${d.k}`} title={`호스트 ${i + 1}`} removeLabel={`호스트 ${i + 1} 빼기`} onRemove={() => drop(d.k)} />
-              <div class="st-item-fields is-host">
-                <label class="field">
-                  <span class="field-label">이름</span>
-                  <input class="input" value={d.name} maxLength={MAX_NAME} placeholder="desk" onInput={(e) => change(d.k, 'name', e.currentTarget.value)} />
-                </label>
-                <label class="field">
-                  <span class="field-label">주소</span>
-                  <input
-                    class="input mono"
-                    type="text"
-                    inputMode="url"
-                    autoCapitalize="off"
-                    autoComplete="off"
-                    spellcheck={false}
-                    value={d.url}
-                    placeholder="https://desk.example.ts.net"
-                    onInput={(e) => change(d.k, 'url', e.currentTarget.value)}
-                  />
-                </label>
-              </div>
-            </div>
-          ))}
-          <EditFoot add="호스트 추가" error={error} saving={saving} onAdd={add} onCancel={stop} />
-        </form>
-      ) : (
-        <>
-          {list.length === 0 && <p class="st-none">등록된 호스트가 없습니다.</p>}
-          {list.map((h, i) => (
-            <div key={h.url + i}>
-              {i > 0 && <div class="st-div is-tight" />}
-              <div class="st-row">
-                <span class="st-row-icon">
-                  <Icon name="monitor" size={20} />
-                </span>
-                <span class="st-row-main">
-                  <span class="st-row-name">
-                    <span class="st-name">{h.name}</span>
-                    {isHere(h.url) && <span class="st-pill">이 호스트</span>}
-                  </span>
-                  <span class="st-row-sub mono">{h.url}</span>
-                </span>
-              </div>
-            </div>
-          ))}
-          <p class="st-hint">다른 컴퓨터에서 도는 Mori의 주소입니다. 화면 맨 위에서 바로 옮겨 갈 수 있습니다.</p>
-        </>
-      )}
+      {list.length === 0 && <p class="st-none">이은 호스트가 없습니다.</p>}
+      {list.map((h, i) => (
+        <div key={h.id}>
+          {i > 0 && <div class="st-div is-tight" />}
+          <div class="st-row">
+            <span class="st-row-icon">
+              <Icon name="monitor" size={20} />
+            </span>
+            <span class="st-row-main">
+              <span class="st-row-name">
+                <span class="st-name">{h.name}</span>
+                {isHere(h.url) && <span class="st-pill">이 호스트</span>}
+                {!h.linked && <span class="st-pill">끊김</span>}
+              </span>
+              <span class="st-row-sub mono">{[h.url, h.version].filter(Boolean).join(' · ')}</span>
+            </span>
+          </div>
+        </div>
+      ))}
+      <p class="st-hint">
+        다른 컴퓨터의 Mori를 이 허브에 이으려면 이 컴퓨터에서 <code>mori hosts link 주소 코드</code>를 실행하세요. 코드는 그 컴퓨터에서 <code>mori pair</code>로 받습니다.
+      </p>
     </section>
   )
 }

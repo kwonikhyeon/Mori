@@ -1,0 +1,251 @@
+/* Design tokens of candidate B (spec §3 #113, #118). Every color the UI
+   uses comes from here. The dark set is written twice: once for the OS
+   setting, once for an explicit choice in Settings. */
+
+:root {
+  color-scheme: light;
+
+  --font-sans: 'Inter', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', monospace;
+
+  --bg: #F6F5F2;
+  --surface: #FFFFFF;
+  --surface-2: #F6F5F2;
+  --border: #E4E1DA;
+  --divider: #ECEAE5;
+  --text: #1C1B19;
+  --text-2: #5F5B53;
+  --text-3: #6F6A62;
+  --text-4: #3D3A35;
+
+  --accent: #2457D6;
+  --accent-hover: #1A3F9E;
+  --accent-text: #2457D6;
+  --on-accent: #FFFFFF;
+  --selected: #E8EEFB;
+  --pressed-border: #B9CBF3;
+  --pressed-text: #1D4FC4;
+  --choice-bg: #F3F6FD;
+  --focus-border: #9DB5EC;
+  --focus-ring: rgba(36, 87, 214, .35);
+
+  --chip: #ECEAE5;
+  --chip-text: #3D3A35;
+  --blocked: #FFB15C;
+  --blocked-text: #1C1B19;
+  --blocked-box: #FFF4E6;
+  --blocked-box-text: #5C3B0E;
+  --blocked-title: #7A4A00;
+  --blocked-border: #F2D3A6;
+  --blocked-key-text: #3D2A0F;
+  --error: #B3123A;
+  --error-text: #FFFFFF;
+  --error-box: #FBEAEE;
+  --error-box-text: #7A0C27;
+  --danger: #B3123A;
+  --danger-border: #EBC3CD;
+  --working: #DCE8FF;
+  --working-text: #1D4FC4;
+  --track: #ECEAE5;
+  --info-box: #F3F6FD;
+  --info-box-text: #3D3A35;
+
+  --term-bg: #1F1E1C;
+  --term-fg: #ECEAE5;
+  --term-dim: #A8A49C;
+
+  --diff-bg: #FAF9F7;
+  --diff-del-bg: #FBE7EB;
+  --diff-del: #8A1230;
+  --diff-add-bg: #E6EEFF;
+  --diff-add: #1D3F8F;
+  --diff-hunk: #6F6A62;
+  --diff-ctx: #5F5B53;
+  --count-add: #1D4FC4;
+  --count-del: #B3123A;
+
+  --kind-m: #2457D6;
+  --kind-u: #5F5B53;
+  --kind-r: #8A3FC4;
+  --kind-a: #0F7B6C;
+  --kind-d: #B3123A;
+
+  --dot-blocked: #FFB15C;
+  --dot-waiting: #8C877E;
+  --dot-error: #B3123A;
+  --dot-exited: #6F6A62;
+
+  --lane-0: #2457D6;
+  --lane-1: #8A3FC4;
+  --lane-2: #0F7B6C;
+  --lane-3: #5F5B53;
+  --lane-4: #5E7A12;
+
+  --grabber: #C9C4BA;
+  --seg-track: #ECEAE5;
+  --seg-active: #FFFFFF;
+  --scrim: rgba(28, 27, 25, .32);
+  --shadow-card: 0 2px 8px rgba(28, 27, 25, .06);
+  --shadow-aside: 0 12px 32px rgba(28, 27, 25, .12);
+  --shadow-sheet: 0 -8px 24px rgba(28, 27, 25, .12);
+  --shadow-seg: 0 1px 2px rgba(28, 27, 25, .12);
+  --shadow-pop: 0 8px 24px rgba(28, 27, 25, .16);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #151412;
+    --surface: #1E1D1B;
+    --surface-2: #262522;
+    --border: #34322E;
+    --divider: #2B2A27;
+    --text: #ECEAE5;
+    --text-2: #B4AFA6;
+    --text-3: #9C978E;
+    --text-4: #D6D2CA;
+    --accent: #3D6BE0;
+    --accent-hover: #5A82EA;
+    --accent-text: #8FB0FF;
+    --on-accent: #FFFFFF;
+    --selected: rgba(127, 162, 255, .16);
+    --pressed-border: #4A66A8;
+    --pressed-text: #A9C1FF;
+    --choice-bg: rgba(127, 162, 255, .10);
+    --focus-border: #5A7BC8;
+    --focus-ring: rgba(143, 176, 255, .45);
+    --chip: #2E2C29;
+    --chip-text: #D6D2CA;
+    --blocked: #FFB15C;
+    --blocked-text: #1C1B19;
+    --blocked-box: #3A2A14;
+    --blocked-box-text: #FFD9A8;
+    --blocked-title: #FFC07A;
+    --blocked-border: #5C4220;
+    --blocked-key-text: #FFE3BF;
+    --error: #C8203F;
+    --error-text: #FFFFFF;
+    --error-box: #3A1620;
+    --error-box-text: #FFB3C1;
+    --danger: #FF8FA3;
+    --danger-border: #5E2433;
+    --working: #1F2E52;
+    --working-text: #A9C1FF;
+    --track: #2E2C29;
+    --info-box: #20283A;
+    --info-box-text: #D6D2CA;
+    --term-bg: #121110;
+    --term-fg: #ECEAE5;
+    --term-dim: #A8A49C;
+    --diff-bg: #191816;
+    --diff-del-bg: #3A1620;
+    --diff-del: #FFB3C1;
+    --diff-add-bg: #1A2A4D;
+    --diff-add: #B9CCFF;
+    --diff-hunk: #9C978E;
+    --diff-ctx: #B4AFA6;
+    --count-add: #8FB0FF;
+    --count-del: #FF8FA3;
+    --kind-m: #8FB0FF;
+    --kind-u: #B4AFA6;
+    --kind-r: #C99BF0;
+    --kind-a: #4FC2B0;
+    --kind-d: #FF8FA3;
+    --dot-blocked: #FFB15C;
+    --dot-waiting: #9C978E;
+    --dot-error: #FF6B86;
+    --dot-exited: #9C978E;
+    --lane-0: #6F95F5;
+    --lane-1: #B583E8;
+    --lane-2: #3DB8A5;
+    --lane-3: #A8A49C;
+    --lane-4: #9BBF3A;
+    --grabber: #4A4843;
+    --seg-track: #2B2A27;
+    --seg-active: #3A3834;
+    --scrim: rgba(0, 0, 0, .5);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, .4);
+    --shadow-aside: 0 12px 32px rgba(0, 0, 0, .4);
+    --shadow-sheet: 0 -8px 24px rgba(0, 0, 0, .4);
+    --shadow-seg: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-pop: 0 8px 24px rgba(0, 0, 0, .5);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #151412;
+  --surface: #1E1D1B;
+  --surface-2: #262522;
+  --border: #34322E;
+  --divider: #2B2A27;
+  --text: #ECEAE5;
+  --text-2: #B4AFA6;
+  --text-3: #9C978E;
+  --text-4: #D6D2CA;
+  --accent: #3D6BE0;
+  --accent-hover: #5A82EA;
+  --accent-text: #8FB0FF;
+  --on-accent: #FFFFFF;
+  --selected: rgba(127, 162, 255, .16);
+  --pressed-border: #4A66A8;
+  --pressed-text: #A9C1FF;
+  --choice-bg: rgba(127, 162, 255, .10);
+  --focus-border: #5A7BC8;
+  --focus-ring: rgba(143, 176, 255, .45);
+  --chip: #2E2C29;
+  --chip-text: #D6D2CA;
+  --blocked: #FFB15C;
+  --blocked-text: #1C1B19;
+  --blocked-box: #3A2A14;
+  --blocked-box-text: #FFD9A8;
+  --blocked-title: #FFC07A;
+  --blocked-border: #5C4220;
+  --blocked-key-text: #FFE3BF;
+  --error: #C8203F;
+  --error-text: #FFFFFF;
+  --error-box: #3A1620;
+  --error-box-text: #FFB3C1;
+  --danger: #FF8FA3;
+  --danger-border: #5E2433;
+  --working: #1F2E52;
+  --working-text: #A9C1FF;
+  --track: #2E2C29;
+  --info-box: #20283A;
+  --info-box-text: #D6D2CA;
+  --term-bg: #121110;
+  --term-fg: #ECEAE5;
+  --term-dim: #A8A49C;
+  --diff-bg: #191816;
+  --diff-del-bg: #3A1620;
+  --diff-del: #FFB3C1;
+  --diff-add-bg: #1A2A4D;
+  --diff-add: #B9CCFF;
+  --diff-hunk: #9C978E;
+  --diff-ctx: #B4AFA6;
+  --count-add: #8FB0FF;
+  --count-del: #FF8FA3;
+  --kind-m: #8FB0FF;
+  --kind-u: #B4AFA6;
+  --kind-r: #C99BF0;
+  --kind-a: #4FC2B0;
+  --kind-d: #FF8FA3;
+  --dot-blocked: #FFB15C;
+  --dot-waiting: #9C978E;
+  --dot-error: #FF6B86;
+  --dot-exited: #9C978E;
+  --lane-0: #6F95F5;
+  --lane-1: #B583E8;
+  --lane-2: #3DB8A5;
+  --lane-3: #A8A49C;
+  --lane-4: #9BBF3A;
+  --grabber: #4A4843;
+  --seg-track: #2B2A27;
+  --seg-active: #3A3834;
+  --scrim: rgba(0, 0, 0, .5);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, .4);
+  --shadow-aside: 0 12px 32px rgba(0, 0, 0, .4);
+  --shadow-sheet: 0 -8px 24px rgba(0, 0, 0, .4);
+  --shadow-seg: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, .5);
+}

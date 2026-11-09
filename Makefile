@@ -2,18 +2,29 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/kwonikhyeon/mori/internal/version.Version=$(VERSION)
 TARGETS := darwin/arm64 darwin/amd64 windows/amd64 windows/arm64 linux/amd64
 
-build:
+build: web
 	go build -ldflags '$(LDFLAGS)' -o bin/mori ./cmd/mori
 
 test:
 	go test ./...
+
+# Builds the web UI into internal/webui/dist, where go:embed picks it up
+# (spec §3 #115). npm ci runs again only when the lock file changed.
+web:
+	@command -v npm >/dev/null || { echo "npm not found: install Node.js 22.12 or newer to build the UI" >&2; exit 1; }
+	@if [ ! -d web/node_modules ] || [ web/package-lock.json -nt web/node_modules/.package-lock.json ]; then \
+	  cd web && npm ci --no-audit --no-fund; fi
+	cd web && npm run build
+
+test-web:
+	cd web && npm test
 
 vet:
 	go vet ./...
 
 # Windows also gets moriw.exe, a GUI-subsystem build that opens no console
 # window; the service runs it.
-release:
+release: web
 	@rm -rf dist
 	@for t in $(TARGETS); do os=$${t%/*}; arch=$${t#*/}; ext=; [ $$os = windows ] && ext=.exe; \
 	  out=dist/mori-$$os-$$arch; \
@@ -35,4 +46,4 @@ test-clean:
 	  HC_SESSION=mori-test-$$id XDG_STATE_HOME=$$a/state XDG_CONFIG_HOME=$$a/config XDG_RUNTIME_DIR=$$a/run HC_SOCKET=$$a/c.sock \
 	  hc server stop >/dev/null 2>&1; rm -rf "$$a"; echo "stopped $$id"; done
 
-.PHONY: build test vet vuln release test-clean
+.PHONY: build web test test-web vet vuln release test-clean

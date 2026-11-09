@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { href, parseHash, type Route } from './router'
+import { href, parseHash, plainClick, type Route } from './router'
 
 describe('parseHash', () => {
   it('reads every screen', () => {
@@ -49,5 +49,18 @@ describe('href', () => {
 
   it('matches the url a notification opens', () => {
     expect(parseHash(new URL('https://macmini.example.ts.net/#/t/machine%2Ft7').hash)).toEqual({ name: 'terminal', addr: 'machine/t7', git: false })
+  })
+})
+
+describe('plainClick', () => {
+  const click = (init: MouseEventInit = {}) => new MouseEvent('click', { button: 0, ...init })
+
+  it('is the main button with no key held', () => {
+    expect(plainClick(click())).toBe(true)
+  })
+
+  it('leaves the other ways of opening a link to the browser', () => {
+    for (const k of ['metaKey', 'ctrlKey', 'shiftKey', 'altKey']) expect(plainClick(click({ [k]: true }))).toBe(false)
+    expect(plainClick(click({ button: 1 }))).toBe(false)
   })
 })

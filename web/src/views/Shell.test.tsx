@@ -2,15 +2,17 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../../test/fakeWs'
 import { folder, status, term } from '../../test/fixtures'
+import { COMMITS, diffOf, LOG } from '../../test/history'
 import { hello } from '../lib/boot'
 import { now } from '../lib/clock'
 import { viewportWidth } from '../lib/media'
-import { route, type Route } from '../lib/router'
+import { href, route, type Route } from '../lib/router'
 import { conn, core, folders, hosts, ready, resetStore, terminals } from '../lib/store'
 import { theme } from '../lib/theme'
 import type { TerminalView } from '../lib/types'
 import { gitFrom } from './Git'
 import { phoneBack, Shell } from './Shell'
+import { forgetCommits } from './useLog'
 
 // jsdom cannot lay out xterm's cells.
 vi.mock('../lib/xterm', async () => {
@@ -42,6 +44,20 @@ function cleanRepo() {
   )
 }
 
+/** A server with the history of test/history.ts. */
+function withHistory() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (u: string) => {
+      const q = new URL(u, 'http://mori.test')
+      if (q.pathname === '/api/git/log') return Response.json(LOG)
+      if (q.pathname === '/api/git/commit') return Response.json(COMMITS[q.searchParams.get('rev')!])
+      if (q.pathname === '/api/git/diff') return Response.json({ diff: diffOf(q.searchParams.get('file')!), truncated: false })
+      return Response.json({})
+    }),
+  )
+}
+
 beforeEach(() => {
   FakeWebSocket.reset()
   vi.stubGlobal('WebSocket', FakeWebSocket)
@@ -62,6 +78,7 @@ afterEach(() => {
   route.value = { name: 'queue' }
   phoneBack.value = '#/'
   gitFrom.value = ''
+  forgetCommits()
   vi.unstubAllGlobals()
 })
 
@@ -144,6 +161,26 @@ describe('PC', () => {
     render(<Shell />)
     expect(screen.getByRole('complementary', { name: 'Git' }).classList.contains('is-over')).toBe(true)
     expect(screen.getByRole('separator', { name: 'Git 패널 너비' }).classList.contains('splitter-over')).toBe(true)
+  })
+
+  it('shows the commit picked in the graph beside it and closes it', async () => {
+    withHistory()
+    load([])
+    at(1440, { name: 'graph', folder: 'f1', head: false })
+    render(<Shell />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Git 그래프' })).toBeTruthy()
+    const rows = await screen.findByRole('list', { name: '커밋' })
+    expect(screen.queryByRole('complementary')).toBeNull()
+    fireEvent.click(within(rows).getByRole('link', { name: /bbbbbbb/ }))
+    const aside = screen.getByRole('complementary', { name: '커밋' })
+    expect(aside.style.width).toBe('360px')
+    expect(screen.getByRole('separator', { name: '커밋 패널 너비' }).getAttribute('aria-controls')).toBe('pc-aside')
+    expect(await within(aside).findByRole('heading', { level: 3, name: '알림이 두 번 뜨던 문제 고침' })).toBeTruthy()
+    // The parent's subject comes from the graph's log.
+    expect(within(aside).getByText('처음')).toBeTruthy()
+    fireEvent.click(within(aside).getByRole('button', { name: '커밋 닫기' }))
+    expect(route.value).toEqual({ name: 'graph', folder: 'f1', head: false })
+    expect(screen.queryByRole('complementary')).toBeNull()
   })
 
   it('says how the host is and links the other hosts', () => {
@@ -233,6 +270,18 @@ describe('phone', () => {
     })
     expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/folders')
     expect(screen.queryByText('이 세션')).toBeNull()
+  })
+
+  it('gives the graph the whole screen and its commit a sheet', async () => {
+    withHistory()
+    load([])
+    at(390, { name: 'graph', folder: 'f1', head: false, c: 'b'.repeat(40) })
+    render(<Shell />)
+    expect(screen.queryByRole('navigation', { name: '주 메뉴' })).toBeNull()
+    expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe(href({ name: 'git', folder: 'f1' }))
+    const sheet = screen.getByRole('region', { name: '커밋' })
+    expect(await within(sheet).findByRole('heading', { name: '알림이 두 번 뜨던 문제 고침' })).toBeTruthy()
+    expect(screen.queryByRole('complementary')).toBeNull()
   })
 
   it('goes back from a session to the tab it was opened from', async () => {

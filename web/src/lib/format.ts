@@ -3,7 +3,7 @@
 
 import type { DiffQuery } from './api'
 import { relTime } from './time'
-import type { Change, FolderView, Preset, TerminalView, Worktree } from './types'
+import type { Change, Commit, CommitFile, FolderView, Preset, TerminalView, Worktree } from './types'
 
 export type ChipKind = 'blocked' | 'error' | 'waiting' | 'working' | 'none' | 'exited'
 
@@ -254,4 +254,52 @@ export function changeGroups(cs: Change[]): ChangeGroup[] {
     if (c.worktree !== '.') by.changed.push(item('changed', c, c.worktree, '', { file }))
   }
   return GROUPS.filter(([k]) => by[k].length > 0).map(([key, label]) => ({ key, label, items: by[key] }))
+}
+
+/** A file of a commit as its panel lists it: a change with its counts. */
+export interface CommitItem extends ChangeItem {
+  added: number
+  deleted: number
+  binary: boolean
+}
+
+const KIND_LETTERS: Record<string, string> = { added: 'A', deleted: 'D', modified: 'M', renamed: 'R', copied: 'C', typechange: 'T' }
+
+/** A commit's files, each opening its diff against the first parent (spec §3 #110), a rename's or a copy's with the path before. */
+export function commitItems(c: Commit): CommitItem[] {
+  return c.files.map((f) => {
+    const letter = KIND_LETTERS[f.kind] ?? 'M'
+    const moved = f.orig && (letter === 'R' || letter === 'C') ? f.orig : ''
+    const [word, tone] = WORDS[letter]
+    return {
+      key: moved ? `${moved}\n${f.path}` : f.path,
+      path: f.path,
+      letter,
+      word,
+      tone,
+      note: moved ? `${moved}에서 ${letter === 'R' ? '옮김' : '복사'}` : '',
+      diff: moved ? { rev: c.hash, file: f.path, orig: moved } : { rev: c.hash, file: f.path },
+      added: f.added,
+      deleted: f.deleted,
+      binary: f.binary,
+    }
+  })
+}
+
+/** A commit message as git shows it: the first paragraph on one line, then the rest. */
+export function splitMessage(message: string): { subject: string; body: string } {
+  const lines = message.replace(/\r\n?/g, '\n').split('\n')
+  const blank = (l: string) => l.trim() === ''
+  let i = 0
+  while (i < lines.length && blank(lines[i])) i++
+  const head: string[] = []
+  for (; i < lines.length && !blank(lines[i]); i++) head.push(lines[i].trim())
+  // Blank lines go from the ends of the body, an indented first line keeps its room.
+  const body = lines.slice(i).join('\n').replace(/^\s*\n|\s+$/g, '')
+  return { subject: head.join(' '), body }
+}
+
+/** The lines a commit's files add and delete. */
+export function fileTotals(files: CommitFile[]): { added: number; deleted: number } {
+  return files.reduce((t, f) => ({ added: t.added + f.added, deleted: t.deleted + f.deleted }), { added: 0, deleted: 0 })
 }

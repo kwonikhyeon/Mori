@@ -17,8 +17,10 @@ import { ASIDE, layout, loadWidth, saveWidth, SIDEBAR, type Pane } from '../lib/
 import { href, navigate, route, type Route } from '../lib/router'
 import { conn, core, host, hosts, terminals } from '../lib/store'
 import { setTheme, theme, type ThemePref } from '../lib/theme'
+import { CommitPanel } from './Commit'
 import { FolderList } from './Folders'
 import { GitPanel, GitScreen, gitFrom } from './Git'
+import { GraphScreen } from './Graph'
 import { NewSession } from './NewSession'
 import { Pending } from './Pending'
 import { QueueList } from './Queue'
@@ -51,7 +53,7 @@ function pcMain(r: Route): ComponentChildren {
     case 'git':
       return <GitScreen key={r.folder} variant="pc" folder={r.folder} path={r.path} />
     case 'graph':
-      return <Pending title="Git 그래프" />
+      return <GraphScreen key={r.folder} variant="pc" folder={r.folder} path={r.path} head={r.head} c={r.c} />
   }
 }
 
@@ -62,6 +64,10 @@ interface AsideView {
 
 /** What the PC aside shows, if anything. */
 function pcAside(r: Route): AsideView | null {
+  if (r.name === 'graph')
+    return r.c
+      ? { label: '커밋', body: <CommitPanel key={r.folder} r={r} onClose={() => navigate({ ...r, c: undefined }, { replace: true })} /> }
+      : null
   if (r.name !== 'terminal' || !r.git) return null
   const t = terminals.value.get(r.addr)
   return {
@@ -96,7 +102,17 @@ function phoneFull(r: Route): ComponentChildren {
         />
       )
     case 'graph':
-      return <Pending title="Git 그래프" back={href({ name: 'git', folder: r.folder, path: r.path })} />
+      return (
+        <GraphScreen
+          key={r.folder}
+          variant="phone"
+          folder={r.folder}
+          path={r.path}
+          head={r.head}
+          c={r.c}
+          back={href({ name: 'git', folder: r.folder, path: r.path })}
+        />
+      )
     default:
       return null
   }

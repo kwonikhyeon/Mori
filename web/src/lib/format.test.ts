@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { folder, status, term, worktree } from '../../test/fixtures'
-import { appName, askText, branchLine, branchOf, changeGroups, chip, endText, fileParts, finishedLine, homeWorktree, place, shortHash, shortPath } from './format'
-import type { Change, Preset } from './types'
+import { appName, askText, branchLine, branchOf, changeGroups, chip, commitItems, endText, fileParts, fileTotals, finishedLine, homeWorktree, place, shortHash, shortPath, splitMessage } from './format'
+import type { Change, Commit, CommitFile, Preset } from './types'
 
 const presets: Preset[] = [
   { id: 'claude', name: 'Claude Code', argv: ['claude'], task: true },
@@ -220,5 +220,87 @@ describe('branchLine', () => {
   it('names a commit off any branch, and a branch with no commit yet', () => {
     expect(branchLine({ ...s, branch: '', detached: true, upstream: '' })).toEqual({ name: 'a1b2c3d', sub: '브랜치가 아닌 커밋에 있습니다' })
     expect(branchLine({ ...s, head: '', upstream: '' })).toEqual({ name: 'main', sub: '아직 커밋이 없습니다' })
+  })
+})
+
+describe('commitItems', () => {
+  const H = 'c'.repeat(40)
+  const file = (path: string, kind: string, over: Partial<CommitFile> = {}): CommitFile => ({ path, kind, added: 1, deleted: 0, binary: false, ...over })
+  const commit = (files: CommitFile[]): Commit => ({
+    hash: H,
+    parents: [],
+    author: 'me',
+    email: 'me@example.com',
+    author_ms: 0,
+    committer: 'me',
+    committer_email: 'me@example.com',
+    commit_ms: 0,
+    message: 's',
+    files,
+    truncated: false,
+  })
+
+  it('reads a commit file as the Git panel reads a change', () => {
+    const items = commitItems(
+      commit([
+        file('a', 'modified'),
+        file('b', 'added'),
+        file('c', 'deleted'),
+        file('docs/d', 'renamed', { orig: 'docs/d0' }),
+        file('e', 'copied', { orig: 'e0' }),
+        file('f', 'typechange'),
+        file('g', 'something new'),
+      ]),
+    )
+    expect(items.map((i) => [i.letter, i.word, i.tone, i.note])).toEqual([
+      ['M', '수정', 'm', ''],
+      ['A', '추가', 'a', ''],
+      ['D', '삭제', 'd', ''],
+      ['R', '이름 바꿈', 'r', 'docs/d0에서 옮김'],
+      ['C', '복사', 'r', 'e0에서 복사'],
+      ['T', '종류 바뀜', 'm', ''],
+      ['M', '수정', 'm', ''],
+    ])
+    expect(new Set(items.map((i) => i.key)).size).toBe(7)
+  })
+
+  it('asks for the diff against the first parent, with the path before a rename or a copy', () => {
+    const items = commitItems(commit([file('x.go', 'modified'), file('new.md', 'renamed', { orig: 'old.md' }), file('k', 'copied', { orig: 'k0' })]))
+    expect(items.map((i) => i.diff)).toEqual([
+      { rev: H, file: 'x.go' },
+      { rev: H, file: 'new.md', orig: 'old.md' },
+      { rev: H, file: 'k', orig: 'k0' },
+    ])
+  })
+
+  it('keeps the counts, which a binary file has none of', () => {
+    const [t, b] = commitItems(commit([file('t', 'modified', { added: 3, deleted: 2 }), file('b.png', 'added', { added: 0, binary: true })]))
+    expect([t.added, t.deleted, t.binary]).toEqual([3, 2, false])
+    expect([b.added, b.deleted, b.binary]).toEqual([0, 0, true])
+  })
+})
+
+describe('splitMessage', () => {
+  it('takes the first paragraph as the subject and the rest as the body', () => {
+    expect(splitMessage('feat: 그래프\n\n행마다 SVG 하나.\n색은 칸마다.\n')).toEqual({ subject: 'feat: 그래프', body: '행마다 SVG 하나.\n색은 칸마다.' })
+  })
+
+  it('joins a subject that runs over lines, as git does', () => {
+    expect(splitMessage('fix: a long\nsubject line\n\nbody')).toEqual({ subject: 'fix: a long subject line', body: 'body' })
+  })
+
+  it('reads CRLF and blank lines with spaces, and a message with no body', () => {
+    expect(splitMessage('  one\r\n \r\n\r\ntwo\r\n\r\nthree  ')).toEqual({ subject: 'one', body: 'two\n\nthree' })
+    expect(splitMessage('only\n')).toEqual({ subject: 'only', body: '' })
+    expect(splitMessage('')).toEqual({ subject: '', body: '' })
+  })
+})
+
+describe('fileTotals', () => {
+  const file = (path: string, kind: string, over: Partial<CommitFile> = {}): CommitFile => ({ path, kind, added: 1, deleted: 0, binary: false, ...over })
+
+  it('adds the lines of the files, of which a binary one has none', () => {
+    expect(fileTotals([file('a', 'modified', { added: 3, deleted: 1 }), file('b', 'added', { added: 5, deleted: 0 }), file('c.png', 'added', { added: 0, binary: true })])).toEqual({ added: 8, deleted: 1 })
+    expect(fileTotals([])).toEqual({ added: 0, deleted: 0 })
   })
 })

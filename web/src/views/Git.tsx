@@ -16,6 +16,7 @@ import { ChangeCards, ChangeList } from './GitChanges'
 import { WorktreeList } from './GitWorktrees'
 import { Loading, type Variant } from './rows'
 import { useDiff, useGit, type GitData } from './useGit'
+import { graphFrom } from './useLog'
 import './git.css'
 
 /** The session a phone opened Git from: back goes to it, and its worktree is marked. */
@@ -71,6 +72,11 @@ function AheadBehind({ g }: { g: GitData }) {
 
 const graphHref = (g: GitData) => href({ name: 'graph', folder: g.f!.id, path: g.shown, head: false })
 
+/** The graph's way back is the screen it was opened from. */
+const fromHere = (g: GitData) => () => {
+  graphFrom.value = { folder: g.f!.id, href: location.hash }
+}
+
 function BranchRow({ g }: { g: GitData }) {
   const { line } = useBranch(g)
   return (
@@ -83,7 +89,7 @@ function BranchRow({ g }: { g: GitData }) {
         <span class="gp-branch-sub">{line.sub ? line.sub + ' · 보기만 합니다' : '보기만 합니다'}</span>
       </div>
       {g.shown && (
-        <a class="btn btn-sm gp-graph" href={graphHref(g)}>
+        <a class="btn btn-sm gp-graph" href={graphHref(g)} onClick={fromHere(g)}>
           <Icon name="graph" size={15} />
           그래프
         </a>
@@ -109,8 +115,8 @@ function BranchCard({ g }: { g: GitData }) {
   )
 }
 
-/** The diff of the change picked on a PC. */
-function DiffPane({ shown, item, tick }: { shown: string; item: ChangeItem; tick: number }) {
+/** The diff of the change picked on a PC, or of a commit's file. */
+export function DiffPane({ shown, item, tick }: { shown: string; item: ChangeItem; tick: number }) {
   const d = useDiff(shown, item, tick)
   const t = totals(d.files)
   const orig = item.diff.orig
@@ -123,10 +129,10 @@ function DiffPane({ shown, item, tick }: { shown: string; item: ChangeItem; tick
         {d.diff && (
           <>
             <span class="gp-diff-counts" aria-hidden="true">
-              <span class="add">+{t.added}</span> <span class="del">−{t.deleted}</span>
+              <span class="add">+{t.added.toLocaleString('ko-KR')}</span> <span class="del">−{t.deleted.toLocaleString('ko-KR')}</span>
             </span>
             <span class="sr-only">
-              {t.added}줄 추가, {t.deleted}줄 삭제
+              {t.added.toLocaleString('ko-KR')}줄 추가, {t.deleted.toLocaleString('ko-KR')}줄 삭제
             </span>
           </>
         )}
@@ -308,7 +314,7 @@ export function GitScreen({ variant, folder, path, back = '#/folders' }: GitScre
           <>
             <BranchCard g={g} />
             {g.shown && (
-              <a class="gs-card gs-graph" href={graphHref(g)}>
+              <a class="gs-card gs-graph" href={graphHref(g)} onClick={fromHere(g)}>
                 <Icon name="graph" size={20} class="gs-graph-icon" />
                 <span class="gs-graph-text">
                   <span class="gs-graph-title">커밋 그래프</span>{' '}

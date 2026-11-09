@@ -66,6 +66,11 @@ export function parseHash(hash: string): Route {
 
 export const route = signal<Route>(QUEUE)
 
+/** A click that opens the link here: the main button, with no key that asks for a new tab or window. */
+export function plainClick(e: MouseEvent): boolean {
+  return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
+}
+
 /** Goes to r; replace leaves no step for the back button. */
 export function navigate(r: Route, opts: { replace?: boolean } = {}): void {
   const h = href(r)

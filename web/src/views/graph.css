@@ -1,0 +1,666 @@
+/* The Git graph (the B-Graph boards): one row per commit with its lines, the
+   commit beside it on a PC and in a sheet on a phone. */
+
+/* ---------- lanes ---------- */
+
+.lane-0 {
+  --tone: var(--lane-0);
+}
+
+.lane-1 {
+  --tone: var(--lane-1);
+}
+
+.lane-2 {
+  --tone: var(--lane-2);
+}
+
+.lane-3 {
+  --tone: var(--lane-3);
+}
+
+.lane-4 {
+  --tone: var(--lane-4);
+}
+
+.gr-svg {
+  display: block;
+  flex: none;
+  overflow: hidden;
+}
+
+.gr-edge {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.gr-dot {
+  fill: var(--tone);
+}
+
+.gr-ring {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 1.5;
+}
+
+/* ---------- the PC header ---------- */
+
+.gs-pc.gr .gs-head {
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 12px 16px;
+}
+
+.gs-pc.gr .gs-titles {
+  flex: 1 1 220px;
+  gap: 2px;
+}
+
+.gs-pc.gr .gs-sub {
+  font-size: 13px;
+}
+
+.gr-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.gr-tools .seg {
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+}
+
+.gr-tools .seg-btn {
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.gr-back {
+  gap: 6px;
+  padding: 0 12px;
+}
+
+/* ---------- the list ---------- */
+
+.gr-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.gr-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+}
+
+/* A long log draws only the rows in view. */
+.gr-li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 44px;
+}
+
+.gr-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px 0 8px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.gr-row:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.gr-row[aria-current='true'] {
+  background: var(--selected);
+}
+
+.gr-row:focus-visible {
+  outline-offset: -2px;
+}
+
+.gr-text {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gr-line1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.gr-subject {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gr-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.gr-hash {
+  flex: none;
+}
+
+.gr-author {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gr-when {
+  flex: none;
+}
+
+.gr-row[aria-current='true'] .gr-subject {
+  font-weight: 600;
+}
+
+.gr-row[aria-current='true'] .gr-meta {
+  color: var(--text-2);
+}
+
+/* ---------- names ---------- */
+
+.gr-chips {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 60%;
+  overflow: hidden;
+}
+
+.gr-chip {
+  position: relative;
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  max-width: 200px;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.gr-chip svg {
+  flex: none;
+}
+
+.gr-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gr-chip.is-head {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 500;
+}
+
+.gr-chip.is-branch {
+  border-color: var(--tone);
+  color: var(--tone);
+}
+
+.gr-chip.is-remote {
+  border-color: var(--tone);
+  border-style: dashed;
+  color: var(--text-2);
+}
+
+.gr-chip.is-tag {
+  background: var(--chip);
+  color: var(--chip-text);
+}
+
+.gr-chip.is-more {
+  flex: none;
+  background: var(--chip);
+  color: var(--text-2);
+}
+
+/* ---------- the foot ---------- */
+
+.gr-foot {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.gr-foot p {
+  margin: 0;
+}
+
+.gr-more {
+  margin-left: auto;
+}
+
+.gr-foot-error {
+  flex-basis: 100%;
+  color: var(--danger);
+  white-space: pre-line;
+}
+
+.gr-empty {
+  flex: 1;
+  justify-content: center;
+}
+
+/* ---------- the phone ---------- */
+
+.gr-scope {
+  flex: none;
+  padding: 0 calc(16px + env(safe-area-inset-right, 0px)) 10px calc(16px + env(safe-area-inset-left, 0px));
+}
+
+.gr-scope .seg {
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.gr-scope .seg-btn {
+  height: 44px;
+  border-radius: 9px;
+}
+
+.gs-phone .gr-scroll {
+  padding: 0 calc(16px + env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+}
+
+.gr-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.gs-phone .gr-list {
+  padding: 4px 0;
+}
+
+.gs-phone .gr-li {
+  contain-intrinsic-size: auto 56px;
+}
+
+.gs-phone .gr-row {
+  gap: 6px;
+  height: 56px;
+  padding: 0 14px 0 4px;
+}
+
+.gs-phone .gr-text {
+  gap: 2px;
+}
+
+.gs-phone .gr-subject {
+  font-size: 14px;
+}
+
+.gs-phone .gr-meta {
+  gap: 6px;
+}
+
+.gs-phone .gr-chips {
+  max-width: 70%;
+}
+
+.gs-phone .gr-chip {
+  padding: 0 7px;
+}
+
+.gs-phone .gr-foot {
+  justify-content: center;
+  padding: 14px 4px 0;
+  border-top: 0;
+  text-align: center;
+}
+
+.gs-phone .gr-more {
+  margin-left: 0;
+}
+
+.gs-phone .gr-empty {
+  flex: none;
+}
+
+/* The rows under the sheet still scroll up out from under it. */
+.gr.has-sheet .gr-scroll {
+  padding-bottom: calc(48dvh + 16px);
+  scroll-padding-bottom: calc(48dvh + 8px);
+}
+
+/* ---------- the phone's sheet ---------- */
+
+.cs {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  height: 48vh;
+  height: 48dvh;
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  border-top: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  background: var(--surface);
+  box-shadow: var(--shadow-sheet);
+}
+
+.cs.is-diff {
+  height: 85vh;
+  height: 85dvh;
+}
+
+.cs-grab {
+  flex: none;
+  width: 36px;
+  height: 4px;
+  margin: 8px auto 4px;
+  border-radius: 999px;
+  background: var(--grabber);
+}
+
+.cs-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  padding: 0 8px 0 20px;
+}
+
+.cs.is-diff .cs-head {
+  padding-left: 8px;
+}
+
+.cs-title {
+  flex: none;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cs-title:focus {
+  outline: none;
+}
+
+.cs-hash {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-head .btn-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+}
+
+.cs-close {
+  margin-left: auto;
+}
+
+.cs-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cs-sum {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cs-subject {
+  font-size: 16px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.cs-body {
+  margin: 4px 0 2px;
+  color: var(--text-2);
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cs-refs {
+  margin: 6px 0 4px;
+}
+
+.cs-refs .gr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: none;
+}
+
+.cs-refs .gr-chip,
+.cm-refs .gr-chip {
+  max-width: 100%;
+}
+
+.cs-meta {
+  color: var(--text-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.cs-meta a {
+  font-size: 12px;
+}
+
+.cs-files {
+  padding: 8px 8px 16px;
+}
+
+.cs-files-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 12px 6px;
+}
+
+.cs-files-title {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cs-file {
+  padding: 6px 12px;
+}
+
+.cs .gp-diff {
+  flex: 1 1 0;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+}
+
+.cs .qnote,
+.cs .gp-error {
+  padding: 12px 20px;
+}
+
+.cs .cm-note {
+  padding: 0 12px 6px;
+}
+
+/* Under the files' head, where its words begin. */
+.cs .cs-files .qnote {
+  padding: 8px 12px;
+}
+
+/* ---------- the commit beside the graph ---------- */
+
+.cm-hash {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cm-close {
+  margin-left: auto;
+}
+
+.cm-sum {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cm-subject {
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.cm-body {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cm-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.cm-facts dt {
+  grid-column: 1;
+  color: var(--text-3);
+}
+
+.cm-facts dd {
+  grid-column: 2;
+  min-width: 0;
+  margin: 0;
+}
+
+.cm-parent {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cm-psub {
+  color: var(--text-2);
+}
+
+.cm-full {
+  color: var(--text-2);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.cm-refs .gr-chips {
+  flex-wrap: wrap;
+  max-width: none;
+}
+
+.cm-totals,
+.cm-counts {
+  position: relative;
+  font-size: 12px;
+}
+
+.cm-counts {
+  flex: none;
+}
+
+.cm-totals .add,
+.cm-counts .add {
+  color: var(--count-add);
+}
+
+.cm-totals .del,
+.cm-counts .del {
+  color: var(--count-del);
+}
+
+.cm-bin {
+  flex: none;
+  color: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: 11px;
+}
+
+.cm-note {
+  margin: 0;
+  padding: 0 8px 4px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.gp .cm-files .qnote {
+  padding: 8px 8px 4px;
+}

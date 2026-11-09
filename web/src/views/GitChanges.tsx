@@ -126,7 +126,7 @@ export function ChangeCards({ groups, count, shown, tick }: ChangeCardsProps) {
                       <FileLabel it={it} />
                       {on && d.diff && (
                         <span class="gcc-counts mono" aria-hidden="true">
-                          <span class="add">+{t.added}</span> <span class="del">−{t.deleted}</span>
+                          <span class="add">+{t.added.toLocaleString('ko-KR')}</span> <span class="del">−{t.deleted.toLocaleString('ko-KR')}</span>
                         </span>
                       )}
                       <Icon name={on ? 'chevron-down' : 'chevron-right'} size={16} class="gcc-chev" />

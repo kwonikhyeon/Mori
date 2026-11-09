@@ -19,7 +19,7 @@ const GAP = 2_000
 const EVERY = 10_000
 
 /** A read that could not reach the server keeps what it read before. */
-const offline = (e: unknown) => e instanceof ApiError && e.status === 0
+export const offline = (e: unknown) => e instanceof ApiError && e.status === 0
 
 interface Ticker {
   /** Notes that a read starts now. */
@@ -31,7 +31,8 @@ interface Ticker {
   stop: () => void
 }
 
-function useTicker(pulse: number | null | undefined): [number, Ticker] {
+/** When to read again: every `every` ms while the page is seen (0: never by itself), on the focus, on waking and when `pulse` moves. */
+export function useTicker(pulse: number | null | undefined, every = EVERY): [number, Ticker] {
   const [tick, setTick] = useState(0)
   const [t] = useState<Ticker>(() => {
     let last = 0
@@ -53,16 +54,16 @@ function useTicker(pulse: number | null | undefined): [number, Ticker] {
     return { mark: () => (last = Date.now()), bump, soon, stop }
   })
   useEffect(() => {
-    const every = setInterval(() => document.visibilityState === 'visible' && t.soon(), EVERY)
+    const timer = every > 0 ? setInterval(() => document.visibilityState === 'visible' && t.soon(), every) : undefined
     const off = onWake(t.soon)
     window.addEventListener('focus', t.soon)
     return () => {
-      clearInterval(every)
+      clearInterval(timer)
       off()
       window.removeEventListener('focus', t.soon)
       t.stop()
     }
-  }, [t])
+  }, [t, every])
   // The session's status moved: what it did may have changed the files.
   const seen = useRef(pulse)
   useEffect(() => {
@@ -74,6 +75,16 @@ function useTicker(pulse: number | null | undefined): [number, Ticker] {
 }
 
 export type GitState = 'loading' | 'missing' | 'norepo' | 'ok'
+
+/** Whether a folder's Git can be read: not before the folders are, nor of one not there or not a repository. */
+export function gitState(f: FolderView | undefined): GitState {
+  return !ready.value ? 'loading' : !f ? 'missing' : !f.repo ? 'norepo' : 'ok'
+}
+
+/** The worktree to show: the one asked for while it is there, else the folder's own; before the server has listed them, the folder. */
+export function pickShown(f: FolderView, ws: Worktree[], want: string | undefined): string {
+  return (ws.find((w) => w.path === want && !w.prunable) ?? homeWorktree(f, ws))?.path ?? (ws.length ? '' : f.path)
+}
 
 export interface StatusRead {
   data?: GitStatus
@@ -101,13 +112,12 @@ export function useGit(fid: string, want: string | undefined, pulse?: number | n
   const [tick, t] = useTicker(pulse)
   const [made, setMade] = useState<Worktree | null>(null)
   const f = folders.value.find((x) => x.id === fid)
-  const state: GitState = !ready.value ? 'loading' : !f ? 'missing' : !f.repo ? 'norepo' : 'ok'
+  const state = gitState(f)
 
   const ws = state === 'ok' && f ? f.worktrees.filter((w) => !w.bare) : []
   const known = !!made && ws.some((w) => w.path === made.path)
   if (made && !known && state === 'ok') ws.push(made)
-  // Before the server has listed the worktrees, the folder is the one it has.
-  const shown = state !== 'ok' || !f ? '' : (ws.find((w) => w.path === want && !w.prunable) ?? homeWorktree(f, ws))?.path ?? (ws.length ? '' : f.path)
+  const shown = state !== 'ok' || !f ? '' : pickShown(f, ws, want)
 
   // Once the folder list has it, the list's own entry is the one to show.
   useLayoutEffect(() => {

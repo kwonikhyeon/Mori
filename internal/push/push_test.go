@@ -180,7 +180,7 @@ func TestNotifierSendsPayload(t *testing.T) {
 	if !slices.Equal(endpoints(got), []string{"https://push.example.com/a", "https://push.example.com/b"}) {
 		t.Fatalf("sent to %v", endpoints(got))
 	}
-	want := push.Payload{Title: "macmini · 승인 대기", Body: "claude — Allow Bash?", Tag: "t1", URL: "/#/t/t1"}
+	want := push.Payload{Title: "macmini · 승인 대기", Body: "claude — Allow Bash?", Tag: "t1", URL: "/#/t/t1", Kind: "blocked"}
 	if got[0].Payload != want {
 		t.Errorf("payload %+v, want %+v", got[0].Payload, want)
 	}
@@ -426,5 +426,25 @@ func TestEnsureVAPIDStable(t *testing.T) {
 	}
 	if c, err := push.EnsureVAPID(st2); err != nil || c != a {
 		t.Errorf("after reopening: %+v, %v; want the same keys", c, err)
+	}
+}
+
+func TestForward(t *testing.T) {
+	e := newEnv(t)
+	e.subscribe(t, "d1", "https://push.example.com/d1")
+	e.subscribe(t, "d2", "https://push.example.com/d2", push.KindExited)
+	p := push.Payload{Title: "desk · 종료", Body: "claude", Tag: "h_abc/t1", URL: "/#/h/h_abc/t/t1", Kind: "exited"}
+	e.focus("t1", true) // Forward does not ask about focus
+	e.n.Forward(push.KindExited, p)
+	e.n.Forward(push.KindExited, p) // nor about the window
+	e.n.Wait()
+	got := e.sender.take()
+	if len(got) != 2 {
+		t.Fatalf("sent %d: %+v", len(got), got)
+	}
+	for _, m := range got {
+		if m.Endpoint != "https://push.example.com/d2" || m.Payload != p {
+			t.Fatalf("%+v", m)
+		}
 	}
 }

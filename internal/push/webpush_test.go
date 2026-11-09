@@ -3,16 +3,12 @@ package push
 import (
 	"bytes"
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/hkdf"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
 	"io"
 	"math/big"
@@ -79,8 +75,26 @@ func TestWebPushSend(t *testing.T) {
 		}
 	}
 	checkVAPID(t, req.header.Get("Authorization"), v.Public, srv.URL, subject)
-	if got := decrypt(t, req.body, ua, secret); !bytes.Equal(got, payload) {
-		t.Errorf("decrypted %q, want %q", got, payload)
+	got, err := Decrypt(req.body, ua, secret)
+	if err != nil || !bytes.Equal(got, payload) {
+		t.Errorf("Decrypt = %q, %v; want %q", got, err, payload)
+	}
+	other, err := ecdh.P256().GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad := bytes.Clone(req.body)
+	bad[len(bad)-1] ^= 1
+	for name, try := range map[string]func() ([]byte, error){
+		"short":        func() ([]byte, error) { return Decrypt(req.body[:20], ua, secret) },
+		"another key":  func() ([]byte, error) { return Decrypt(req.body, other, secret) },
+		"another auth": func() ([]byte, error) { return Decrypt(req.body, ua, make([]byte, 16)) },
+		"tampered":     func() ([]byte, error) { return Decrypt(bad, ua, secret) },
+		"cut":          func() ([]byte, error) { return Decrypt(req.body[:len(req.body)-1], ua, secret) },
+	} {
+		if b, err := try(); err == nil {
+			t.Errorf("%s: Decrypt = %q, want an error", name, b)
+		}
 	}
 
 	status.Store(http.StatusGone)
@@ -159,54 +173,6 @@ func checkVAPID(t *testing.T, header, public, origin, subject string) {
 	if !ecdsa.Verify(pk, h[:], new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])) {
 		t.Error("the token is not signed by the host's key")
 	}
-}
-
-// decrypt reads an aes128gcm message with the subscription's private key
-// and auth secret (RFC 8188, RFC 8291).
-func decrypt(t *testing.T, body []byte, ua *ecdh.PrivateKey, secret []byte) []byte {
-	t.Helper()
-	if len(body) < 21 {
-		t.Fatalf("body of %d bytes", len(body))
-	}
-	salt, idlen := body[:16], int(body[20])
-	if rs := binary.BigEndian.Uint32(body[16:20]); rs < 18 {
-		t.Fatalf("record size %d", rs)
-	}
-	keyid, ct := body[21:21+idlen], body[21+idlen:]
-	as, err := ecdh.P256().NewPublicKey(keyid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	shared, err := ua.ECDH(as)
-	if err != nil {
-		t.Fatal(err)
-	}
-	must := func(b []byte, err error) []byte {
-		t.Helper()
-		if err != nil {
-			t.Fatal(err)
-		}
-		return b
-	}
-	prkKey := must(hkdf.Extract(sha256.New, shared, secret))
-	ikm := must(hkdf.Expand(sha256.New, prkKey, "WebPush: info\x00"+string(ua.PublicKey().Bytes())+string(keyid), 32))
-	prk := must(hkdf.Extract(sha256.New, ikm, salt))
-	cek := must(hkdf.Expand(sha256.New, prk, "Content-Encoding: aes128gcm\x00", 16))
-	nonce := must(hkdf.Expand(sha256.New, prk, "Content-Encoding: nonce\x00", 12))
-	block, err := aes.NewCipher(cek)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		t.Fatal(err)
-	}
-	plain := must(gcm.Open(nil, nonce, ct, nil))
-	plain = bytes.TrimRight(plain, "\x00")
-	if len(plain) == 0 || plain[len(plain)-1] != 2 {
-		t.Fatal("the record does not end with the last-record delimiter")
-	}
-	return plain[:len(plain)-1]
 }
 
 func TestEnsureVAPIDReplacesBrokenPair(t *testing.T) {

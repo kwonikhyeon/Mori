@@ -28,8 +28,9 @@ import (
 type Payload struct {
 	Title string `json:"title"`
 	Body  string `json:"body"`
-	Tag   string `json:"tag"` // a newer notification with the same tag replaces the older one
-	URL   string `json:"url"` // what a tap opens, under the host's origin
+	Tag   string `json:"tag"`            // a newer notification with the same tag replaces the older one
+	URL   string `json:"url"`            // what a tap opens, under the host's origin
+	Kind  string `json:"kind,omitempty"` // what it is about; a hub that relays it reads this (spec §3 #167)
 }
 
 // Sender delivers one message to one subscription. It returns the push
@@ -159,8 +160,25 @@ func (n *Notifier) OnChange(c core.Change) {
 		n.o.Logger.Error("encoding a notification", "err", err)
 		return
 	}
+	n.send(kind, body)
+}
+
+// Forward sends p, a notification another host sent this hub, to the
+// subscriptions that want k (spec §3 #166). The other host has already
+// decided and checked focus, so nothing is held back here.
+func (n *Notifier) Forward(k Kind, p Payload) {
+	body, err := json.Marshal(p)
+	if err != nil {
+		n.o.Logger.Error("encoding a notification", "err", err)
+		return
+	}
+	n.send(k, body)
+}
+
+// send delivers body in the background to every subscription that wants k.
+func (n *Notifier) send(k Kind, body []byte) {
 	for _, s := range n.o.Store.Get().PushSubs {
-		if wants(s, kind) {
+		if wants(s, k) {
 			n.wg.Go(func() { n.deliver(context.Background(), s, body) })
 		}
 	}
@@ -399,6 +417,7 @@ func payloadFor(host string, k Kind, t *hc.Terminal) Payload {
 		Body:  clip(body, maxBody),
 		Tag:   t.Address,
 		URL:   "/#/t/" + url.PathEscape(t.Address),
+		Kind:  string(k),
 	}
 }
 

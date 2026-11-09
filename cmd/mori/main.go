@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/kwonikhyeon/mori/internal/version"
 )
@@ -19,6 +20,7 @@ const usage = `사용법: mori <명령> [옵션]
   pair      새 기기를 페어링할 코드와 QR을 만듭니다
   devices   페어링된 기기를 봅니다
   revoke    기기의 페어링을 철회합니다
+  hosts     이 허브에 이은 다른 호스트를 보고, 잇고, 끊습니다 (link, unlink)
   doctor    설치와 연결 상태를 점검합니다
   version   버전을 출력합니다
   help      이 도움말을 출력합니다
@@ -52,6 +54,8 @@ func main() {
 		err = runDevices(args)
 	case "revoke":
 		err = runRevoke(args)
+	case "hosts":
+		err = runHosts(os.Stdout, args)
 	case "doctor":
 		err = runDoctor(args)
 	case "version", "-v", "--version":
@@ -86,22 +90,41 @@ func newFlagSet(name, synopsis string) *flag.FlagSet {
 	return fs
 }
 
-// parseFlags parses args, which must end with exactly the named positional
-// arguments.
+// parseFlags parses args, which must hold the named positional arguments;
+// flags may come after them too. A name in brackets, such as "[코드]", is
+// optional and goes last. Afterwards fs.Arg gives the positional arguments.
 func parseFlags(fs *flag.FlagSet, args []string, positional ...string) error {
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return err
+	var pos []string
+	for {
+		if err := fs.Parse(args); err != nil {
+			if errors.Is(err, flag.ErrHelp) {
+				return err
+			}
+			return errUsage // the flag package has printed the problem and the usage
 		}
-		return errUsage // the flag package has printed the problem and the usage
+		rest := fs.Args()
+		if len(rest) == 0 {
+			break
+		}
+		if n := len(args) - len(rest); n > 0 && args[n-1] == "--" { // all after -- is positional
+			pos = append(pos, rest...)
+			break
+		}
+		pos, args = append(pos, rest[0]), rest[1:]
+	}
+	required := 0
+	for _, p := range positional {
+		if !strings.HasPrefix(p, "[") {
+			required++
+		}
 	}
 	switch {
-	case fs.NArg() > len(positional):
-		fmt.Fprintf(fs.Output(), "mori %s: 알 수 없는 인자 %q\n", fs.Name(), fs.Arg(len(positional)))
+	case len(pos) > len(positional):
+		fmt.Fprintf(fs.Output(), "mori %s: 알 수 없는 인자 %q\n", fs.Name(), pos[len(positional)])
 		return errUsage
-	case fs.NArg() < len(positional):
-		fmt.Fprintf(fs.Output(), "mori %s: <%s> 인자가 필요합니다\n", fs.Name(), positional[fs.NArg()])
+	case len(pos) < required:
+		fmt.Fprintf(fs.Output(), "mori %s: <%s> 인자가 필요합니다\n", fs.Name(), positional[len(pos)])
 		return errUsage
 	}
-	return nil
+	return fs.Parse(append([]string{"--"}, pos...)) // so that fs.Arg gives them
 }

@@ -429,3 +429,10 @@ func (f fakeServer) Shutdown() {
 		f.shutdown()
 	}
 }
+func (f fakeServer) Hosts() []admin.HostInfo { return nil }
+func (f fakeServer) LinkHost(context.Context, string, string, string) (admin.HostInfo, bool, error) {
+	return admin.HostInfo{}, false, nil
+}
+func (f fakeServer) UnlinkHost(context.Context, string) (admin.HostInfo, error) {
+	return admin.HostInfo{}, nil
+}

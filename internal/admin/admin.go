@@ -19,9 +19,11 @@ import (
 
 // Request is one command, sent as one JSON line.
 type Request struct {
-	Op   string `json:"op"` // pair, devices, revoke, status, shutdown
-	Name string `json:"name,omitempty"`
-	ID   string `json:"id,omitempty"`
+	Op   string `json:"op"`             // pair, devices, revoke, hosts, link_host, unlink_host, status, shutdown
+	Name string `json:"name,omitempty"` // pair: the device; link_host: the host
+	ID   string `json:"id,omitempty"`   // revoke: a device ID; unlink_host: a host ID or name
+	URL  string `json:"url,omitempty"`  // link_host: an origin or a pairing link
+	Code string `json:"code,omitempty"` // link_host: the pairing code, when URL has none
 }
 
 // Response is the one JSON line that answers a Request.
@@ -31,6 +33,9 @@ type Response struct {
 	URL       string          `json:"url,omitempty"`
 	ExpiresMs int64           `json:"expires_ms,omitempty"`
 	Devices   []DeviceInfo    `json:"devices,omitempty"`
+	Hosts     []HostInfo      `json:"hosts,omitempty"`
+	Host      *HostInfo       `json:"host,omitempty"`    // link_host, unlink_host
+	Created   bool            `json:"created,omitempty"` // link_host: a new host, not a re-link
 	Status    json.RawMessage `json:"status,omitempty"`
 }
 
@@ -61,12 +66,27 @@ type DeviceInfo struct {
 	LastSeenMs int64  `json:"last_seen_ms"`
 }
 
+// HostInfo is a host this hub links to (spec §3 #168), without its token.
+type HostInfo struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	URL        string `json:"url"`
+	Linked     bool   `json:"linked"`
+	Version    string `json:"version,omitempty"`
+	Relay      bool   `json:"relay"`
+	RelayError string `json:"relay_error,omitempty"`
+}
+
 // Handler does what the requests ask. Its methods run on the connection's
-// goroutine.
+// goroutine. LinkHost and UnlinkHost get a context that ends with the
+// request's deadline or the server.
 type Handler interface {
 	PairCode(name string) (code, url string, expires time.Time)
 	Devices() []DeviceInfo
 	Revoke(id string) error
+	Hosts() []HostInfo
+	LinkHost(ctx context.Context, rawURL, code, name string) (host HostInfo, created bool, err error)
+	UnlinkHost(ctx context.Context, idOrName string) (HostInfo, error)
 	Status() any
 	Shutdown()
 }
@@ -77,8 +97,20 @@ var ErrNotRunning = errors.New("Mori 서버가 돌고 있지 않습니다")
 const (
 	connTimeout   = 10 * time.Second
 	clientTimeout = 5 * time.Second
-	maxRequest    = 64 << 10
+	// slowTimeout bounds link_host and unlink_host, which wait on another
+	// host: linking takes up to 30 s (spec §3 #169).
+	slowTimeout = 40 * time.Second
+	maxRequest  = 64 << 10
 )
+
+// timeout is how long op may take: base, or slowTimeout for an op that
+// waits on another host.
+func timeout(op string, base time.Duration) time.Duration {
+	if op == "link_host" || op == "unlink_host" {
+		return slowTimeout
+	}
+	return base
+}
 
 // Listen opens the socket at path. It fails when another server answers
 // there, and removes a socket file that a crashed server left behind.
@@ -138,11 +170,11 @@ func Serve(ctx context.Context, ln net.Listener, h Handler) {
 			time.Sleep(100 * time.Millisecond) // out of file descriptors, say
 			continue
 		}
-		go serveConn(c, h)
+		go serveConn(ctx, c, h)
 	}
 }
 
-func serveConn(c net.Conn, h Handler) {
+func serveConn(ctx context.Context, c net.Conn, h Handler) {
 	defer c.Close()
 	c.SetDeadline(time.Now().Add(connTimeout))
 	var req Request
@@ -150,14 +182,18 @@ func serveConn(c net.Conn, h Handler) {
 		json.NewEncoder(c).Encode(Response{Error: "요청을 읽지 못했습니다: " + err.Error()})
 		return
 	}
-	res, after := handle(h, req)
+	limit := timeout(req.Op, connTimeout)
+	c.SetDeadline(time.Now().Add(limit))
+	ctx, cancel := context.WithTimeout(ctx, limit)
+	defer cancel()
+	res, after := handle(ctx, h, req)
 	json.NewEncoder(c).Encode(res)
 	if after != nil {
 		after() // shutdown answers first
 	}
 }
 
-func handle(h Handler, req Request) (Response, func()) {
+func handle(ctx context.Context, h Handler, req Request) (Response, func()) {
 	switch req.Op {
 	case "pair":
 		code, url, exp := h.PairCode(req.Name)
@@ -169,6 +205,20 @@ func handle(h Handler, req Request) (Response, func()) {
 			return Response{Error: err.Error()}, nil
 		}
 		return Response{}, nil
+	case "hosts":
+		return Response{Hosts: h.Hosts()}, nil
+	case "link_host":
+		host, created, err := h.LinkHost(ctx, req.URL, req.Code, req.Name)
+		if err != nil {
+			return Response{Error: err.Error()}, nil
+		}
+		return Response{Host: &host, Created: created}, nil
+	case "unlink_host":
+		host, err := h.UnlinkHost(ctx, req.ID)
+		if err != nil {
+			return Response{Error: err.Error()}, nil
+		}
+		return Response{Host: &host}, nil
 	case "status":
 		b, err := json.Marshal(h.Status())
 		if err != nil {
@@ -195,7 +245,7 @@ func (c Client) Do(req Request) (Response, error) {
 		return Response{}, fmt.Errorf("%w. mori serve나 mori service install로 서버를 먼저 띄우세요(%s에 연결하지 못했습니다)", ErrNotRunning, c.Path)
 	}
 	defer conn.Close()
-	conn.SetDeadline(time.Now().Add(clientTimeout))
+	conn.SetDeadline(time.Now().Add(timeout(req.Op, clientTimeout)))
 	if err := json.NewEncoder(conn).Encode(req); err != nil {
 		return Response{}, fmt.Errorf("관리 소켓에 쓰지 못했습니다: %w", err)
 	}

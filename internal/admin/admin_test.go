@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"os"
@@ -29,6 +30,28 @@ func (f *fakeHandler) Revoke(id string) error {
 }
 func (f *fakeHandler) Status() any { return map[string]bool{"ok": true} }
 func (f *fakeHandler) Shutdown()   { close(f.shutdown) }
+
+func (f *fakeHandler) Hosts() []HostInfo {
+	return []HostInfo{{ID: "h_1", Name: "desk", URL: "https://desk.example.ts.net", Linked: true, Relay: true}}
+}
+
+// LinkHost fails unless the server gave it time to wait on the host.
+func (f *fakeHandler) LinkHost(ctx context.Context, rawURL, code, name string) (HostInfo, bool, error) {
+	if d, ok := ctx.Deadline(); !ok || time.Until(d) < 30*time.Second {
+		return HostInfo{}, false, errors.New("a link needs 30 s")
+	}
+	if code != "ABCD-EFGH" {
+		return HostInfo{}, false, errors.New("코드가 맞지 않습니다")
+	}
+	return HostInfo{ID: "h_1", Name: cmp.Or(name, "desk"), URL: rawURL, Linked: true}, true, nil
+}
+
+func (f *fakeHandler) UnlinkHost(ctx context.Context, idOrName string) (HostInfo, error) {
+	if idOrName != "h_1" && idOrName != "desk" {
+		return HostInfo{}, errors.New("no such host")
+	}
+	return HostInfo{ID: "h_1", Name: "desk", URL: "https://desk.example.ts.net"}, nil
+}
 
 // socketPath is short: macOS allows 104 bytes for a socket path, and test
 // temp directories there are long.
@@ -89,6 +112,19 @@ func TestAdminRoundTrip(t *testing.T) {
 	}
 	if _, err := c.Do(Request{Op: "revoke", ID: "d_2"}); err == nil || err.Error() != "no such device" {
 		t.Fatal(err)
+	}
+	if r, err := c.Do(Request{Op: "hosts"}); err != nil || len(r.Hosts) != 1 || r.Hosts[0].ID != "h_1" || !r.Hosts[0].Relay {
+		t.Fatal(r, err)
+	}
+	r, err = c.Do(Request{Op: "link_host", URL: "https://desk.example.ts.net", Code: "ABCD-EFGH", Name: "책상"})
+	if err != nil || r.Host == nil || r.Host.Name != "책상" || !r.Created {
+		t.Fatal(r, err)
+	}
+	if _, err := c.Do(Request{Op: "link_host", URL: "https://desk.example.ts.net", Code: "WXYZ-WXYZ"}); err == nil || err.Error() != "코드가 맞지 않습니다" {
+		t.Fatal(err)
+	}
+	if r, err := c.Do(Request{Op: "unlink_host", ID: "desk"}); err != nil || r.Host == nil || r.Host.ID != "h_1" {
+		t.Fatal(r, err)
 	}
 	if r, err := c.Do(Request{Op: "status"}); err != nil || string(r.Status) != `{"ok":true}` {
 		t.Fatal(r, err)
@@ -163,5 +199,14 @@ func TestClientStatus(t *testing.T) {
 	_, err := (Client{Path: filepath.Join(filepath.Dir(path), "none.sock")}).Status()
 	if !errors.Is(err, ErrNotRunning) || !strings.Contains(err.Error(), "mori service install") {
 		t.Fatal(err)
+	}
+}
+
+func TestSlowOpsWaitLonger(t *testing.T) {
+	if timeout("link_host", clientTimeout) != slowTimeout || timeout("unlink_host", connTimeout) != slowTimeout {
+		t.Fatal("linking waits on another host")
+	}
+	if timeout("devices", clientTimeout) != clientTimeout {
+		t.Fatal("other ops keep their deadline")
 	}
 }

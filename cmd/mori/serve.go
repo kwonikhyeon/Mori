@@ -24,6 +24,7 @@ import (
 	"github.com/kwonikhyeon/mori/internal/gitx"
 	"github.com/kwonikhyeon/mori/internal/hc"
 	"github.com/kwonikhyeon/mori/internal/paths"
+	"github.com/kwonikhyeon/mori/internal/peer"
 	"github.com/kwonikhyeon/mori/internal/presence"
 	"github.com/kwonikhyeon/mori/internal/push"
 	"github.com/kwonikhyeon/mori/internal/server"
@@ -104,6 +105,9 @@ func runServe(args []string) error {
 	addr := ln.Addr().String()
 	pub := publicURL(*publicFlag, addr, tailscale.DNSName)
 	host := hostName(tailscale.DNSName)
+	// links pairs this hub with other hosts; the API and the admin socket
+	// share it (spec §6.9).
+	links := peer.New(peer.Options{Store: st, PublicURL: pub, Listen: addr, HostName: host, Version: version.Version, Logger: logger})
 	pres := presence.New()
 	notifier := push.New(push.Options{Store: st, Sender: push.NewWebPush(vapid, pushSubject), Focused: pres.Focused, Host: host, Logger: logger})
 	// hc connect may not start the core on Windows (spec §15), so there the
@@ -125,6 +129,7 @@ func runServe(args []string) error {
 		Logger:    logger,
 		Presence:  pres,
 		Push:      notifier,
+		Links:     links,
 	})
 	hs := &http.Server{
 		Handler:           srv.Handler(),
@@ -146,7 +151,7 @@ func runServe(args []string) error {
 	coreDone := make(chan struct{})
 	go func() { cm.Run(coreCtx); close(coreDone) }()
 	go fr.Run(ctx, worktreeRefresh, logger)
-	go admin.Serve(ctx, adminLn, adminHandler{auth: au, publicURL: pub, shutdown: shutdown, status: func() any {
+	go admin.Serve(ctx, adminLn, adminHandler{auth: au, links: links, logger: logger, publicURL: pub, shutdown: shutdown, status: func() any {
 		cs := cm.Status()
 		return admin.Status{
 			Version: version.Version, PID: os.Getpid(), Listen: addr, Home: home,
@@ -242,6 +247,8 @@ func publicURL(flagValue, listen string, dnsName func(context.Context) (string, 
 // adminHandler answers the mori commands through the admin socket.
 type adminHandler struct {
 	auth      *auth.Auth
+	links     *peer.Manager
+	logger    *slog.Logger
 	publicURL func() string
 	status    func() any
 	shutdown  func()
@@ -266,6 +273,40 @@ func (h adminHandler) Revoke(id string) error {
 		return fmt.Errorf("%q: 그런 기기가 없습니다. mori devices로 ID를 확인하세요", id)
 	}
 	return err
+}
+
+func (h adminHandler) Hosts() []admin.HostInfo {
+	var out []admin.HostInfo
+	for _, v := range h.links.Views() {
+		out = append(out, hostInfo(v))
+	}
+	return out
+}
+
+func (h adminHandler) LinkHost(ctx context.Context, rawURL, code, name string) (admin.HostInfo, bool, error) {
+	v, created, err := h.links.Link(ctx, rawURL, code, name)
+	if err != nil {
+		return admin.HostInfo{}, false, err
+	}
+	h.logger.Info("host linked", "host", v.ID, "url", v.URL, "relay", v.Relay)
+	return hostInfo(v), created, nil
+}
+
+func (h adminHandler) UnlinkHost(ctx context.Context, idOrName string) (admin.HostInfo, error) {
+	v, err := h.links.Lookup(idOrName)
+	if err != nil {
+		return admin.HostInfo{}, err
+	}
+	if v, err = h.links.Unlink(ctx, v.ID); err != nil {
+		return admin.HostInfo{}, err
+	}
+	h.logger.Info("host unlinked", "host", v.ID, "url", v.URL)
+	return hostInfo(v), nil
+}
+
+// hostInfo is what the admin socket says of v.
+func hostInfo(v peer.View) admin.HostInfo {
+	return admin.HostInfo{ID: v.ID, Name: v.Name, URL: v.URL, Linked: v.Linked, Version: v.Version, Relay: v.Relay, RelayError: v.RelayError}
 }
 
 func (h adminHandler) Status() any { return h.status() }

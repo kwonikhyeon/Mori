@@ -95,8 +95,7 @@ func TestDoctorStateDir(t *testing.T) {
 	}
 }
 
-// statusServer answers status on the admin socket of a new state
-// directory, as a running server does, and returns the directory.
+// statusServer answers status as a running server does. It links no hosts.
 type statusServer struct{ st admin.Status }
 
 func (s statusServer) PairCode(string) (string, string, time.Time) { return "", "", time.Time{} }
@@ -104,6 +103,13 @@ func (s statusServer) Devices() []admin.DeviceInfo                 { return nil 
 func (s statusServer) Revoke(string) error                         { return nil }
 func (s statusServer) Status() any                                 { return s.st }
 func (s statusServer) Shutdown()                                   {}
+func (s statusServer) Hosts() []admin.HostInfo                     { return nil }
+func (s statusServer) LinkHost(context.Context, string, string, string) (admin.HostInfo, bool, error) {
+	return admin.HostInfo{}, false, nil
+}
+func (s statusServer) UnlinkHost(context.Context, string) (admin.HostInfo, error) {
+	return admin.HostInfo{}, nil
+}
 
 // shortHome is a state directory whose socket path fits: macOS allows 104
 // bytes for one, and test temp directories there are long.
@@ -117,7 +123,16 @@ func shortHome(t *testing.T) string {
 	return dir
 }
 
+// serveStatus serves st as a running server's status and returns the state
+// directory.
 func serveStatus(t *testing.T, st admin.Status) string {
+	t.Helper()
+	return serveAdmin(t, statusServer{st})
+}
+
+// serveAdmin serves h on the admin socket of a new state directory, as a
+// running server does, and returns the directory.
+func serveAdmin(t *testing.T, h admin.Handler) string {
 	t.Helper()
 	home := shortHome(t)
 	ln, err := admin.Listen(paths.Socket(home))
@@ -126,7 +141,7 @@ func serveStatus(t *testing.T, st admin.Status) string {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
-	go func() { admin.Serve(ctx, ln, statusServer{st}); close(done) }()
+	go func() { admin.Serve(ctx, ln, h); close(done) }()
 	t.Cleanup(func() { cancel(); <-done })
 	return home
 }

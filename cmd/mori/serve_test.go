@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"io"
 	"strings"
 	"testing"
@@ -115,6 +116,7 @@ func TestParseFlagsPositional(t *testing.T) {
 	}{
 		{[]string{"d_1"}, true},
 		{[]string{"--home", "/x", "d_1"}, true},
+		{[]string{"d_1", "--home", "/x"}, true},
 		{nil, false},
 		{[]string{"d_1", "d_2"}, false},
 	} {
@@ -124,6 +126,39 @@ func TestParseFlagsPositional(t *testing.T) {
 		if err := parseFlags(fs, tc.args, "기기 ID"); (err == nil) != tc.ok {
 			t.Errorf("%q: %v", tc.args, err)
 		}
+	}
+}
+
+func TestParseFlagsLateAndOptional(t *testing.T) {
+	fs := newFlagSet("revoke", "<기기 ID>")
+	fs.SetOutput(io.Discard)
+	home := fs.String("home", "", "")
+	if err := parseFlags(fs, []string{"d_1", "--home", "/x"}, "기기 ID"); err != nil || *home != "/x" || fs.Arg(0) != "d_1" {
+		t.Fatal(err, *home, fs.Args())
+	}
+
+	link := func(args ...string) (*flag.FlagSet, string, error) {
+		fs := newFlagSet("hosts link", "[옵션] <주소 또는 페어링 링크> [코드]")
+		fs.SetOutput(io.Discard)
+		name := fs.String("name", "", "")
+		err := parseFlags(fs, args, "주소 또는 페어링 링크", "[코드]")
+		return fs, *name, err
+	}
+	fs, name, err := link("https://desk.example.ts.net", "ABCD-EFGH", "--name", "desk")
+	if err != nil || fs.Arg(0) != "https://desk.example.ts.net" || fs.Arg(1) != "ABCD-EFGH" || name != "desk" {
+		t.Fatal(err, fs.Args(), name)
+	}
+	fs, _, err = link("https://desk.example.ts.net/pair#code=ABCD-EFGH")
+	if err != nil || fs.NArg() != 1 || fs.Arg(1) != "" {
+		t.Fatal(err, fs.Args())
+	}
+	for _, args := range [][]string{{"a", "b", "c"}, {"--name", "desk"}} {
+		if _, _, err := link(args...); !errors.Is(err, errUsage) {
+			t.Errorf("%q: %v", args, err)
+		}
+	}
+	if fs, _, err := link("--", "-d"); err != nil || fs.Arg(0) != "-d" {
+		t.Fatal(err, fs.Args())
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 )
 
@@ -45,7 +46,11 @@ func Open(path string) (*Store, error) {
 		s.cur = defaultState()
 		return s, writeAtomic(path, s.cur)
 	}
+	needIDs := slices.ContainsFunc(st.Hosts, func(h Host) bool { return h.ID == "" })
 	s.cur = normalize(st)
+	if needIDs {
+		return s, writeAtomic(path, s.cur) // hosts from before IDs keep the ID they get now
+	}
 	return s, nil
 }
 
@@ -64,6 +69,13 @@ func (s *Store) Folders() []Folder {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]Folder{}, s.cur.Folders...)
+}
+
+// Hosts returns a copy of the linked hosts, cheaper than Get.
+func (s *Store) Hosts() []Host {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]Host{}, s.cur.Hosts...)
 }
 
 // Update runs fn on a copy of the state, saves the result, and only then

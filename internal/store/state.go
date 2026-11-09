@@ -30,10 +30,32 @@ type Folder struct {
 	CreatedMs int64  `json:"created_ms"`
 }
 
-// Host links to the Mori of another machine.
+// Host is another machine's Mori that this hub links to (spec §3 #158~#168).
+// ID never changes, even when the host is linked again.
 type Host struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
+	ID   string   `json:"id"`
+	Name string   `json:"name"`
+	URL  string   `json:"url"` // the host's origin
+	Link HostLink `json:"link,omitzero"`
+}
+
+// HostLink is the hub's pairing with the host. An empty Token means not linked.
+type HostLink struct {
+	Token    string `json:"token"`
+	Version  string `json:"version"` // the host's Mori version when linked
+	LinkedMs int64  `json:"linked_ms"`
+	Relay    Relay  `json:"relay,omitzero"`
+}
+
+// Relay is the push subscription the hub holds on the host (spec §3 #165): the host
+// sends its notifications to <Base>/api/relay/<Secret>, encrypted to Key and Auth.
+type Relay struct {
+	Secret string `json:"secret"`
+	Key    string `json:"key"`  // P-256 private key, base64url without padding
+	Auth   string `json:"auth"` // 16-byte auth secret, base64url without padding
+	Base   string `json:"base"` // the hub public URL the endpoint was made from
+	OK     bool   `json:"ok"`
+	Error  string `json:"error,omitempty"`
 }
 
 // Preset is a program a new session starts with. An empty Argv runs the
@@ -111,6 +133,11 @@ func normalize(st State) State {
 	}
 	if st.Hosts == nil {
 		st.Hosts = []Host{}
+	}
+	for i := range st.Hosts {
+		if st.Hosts[i].ID == "" {
+			st.Hosts[i].ID = NewID("h_")
+		}
 	}
 	if st.Devices == nil {
 		st.Devices = []Device{}

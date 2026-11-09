@@ -178,3 +178,61 @@ func TestNewID(t *testing.T) {
 		t.Fatalf("%s %s", a, b)
 	}
 }
+
+func TestOldHostsGetIDs(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "state.json")
+	old := `{"version":1,"hosts":[{"name":"desk","url":"https://desk.example.ts.net"},{"name":"lab","url":"https://lab.example.ts.net"}]}`
+	if err := os.WriteFile(p, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hs := s.Hosts()
+	if len(hs) != 2 || !strings.HasPrefix(hs[0].ID, "h_") || hs[0].ID == hs[1].ID || hs[0].Link.Token != "" {
+		t.Fatalf("%+v", hs)
+	}
+	again, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := again.Hosts(); got[0].ID != hs[0].ID || got[1].ID != hs[1].ID {
+		t.Fatalf("IDs changed on reopen: %+v then %+v", hs, got)
+	}
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), `"link"`) {
+		t.Fatalf("an unlinked host wrote its link: %s", b)
+	}
+}
+
+func TestHostsIsACopy(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(func(st *State) error {
+		st.Hosts = append(st.Hosts, Host{Name: "desk", URL: "https://desk.example.ts.net"})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	hs := s.Hosts()
+	if len(hs) != 1 || !strings.HasPrefix(hs[0].ID, "h_") {
+		t.Fatalf("%+v", hs)
+	}
+	id := hs[0].ID
+	hs[0].Name = "changed"
+	if s.Hosts()[0].Name != "desk" {
+		t.Fatal("Hosts shares its slice with the store")
+	}
+	if err := s.Update(func(st *State) error { st.Hosts[0].Name = "desk2"; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if h := s.Hosts()[0]; h.ID != id || h.Name != "desk2" {
+		t.Fatalf("%+v", h)
+	}
+}

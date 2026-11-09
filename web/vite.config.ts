@@ -29,6 +29,9 @@ export default defineConfig({
     proxy: {
       '/api': { target: 'http://127.0.0.1:7761', changeOrigin: false },
       '/ws': { target: 'ws://127.0.0.1:7761', ws: true, changeOrigin: false },
+      // A linked host's API and sockets, relayed by the server (spec §3
+      // #161). The key ends in a slash so that only /h/<ID>/… goes there.
+      '/h/': { target: 'http://127.0.0.1:7761', ws: true, changeOrigin: false },
     },
   },
   test: {

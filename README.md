@@ -3,10 +3,10 @@
 herdr-core(`hc`) 위에서 도는 원격 작업 웹앱입니다. 터미널 세션과 코딩 에이전트(Claude Code, Codex)를 폴더별로 띄우고, 승인·입력 대기 알림을 받고, Git 워크트리를 다룹니다. 휴대폰을 포함해 어느 기기의 브라우저에서든 씁니다. 밖에서는 Tailscale을 거쳐 접속합니다.
 
 - **세션은 herdr-core에 삽니다.** 브라우저를 닫거나 Mori를 다시 띄워도 세션은 그대로입니다.
-- **호스트마다 Mori 하나:** 세션을 돌릴 컴퓨터마다 Mori를 설치합니다. 한 호스트가 꺼져도 나머지는 계속 돕니다.
+- **호스트마다 Mori 하나, 폰에는 앱 하나:** 세션을 돌릴 컴퓨터마다 Mori를 설치합니다. 폰은 그중 하나(허브)에만 페어링하고, 허브가 이은 다른 호스트의 세션과 알림을 함께 다룹니다. 한 호스트가 꺼져도 나머지는 계속 돕니다.
 - **tailnet 안에서만:** Mori는 127.0.0.1에서만 듣습니다. 다른 기기에서는 `tailscale serve`가 주는 `https://<호스트>.<tailnet>.ts.net`으로 엽니다.
 
-> 단계 10(웹 UI)까지 만들었습니다. 실제 기기에서 확인할 것(iPhone 홈 화면 앱의 입력과 알림, Windows 호스트, 에이전트의 상태 보고)은 [설계](docs/superpowers/specs/2026-11-08-mori-design.md) §13과 §15에 남아 있습니다.
+> 단계 11(여러 호스트를 한 앱에서)의 서버와 명령까지 만들었습니다. 허브의 화면에서 다른 호스트를 여는 것은 화면 후보를 고른 뒤 만듭니다. 실제 기기에서 확인할 것(iPhone 홈 화면 앱의 입력과 알림, Windows 호스트, 에이전트의 상태 보고)은 [설계](docs/superpowers/specs/2026-11-08-mori-design.md) §13과 §15에 남아 있습니다.
 
 ## 화면
 
@@ -80,8 +80,29 @@ mori revoke <기기 ID>       # 페어링 철회. 그 기기의 열린 연결이
 
 - 새 기기에서 QR을 찍거나 링크를 엽니다. 코드는 5분 동안 한 번만 쓸 수 있습니다.
 - 페어링한 기기가 있으면 설정의 "새 기기 페어링"에서 "코드 만들기"를 눌러도 됩니다. 코드, 링크, QR이 나오고, 새 기기가 연결되면 알려 줍니다. 링크의 주소는 `mori pair`와 같습니다(`--public-url`, 없으면 이 컴퓨터의 Tailscale 이름). 설정의 "기기"에서 기기의 연결을 해제합니다.
-- 호스트마다 주소(origin)가 다르므로 페어링, 홈 화면 추가, 알림 켜기도 호스트마다 따로 합니다.
+- 페어링, 홈 화면 추가, 알림 켜기는 주소(origin)마다 따로 합니다. 호스트가 여럿이면 폰은 허브 하나에만 하고, 나머지 호스트는 허브에 잇습니다(아래 "여러 호스트를 한 앱에서").
 - iPhone·iPad에서 알림을 받으려면 Safari의 "홈 화면에 추가"로 설치한 앱에서 열어야 합니다.
+
+## 여러 호스트를 한 앱에서
+
+폰에는 Mori 하나(허브)만 홈 화면에 추가하고 페어링합니다. 허브에 다른 호스트를 이어 두면 폰은 허브의 앱 하나로 그 호스트들의 세션을 열고 입력하며, 알림도 허브에서 받습니다. 어느 Mori든 다른 호스트를 이으면 허브가 됩니다.
+
+1. 이을 호스트에서 페어링 코드를 만듭니다. 그 호스트에서 `mori pair`를 실행하거나, 그 호스트의 설정에서 "새 기기 페어링"의 "코드 만들기"를 누릅니다.
+2. 허브에서 그 링크로, 또는 주소와 코드로 잇습니다.
+
+   ```sh
+   mori hosts link 'https://desk.<tailnet>.ts.net/pair#code=ABCD-EFGH'
+   mori hosts link https://desk.<tailnet>.ts.net ABCD-EFGH --name 책상
+   mori hosts                # 이은 호스트: ID, 이름, 주소, 연결, 알림, 버전
+   mori hosts unlink 책상     # ID나 이름으로 끊습니다
+   ```
+
+- 페어링 링크는 따옴표로 감쌉니다. zsh에서 `extended_glob`을 켰다면 `#`이 glob 문자가 됩니다.
+- 이은 호스트의 기기 목록에는 허브가 "<허브 이름> 허브"로 보입니다. 거기서 철회하면 그 호스트와의 연결만 끊기고, 허브는 그 호스트를 "끊김"으로 둡니다. 새 코드로 다시 이으면 ID는 그대로이고, 이름도 `--name`을 주지 않으면 그대로입니다. 예전에 설정의 "다른 호스트"에 넣은 호스트도 "끊김"으로 남아 있다가 같은 방법으로 이어집니다.
+- 허브에서 폰을 철회하면 그 폰은 허브를 거쳐 어느 호스트에도 닿지 못합니다.
+- **알림:** 허브의 주소가 https(`tailscale serve`)면 허브가 이은 호스트의 알림을 구독해 폰으로 중계합니다. 폰은 허브의 알림만 켜면 되고, 알림을 누르면 그 호스트의 터미널이 열립니다. `mori hosts`의 알림 칸이 "끔"이면 `mori hosts link`가 이유를 보여 줍니다. 허브의 주소가 바뀌면 중계가 꺼지므로 새 코드로 다시 잇습니다.
+- 허브와 이은 호스트의 버전이 달라도 됩니다. 허브의 화면이 그 호스트에 없는 기능을 부르면 그 화면만 오류를 보입니다. `mori hosts`의 버전은 이을 때 읽은 것입니다.
+- 이은 호스트도 제 주소로 그대로 열립니다. 허브가 꺼져 있을 때 그 주소로 직접 열려면 폰을 그 호스트에도 페어링해 두어야 합니다.
 
 ## 업데이트와 제거
 
@@ -97,7 +118,7 @@ mori revoke <기기 ID>       # 페어링 철회. 그 기기의 열린 연결이
 
 ## 알아 둘 것
 
-- **상태 디렉터리:** `--home`, 다음 `MORI_HOME`, 그다음 OS의 설정 디렉터리 아래 `Mori`입니다(macOS `~/Library/Application Support/Mori`, Windows `%AppData%\Mori`, Linux `~/.config/Mori`). 안에는 `state.json`(폴더, 프리셋, 기기, 알림 구독과 키), `mori.sock`(관리 소켓), `mori.log`(서비스의 로그)가 있습니다.
+- **상태 디렉터리:** `--home`, 다음 `MORI_HOME`, 그다음 OS의 설정 디렉터리 아래 `Mori`입니다(macOS `~/Library/Application Support/Mori`, Windows `%AppData%\Mori`, Linux `~/.config/Mori`). 안에는 `state.json`(폴더, 프리셋, 기기, 알림 구독과 키, 이은 호스트), `mori.sock`(관리 소켓), `mori.log`(서비스의 로그)가 있습니다.
 - **macOS의 PATH:** 서비스의 서버는 설치할 때 셸의 `PATH`로 hc, git, 프리셋 프로그램을 찾습니다. LaunchAgent의 기본 `PATH`에는 `/opt/homebrew/bin`이나 `~/.local/bin`이 없기 때문입니다. `PATH`를 바꿨다면 `mori service install`을 다시 실행합니다. 서비스가 설치되어 있으면 `mori doctor`도 그 `PATH`로 찾아 봅니다.
 - **실행 파일을 옮겼다면** `mori service install`을 다시 실행합니다. 서비스는 설치할 때의 경로를 가리킵니다.
 - **Windows의 Run 키:** 로그인 뒤 조금 늦게 뜰 수 있고, 안전 모드에서는 뜨지 않습니다. 명령은 260자까지만 보장되므로, 너무 길면 `mori service install`이 경고합니다. 서버가 비정상 종료하면 다음 로그인까지 다시 뜨지 않으니 `mori service install`로 다시 띄웁니다.
@@ -111,6 +132,7 @@ mori revoke <기기 ID>       # 페어링 철회. 그 기기의 열린 연결이
 | `mori serve` | 서버를 실행합니다(`--home`, `--listen`, `--public-url`, `--log`, `--hc`, `--hc-session`) |
 | `mori service install` / `uninstall` | 로그인할 때 서버를 띄우도록 설치하거나 제거합니다(`--dry-run`) |
 | `mori pair` / `devices` / `revoke` | 기기를 페어링하고, 보고, 철회합니다 |
+| `mori hosts` / `hosts link` / `hosts unlink` | 허브에 이은 호스트를 보고, 잇고, 끊습니다(`--home`, `hosts link`는 `--name`) |
 | `mori doctor` | 설치와 연결 상태를 점검합니다(`--home`, `--hc`) |
 | `mori version` | 버전, OS, Go 버전을 출력합니다 |
 
@@ -122,7 +144,9 @@ mori revoke <기기 ID>       # 페어링 철회. 그 기기의 열린 연결이
 - **기기 인증:** 페어링한 기기만 들어옵니다. 기기 토큰은 JS가 읽을 수 없는 쿠키(SameSite=Strict)로만 오가고, 서버에는 해시만 저장합니다. 상태를 바꾸는 요청과 WebSocket은 `Origin`이 같은 호스트여야 합니다.
 - **페어링 남용:** 코드는 한 번만 쓰고 5분 뒤 만료됩니다. 실패가 10분 안에 10번을 넘으면 그 창이 끝날 때까지 모든 페어링을 거절합니다.
 - **코어 보호:** 브라우저는 herdr-core에 직접 명령을 보낼 수 없고, Mori가 정해진 동작만 중계합니다. git 경로는 등록한 폴더의 워크트리로 제한합니다.
-- **로컬 파일:** 상태 디렉터리는 0700, `state.json`과 관리 소켓은 0600입니다(Windows는 사용자 프로필의 ACL을 따릅니다). `state.json`에는 알림 서명 키(VAPID 개인 키)와 토큰 해시가 들어 있습니다. 관리 소켓은 같은 사용자의 `mori` 명령만 씁니다.
+- **허브:** 허브에 페어링한 기기는 허브가 이은 모든 호스트에 닿습니다. 허브는 정해진 API와 WebSocket만 넘기고(그 밖은 404), 폰의 쿠키 대신 그 호스트가 허브에 준 기기 토큰을 씁니다. 그 호스트의 쿠키와 보안 헤더는 폰에 넘기지 않습니다. 한 호스트만 떼려면 그 호스트에서 허브를 철회합니다.
+- **알림 중계:** 이은 호스트가 보내는 알림(`/api/relay/<비밀>`)은 쿠키 없이 받습니다. 대신 경로의 256비트 비밀이 맞고 본문이 허브의 키로 풀려야 하며(RFC 8291), 그 경로는 로그에 남기지 않습니다.
+- **로컬 파일:** 상태 디렉터리는 0700, `state.json`과 관리 소켓은 0600입니다(Windows는 사용자 프로필의 ACL을 따릅니다). `state.json`에는 알림 서명 키(VAPID 개인 키)와 토큰 해시가, 허브라면 이은 호스트마다 그 호스트의 기기 토큰(해시가 아닌 값)과 알림 중계 키가 들어 있습니다. 관리 소켓은 같은 사용자의 `mori` 명령만 씁니다.
 - **서비스 환경:** macOS의 plist에는 `PATH`, 로캘, XDG 디렉터리 변수만 넣습니다. 셸의 토큰이나 키는 plist와 세션에 들어가지 않습니다.
 - **응답 헤더:** 모든 응답에 CSP(`default-src 'self'`, 인라인 스크립트 금지), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`를 붙입니다.
 
@@ -141,5 +165,5 @@ make test-clean  # 통합 테스트가 남긴 격리 코어를 멈추고 지웁�
 
 - 통합 테스트는 실제 `hc`로 테스트마다 격리 코어를 띄웁니다. 세션은 `mori-test-<id>`이고, 소켓과 XDG 디렉터리는 저장소의 `.dev/test/<id>`에 둡니다. 사용자의 기본 코어는 건드리지 않습니다. hc가 없으면 그 테스트는 건너뜁니다. 다른 hc로 시험하려면 `MORI_TEST_HC`에 경로를 줍니다.
 - 웹 UI는 `web/`의 Preact·TypeScript 앱입니다. Vite가 `internal/webui/dist`에 빌드하고, 실행 파일이 그 파일을 품습니다. 빌드 결과는 커밋하지 않습니다. `make web` 없이 `go build`만 하면 자리표시 페이지가 뜹니다. 그 페이지는 서버 정보를 보여 주고, `mori pair`의 링크로 연 기기만 페어링합니다.
-- UI를 고칠 때는 `mori serve`(127.0.0.1:7761)를 띄워 두고 `cd web && npm run dev`를 실행한 뒤 Vite가 알려 주는 주소(`http://localhost:5173`)를 엽니다. `/api`와 `/ws`는 서버로 넘어갑니다. 페어링은 `mori pair`의 코드를 페이지에 입력합니다.
-- 설계는 [docs/superpowers/specs/2026-11-08-mori-design.md](docs/superpowers/specs/2026-11-08-mori-design.md), 구현 계획은 [백엔드](docs/superpowers/plans/2026-11-09-mori-backend-v1.md)와 [웹 UI](docs/superpowers/plans/2026-11-09-mori-web-ui.md)에 있습니다.
+- UI를 고칠 때는 `mori serve`(127.0.0.1:7761)를 띄워 두고 `cd web && npm run dev`를 실행한 뒤 Vite가 알려 주는 주소(`http://localhost:5173`)를 엽니다. `/api`, `/ws`, `/h/`(이은 호스트)는 서버로 넘어갑니다. 페어링은 `mori pair`의 코드를 페이지에 입력합니다.
+- 설계는 [docs/superpowers/specs/2026-11-08-mori-design.md](docs/superpowers/specs/2026-11-08-mori-design.md), 구현 계획은 [백엔드](docs/superpowers/plans/2026-11-09-mori-backend-v1.md), [웹 UI](docs/superpowers/plans/2026-11-09-mori-web-ui.md), [여러 호스트](docs/superpowers/plans/2026-11-10-mori-multi-host.md)에 있습니다.

@@ -45,10 +45,10 @@ func (e *Error) Error() string {
 func (e *Error) Unwrap() error { return e.Err }
 
 // NameError is a branch or base name git would not take, or that would
-// read as an option.
+// read as an option, or a commit that is not a full hash.
 type NameError struct{ Name string }
 
-func (e *NameError) Error() string { return fmt.Sprintf("bad branch or base name %q", e.Name) }
+func (e *NameError) Error() string { return fmt.Sprintf("bad branch, base or commit name %q", e.Name) }
 
 const maxStderr = 8 << 10
 

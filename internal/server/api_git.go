@@ -238,14 +238,31 @@ func (s *Server) handleGitStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGitDiff shows the diff of a file or directory of a worktree, or of
-// every tracked file when file is empty (spec §3 decision 62).
+// every tracked file when file is empty (spec §3 decision 62). With rev it
+// shows the commit's instead, and orig, the path a renamed file had, makes
+// it show the rename (decisions 109, 110).
 func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request) {
-	file := r.URL.Query().Get("file")
-	if file != "" && !gitx.SafeRelPath(file) {
-		writeError(w, invalid("file은 워크트리 안의 상대 경로여야 합니다: %s", file))
-		return
+	q := r.URL.Query()
+	file, orig, rev := q.Get("file"), q.Get("orig"), q.Get("rev")
+	for _, p := range [][2]string{{"file은", file}, {"orig는", orig}} {
+		if p[1] != "" && !gitx.SafeRelPath(p[1]) {
+			writeError(w, invalid("%s 워크트리 안의 상대 경로여야 합니다: %s", p[0], p[1]))
+			return
+		}
 	}
 	staged, err := queryBool(r, "staged")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	switch {
+	case rev != "" && !gitx.IsHash(rev):
+		err = badRev(rev)
+	case rev != "" && staged:
+		err = invalid("rev와 staged는 함께 쓸 수 없습니다")
+	case orig != "" && (rev == "" || file == ""):
+		err = invalid("orig는 rev와 file이 있을 때만 씁니다")
+	}
 	if err != nil {
 		writeError(w, err)
 		return
@@ -255,12 +272,84 @@ func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	diff, truncated, err := s.d.Git.Diff(r.Context(), wt.Path, file, staged, maxDiff)
+	var diff string
+	var truncated bool
+	if rev != "" {
+		var paths []string
+		for _, p := range []string{orig, file} {
+			if p != "" {
+				paths = append(paths, p)
+			}
+		}
+		diff, truncated, err = s.d.Git.CommitDiff(r.Context(), wt.Path, rev, paths, maxDiff)
+	} else {
+		diff, truncated, err = s.d.Git.Diff(r.Context(), wt.Path, file, staged, maxDiff)
+	}
 	if err != nil {
 		writeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"diff": diff, "truncated": truncated})
+}
+
+// handleGitLog is the commit graph of a worktree's repository, laid out in
+// lanes (spec §3 decisions 104 to 108).
+func (s *Server) handleGitLog(w http.ResponseWriter, r *http.Request) {
+	limit, err := queryInt(r, "limit", gitx.DefaultLogLimit)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if limit < 1 || limit > gitx.MaxLogLimit {
+		writeError(w, invalid("limit=%d: 1부터 %d까지여야 합니다", limit, gitx.MaxLogLimit))
+		return
+	}
+	head, err := queryBool(r, "head")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	wt, err := s.worktreeParam(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	gr, err := s.d.Git.Log(r.Context(), wt.Path, head, limit)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, gr)
+}
+
+// handleGitCommit is a commit of the graph with the files it changed
+// (spec §3 decisions 109, 110).
+func (s *Server) handleGitCommit(w http.ResponseWriter, r *http.Request) {
+	rev := r.URL.Query().Get("rev")
+	if !gitx.IsHash(rev) {
+		writeError(w, badRev(rev))
+		return
+	}
+	wt, err := s.worktreeParam(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	c, err := s.d.Git.Commit(r.Context(), wt.Path, rev)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
+}
+
+// badRev refuses a rev that is not a full commit hash (spec §3 decision
+// 109).
+func badRev(rev string) *apiError {
+	if rev == "" {
+		return invalid("rev가 필요합니다")
+	}
+	return invalid("rev는 커밋의 전체 해시여야 합니다: %q", rev)
 }
 
 // worktreeParam is the worktree ?path= names. It must be one of a

@@ -104,6 +104,8 @@ func (s *Server) routes() {
 	api.HandleFunc("DELETE /api/folders/{id}/worktrees", s.handleRemoveWorktree)
 	api.HandleFunc("GET /api/git/status", s.handleGitStatus)
 	api.HandleFunc("GET /api/git/diff", s.handleGitDiff)
+	api.HandleFunc("GET /api/git/log", s.handleGitLog)
+	api.HandleFunc("GET /api/git/commit", s.handleGitCommit)
 	api.HandleFunc("GET /api/terminals", s.handleListTerminals)
 	api.HandleFunc("POST /api/terminals", s.handleCreateTerminal)
 	api.HandleFunc("GET /api/terminals/{t}", s.handleGetTerminal)

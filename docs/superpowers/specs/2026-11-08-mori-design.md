@@ -110,6 +110,15 @@ herdr 제품군에는 두 계열이 있다.
 - **워크트리:** `worktree add`는 없는 상위 디렉터리를 만든다. 브랜치가 이미 다른 워크트리에 있어 거절되면 디렉터리를 남기지 않는다. 잠긴 워크트리는 `remove --force` 하나로는 지워지지 않는다("use 'remove -f -f'"). `-z`는 줄마다 NUL, 항목마다 NUL을 하나 더 붙이고, 잠금 이유에 줄바꿈이 그대로 들어간다. `-z`가 없으면 이유를 C 문자열처럼 따옴표로 싼다. `worktree list -z`는 git 2.36부터다(Ubuntu 22.04는 2.34).
 - **diff 머리:** 이름에 공백이 있으면 `+++ b/<이름>` 끝에 탭이 붙는다. `diff --no-index`는 파일이 다르면 1로 끝난다.
 
+아래는 Git 그래프를 만들며 git 2.54로 확인한 것이다(2026-11-09). 그래프·커밋 API(결정 104~111)가 이 동작에 기댄다.
+
+- **장식 거르기:** `--decorate-refs`를 하나라도 주면 HEAD 장식이 빠진다. `--decorate-refs=HEAD`를 함께 주면 돌아온다. 브랜치에 있으면 `HEAD -> refs/heads/x`, 분리되어 있으면 `HEAD`다. 명시한 `--decorate-refs`는 `log.excludeDecoration` 설정을 이긴다. 원격의 `HEAD`는 `refs/remotes/origin/HEAD`라는 이름으로 따로 나온다. 장식은 `, `로 잇고, 주석 태그와 가벼운 태그 모두 `tag: refs/tags/x`다.
+- **NUL 구분:** `-z`와 `--format`(tformat)을 함께 쓰면 기록마다 끝에 NUL이 붙는다. 필드 사이에 `%x00`을 넣으면 출력 전체를 NUL로 나눠 필드 수만큼씩 끊어 읽을 수 있다.
+- **빈 저장소:** 커밋이 없으면 `git log HEAD`는 "bad revision 'HEAD'"와 함께 128로 끝난다. `--ignore-missing`을 주면 아무것도 내지 않고 0으로 끝난다. 없는 전체 해시도 조용히 건너뛰므로, 커밋 하나를 읽을 때는 쓰지 않는다.
+- **커밋의 파일:** `diff-tree -r -M --raw --numstat -z <부모> <커밋>`은 raw 항목을 모두 낸 뒤 numstat 항목을 같은 순서로 낸다. raw는 `:<모드> <모드> <해시> <해시> <상태>\0<경로>\0`이고, 이름 바꾸기는 `R083\0<이전>\0<새>\0`이다. numstat은 `<추가>\t<삭제>\t<경로>\0`이고, 이름 바꾸기는 `<추가>\t<삭제>\t\0<이전>\0<새>\0`, 바이너리는 `-\t-`다. 루트 커밋은 `--root <커밋>`으로 빈 트리와 비교한다. 이때 `--no-commit-id`가 없으면 맨 앞에 커밋 해시가 하나 더 나온다.
+- **이름 바꾸기 diff:** `diff-tree -p -M <부모> <커밋> -- <새 경로>`는 이전 경로를 보지 못해 새 파일로 보여 준다. 두 경로를 다 주면 `rename from`·`rename to`가 나온다.
+- **커밋 찾기:** `log -1 <해시>`는 트리의 해시를 받으면 아무것도 내지 않고 0으로 끝난다. 없는 해시를 받으면 "bad object"나 "bad revision"과 함께 128로 끝나고, 저장소가 아닐 때도 128이다. `rev-parse --verify --quiet <해시>^{commit}`은 커밋이면 0, 트리·블롭이나 없는 객체면 1, 저장소가 아니면 128로 끝나서 이 둘을 가른다. `cat-file -e <해시>^{commit}`은 셋 다 128이라 가르지 못한다. 주석 태그 객체의 해시는 그 커밋으로 벗겨져 다른 해시가 나온다.
+
 아래는 단계 7에서 격리 코어로 확인한 것이다(2026-11-09). 알림 판정(§6.5, 결정 78)이 이 동작에 기댄다.
 
 - **OSC 7501 보고:** 프로그램이 `ESC ] 7501 ; 키=값:키=값 BEL`을 출력하면 코어가 그 터미널의 상태로 받는다. 쌍은 `:`로 잇는다. `;`로 이으면 보고 전체가 무시된다. 키는 `state`(`idle`·`working`·`done`·`blocked`·`error`), `kind`(`permission`·`question`·`auth`), `progress`(0~100), `app`(문자열 그대로), `msg`·`title`(UTF-8 문자열의 base64, 패딩은 있어도 없어도 된다)이다. 모르는 키는 무시한다.
@@ -239,6 +248,15 @@ herdr 제품군에는 두 계열이 있다.
 | 101 | 프록시 대상 비교 | doctor와 설치 안내는 서버의 수신 주소를 `http://<IP>:<포트>`로 바꿔 `tailscale serve` 설정과 비교한다. `localhost`는 127.0.0.1로 본다. 루프백 주소면 `http://localhost:<포트>`도 맞는 것으로 친다 | 주소 문자열 그대로 비교 | Go는 `localhost`를 127.0.0.1에서 듣는다(§2.3). `tailscale serve --bg http://localhost:7761`로 켠 사용자도 있다 |
 | 102 | 버전 출력 | `mori version`과 doctor의 첫 줄은 `<버전> (<OS>/<아키텍처>, <Go 버전>)`이다 | 버전만 | 표준 라이브러리의 취약점은 빌드한 Go 버전에 달렸다(결정 88) |
 | 103 | UI 후보 형식 | 디자인 캔버스 하나에 후보마다 페이지 하나를 둔다. 후보마다 PC 화면 하나와 폰 화면 다섯 개(홈, 터미널, 새 세션, Git, 알림·기기)를 그린다 | 후보마다 아티팩트 하나 | 한 링크에서 후보를 나란히 비교할 수 있다. 캔버스 형식은 작업 하나에 캔버스 하나를 쓴다 |
+| 104 | Git 그래프 범위 | `GET /api/git/log`는 로컬 브랜치·원격 추적 브랜치·태그·HEAD에서 닿는 커밋을 준다(`--branches --remotes --tags HEAD`). `head=1`이면 HEAD에서 닿는 커밋만 준다. 원격의 `HEAD`(`origin/HEAD`)는 이름표에서 뺀다. 다른 워크트리의 분리된 HEAD는 그 워크트리의 `path`로 열 때만 보인다 | `--all` · HEAD만 | `--all`은 `refs/stash`와 `refs/notes`의 커밋까지 그래프에 섞는다. 에이전트마다 브랜치를 따서 일하므로, 여러 브랜치를 한눈에 보는 것이 이 기능의 목적이다. `origin/HEAD`는 늘 `origin/main` 같은 이름과 같은 커밋에 붙는다 |
+| 105 | 그래프 순서 | `--topo-order`다. 자식은 늘 부모보다 위에 있고, 한 브랜치의 커밋이 모여서 나온다 | `--date-order` · 기본 순서 | `git log --graph`의 기본 순서다. 날짜 순은 브랜치가 번갈아 나와서 좁은 폰 화면에서 선이 많이 엇갈린다. 기본 순서는 시계가 어긋난 커밋에서 부모가 자식보다 먼저 나올 수 있어 선을 이을 수 없다 |
+| 106 | 그래프 칸 배치 | 서버가 칸을 정한다(§7.1). 커밋은 그 커밋을 기다리는 칸 중 가장 왼쪽에 놓이고, 기다리는 칸이 없으면(브랜치 끝) 가장 왼쪽 빈칸에 놓인다. 첫 부모는 커밋의 칸을 잇는다. 다른 부모는 그 부모를 이미 기다리는 칸이 있으면 그 칸으로 가고, 없으면 가장 왼쪽 빈칸을 새로 쓴다. 칸은 옮기지 않는다. 너비는 쓰인 칸 수다. 선마다(칸이 새로 생겨 다른 칸에 합쳐지거나 루트에서 끝날 때까지) 0부터 차례로 색 번호를 주고, 화면은 `color % 팔레트 크기`로 색을 고른다 | 브라우저가 계산 · 빈칸을 당겨 좁힘 | 같은 계산을 UI마다 다시 짜지 않는다. 순수 함수라서 고정 입력으로 테스트할 수 있다. 칸을 옮기지 않으면 선은 세로선과 한 행 안의 사선뿐이라 그리기 쉽다. 빈칸은 다음 브랜치가 곧 다시 쓴다 |
+| 107 | 그래프 길이 | `limit`(기본 200, 1~2000)개를 주고, 더 있으면 `more`를 켠다. 이어 받기는 없다. 화면은 더 큰 `limit`로 다시 받는다 | `skip`·커서로 이어 받기 | 칸 배치는 위의 행 전부에 달려 있어서, 이어 받더라도 서버가 처음부터 다시 계산해야 한다. 그사이 새 커밋이 생기면 이어 붙인 그래프가 어긋난다 |
+| 108 | 빈 저장소의 그래프 | 커밋이 없거나 HEAD가 아직 커밋 없는 브랜치를 가리키면, 오류 없이 있는 커밋만 준다(`--ignore-missing`, §2.3) | 422 | 막 `git init`한 폴더나 orphan 브랜치에서도 그래프 화면이 열려야 한다 |
+| 109 | 커밋 지정 | `rev`는 40자나 64자의 소문자 16진수(전체 커밋 해시)만 받고, 아니면 400이다. 없는 객체나 커밋이 아닌 객체는 404 `not_found`다 | 브랜치 이름·짧은 해시 허용 | 화면은 그래프가 준 해시만 쓴다. 이름과 짧은 해시는 모호할 수 있고, `-`로 시작하면 옵션으로 읽힌다. SHA-256 저장소의 해시는 64자다 |
+| 110 | 커밋의 변경 | 커밋 상세의 파일 목록과 `rev` diff는 첫 부모와 비교하고, 루트 커밋은 빈 트리와 비교한다. 이름 바꾸기를 찾는다(`-M`). `orig`에 이전 경로를 함께 주면 이름이 바뀐 파일의 diff가 이름 바꾸기로 보인다. 파일 목록은 3000개까지이고, 넘으면 `truncated`를 켠다 | 병합 커밋은 결합 diff(`--cc`) | 병합 커밋에서 궁금한 것은 이 병합으로 들어온 변경이다. 결합 diff는 충돌을 푼 곳만 보여 준다. 새 경로 하나로 거르면 git이 이전 경로를 보지 못해 새 파일로 보여 준다(§2.3) |
+| 111 | 로그 출력 고정 | `--no-show-signature`, `--encoding=UTF-8`, `--decorate=full`, `--decorate-refs`(HEAD·브랜치·원격·태그)를 준다. 이름과 메일은 mailmap을 따른다(`%aN`·`%aE`). 그래프의 시각은 작성 시각이다 | 사용자 설정을 그대로 따름 | `log.showSignature`가 켜져 있으면 서명 확인 출력이 형식 사이에 끼고, `i18n.logOutputEncoding`은 다른 인코딩으로 낸다. 명시한 `--decorate-refs`는 `log.excludeDecoration`을 이기므로, 원격 브랜치를 숨기는 설정에서도 이름표가 같다(§2.3). `git log`도 mailmap을 따르고 작성 시각을 보여 준다 |
+| 112 | 그래프 화면 후보 | 세 후보에 그래프 화면을 더한다. 후보마다 PC 화면 하나(그래프 옆에 고른 커밋의 상세)와 폰 화면 하나(고른 커밋은 아래 시트)를 그리고, 기존 Git 화면에서 그래프로 가는 길을 둔다 | 그래프 화면만 모은 후보를 따로 | 사용자가 그래프 화면까지 보고 후보를 고르기로 했다(2026-11-09). 그래프도 각 후보의 배치 원칙 안에서 비교해야 한다 |
 
 ## 4. 구조
 
@@ -367,7 +385,9 @@ herdr 제품군에는 두 계열이 있다.
 | `POST /api/folders/{id}/worktrees` | `{branch, create, base?}` → `git worktree add`(위치는 결정 15), 201과 새 워크트리 레코드. `create`면 `base`(없으면 HEAD)에서 새 브랜치를 만들고, 아니면 있는 브랜치를 쓴다. 원격 하나에만 있는 브랜치는 git이 그것을 따르는 로컬 브랜치로 만든다. 원격 여럿에 있으면 `{branch: "x", create: true, base: "origin/x"}`처럼 준다 |
 | `DELETE /api/folders/{id}/worktrees?path=&force=0` | 결정 73의 확인을 거쳐 `git worktree remove`, 204. 그곳에서 살아 있는 세션이 있으면 409 `live` |
 | `GET /api/git/status?path=` | 워크트리 상태 `{head, branch, detached, upstream, ahead, behind, changes: [{path, orig?, index, worktree, kind}]}`. `kind`는 `changed`·`renamed`·`unmerged`·`untracked`다. `path`는 결정 75 |
-| `GET /api/git/diff?path=&file=&staged=0` | `file`(파일이나 디렉터리, 비우면 추적 파일 전체)의 unified diff `{diff, truncated}`. 읽기 전용이고, 1 MiB에서 줄 단위로 자른다. 스테이지 안 한 diff에는 추적 안 된 파일이 새 파일로 붙는다(결정 62) |
+| `GET /api/git/diff?path=&file=&staged=0&rev=&orig=` | `file`(파일이나 디렉터리, 비우면 전체)의 unified diff `{diff, truncated}`. 읽기 전용이고, 1 MiB에서 줄 단위로 자른다. `rev`가 없으면 워크트리의 diff다. 이때 `file`이 비면 추적 파일 전체이고, 스테이지 안 한 diff에는 추적 안 된 파일이 새 파일로 붙는다(결정 62). `rev`를 주면 그 커밋의 diff다(결정 109·110). `orig`는 이름이 바뀐 파일의 이전 경로이고, `rev`와 `file`이 둘 다 있을 때만 쓴다. `rev`와 `staged=1`을 함께 주거나, `rev`나 `file` 없이 `orig`를 주면 400이다 |
+| `GET /api/git/log?path=&limit=200&head=0` | 커밋 그래프 `{commits, width, more}`. 커밋은 `{hash, parents, author, time_ms, subject, refs, lane, color, up, pass, down}`이다. `refs`는 `[{name, kind, current}]`이고, `kind`는 `head`(분리된 HEAD)·`branch`·`remote`·`tag`다. `current`는 HEAD가 가리키는 브랜치에서만 켜진다. 순서는 `head`, `branch`(현재 브랜치가 먼저), `remote`, `tag`이고 같은 종류는 이름순이다. 선(`up`·`pass`·`down`)은 `[{lane, color}]`이고, `width`는 칸 수다(결정 104~108, 111) |
+| `GET /api/git/commit?path=&rev=` | 커밋 상세 `{hash, parents, author, email, author_ms, committer, committer_email, commit_ms, message, files, truncated}`. `files`는 첫 부모에 대한 변경 `[{path, orig?, kind, added, deleted, binary}]`이고, `kind`는 `added`·`deleted`·`modified`·`renamed`·`copied`·`typechange`다(결정 109·110) |
 | `GET /api/terminals?all=0` | 터미널 목록(각각 `folder_id`, `worktree`, `display_title` 포함). 기본값은 살아 있는 것과 24시간 안에 끝난 것 |
 | `POST /api/terminals` | 세션 만들기(§6.3) |
 | `GET/PATCH/DELETE /api/terminals/{t}` | 한 터미널 · 제목 변경(`mori.title` 라벨) · 끝난 터미널 지우기(`terminal.rm`) |
@@ -387,6 +407,8 @@ herdr 제품군에는 두 계열이 있다.
 터미널 목록과 overview는 코어가 없어도 캐시로 답한다(결정 44). send·keys·interrupt·text·files는 hc의 결과를 그대로 돌려주고(결정 45, 형식은 §2.3), 만들기·한 터미널·제목 변경·kill은 아래의 터미널 레코드를 돌려준다. `PUT /api/presets`와 `PUT /api/hosts`는 목록 전체를 바꾸고 저장한 목록을 돌려준다(결정 42, 43).
 
 터미널 레코드는 hc의 `Terminal` 필드에 `folder_id`, `worktree`, `display_title`, `preset`을 더한 것이다. `title`은 프로그램이 정한 제목(hc) 그대로다. 보여 줄 이름은 `display_title`이다. 순서는 `mori.title` 라벨 → 프로그램 제목 → 포그라운드 프로그램 이름 → argv[0]의 파일 이름 → "셸"이다.
+
+그래프는 커밋마다 한 행이다. 칸 너비를 w, 행 높이를 h라 하면 점은 `(lane·w + w/2, h/2)`에 있다. `up`의 선은 그 칸의 윗변에서 점으로, `pass`의 선은 그 칸의 윗변에서 아랫변으로, `down`의 선은 점에서 그 칸의 아랫변으로 간다. 한 행의 `pass`와 `down`은 다음 행의 `up`과 `pass`로 같은 칸, 같은 색으로 이어진다. 마지막 행의 `down`은 받지 않은 부모로 가는 선이다(결정 106).
 
 ### 7.2 이벤트 WS `/ws/events` (서버 → 브라우저, JSON)
 
@@ -519,6 +541,7 @@ Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limit
 | 7 | 알림 | 가짜 발송기로 blocked·turn 이벤트가 알림 한 건이 된다. 중복과 포커스 억제가 동작한다 |
 | 8 | 배포: `service`, `doctor`, 릴리스 빌드, README | macmini에서 `mori doctor`가 모든 항목을 보고한다. `service install --dry-run`이 올바른 plist·명령을 낸다 |
 | 9 | UI 후보 아티팩트 3개 | 사용자가 하나를 고르거나 고칠 점을 준다 |
+| 9.1 | Git 그래프: 로그·칸 배치·커밋 상세·커밋 diff API, 세 후보의 그래프 화면(결정 104~112) | 브랜치·병합·태그·이름 바꾸기가 있는 임시 저장소에서 그래프와 커밋 상세, 커밋 diff가 맞다. 세 후보에 PC·폰 그래프 화면이 있다 |
 | 10 | UI 구현(별도 계획) | 고른 UI로 폰·PC에서 실제로 일할 수 있다 |
 
 단계 9 상태(2026-11-09): 후보 세 개를 캔버스에 올렸다(결정 103). 세 후보는 같은 가짜 데이터(호스트 macmini, 폴더 Mori·TopoMind)를 써서 배치만 비교한다. 다른 호스트는 링크로만, Git은 읽기 전용으로 그렸다. QR은 자리표시다.
@@ -540,6 +563,7 @@ Mori 자체 kind에는 `unauthorized`(401), `forbidden_origin`(403), `rate_limit
   - 저장 원자성
   - 페어링·쿠키·Origin·시도 제한
   - git 출력 파서(고정 입력)
+  - 그래프 칸 배치(고정 입력, 행 사이 선 이어짐)
   - 폴더 소속 계산
   - 알림 판정(중복·포커스·부모 규칙)
 - **통합 테스트:** 실제 `hc`로 격리 코어를 띄운다. `HC_SESSION=mori-test-<id>`를 쓰고, `XDG_STATE_HOME`·`XDG_CONFIG_HOME`·`XDG_RUNTIME_DIR`·`HC_SOCKET`은 저장소의 `.dev/test/<id>`에 둔다. 테스트가 끝나면 같은 환경으로 `hc server stop`을 실행한다. 사용자의 기본 코어는 절대 건드리지 않는다. `hc`가 없으면 건너뛴다. `make test-clean`은 남은 격리 코어를 멈춘다.

@@ -37,6 +37,7 @@ func TestToAPIError(t *testing.T) {
 		{&gitx.Error{Args: []string{"status"}, Err: context.DeadlineExceeded}, 422, "git_failed", "git 명령이 시간 안에 끝나지 않았습니다", ""},
 		{&gitx.Error{Args: []string{"status"}, Err: &exec.Error{Name: "git", Err: exec.ErrNotFound}}, 422, "git_failed", "git을 찾을 수 없습니다. 이 호스트에 git을 설치하세요", ""},
 		{&gitx.NameError{Name: "-x"}, 400, "invalid_params", `브랜치나 커밋 이름으로 쓸 수 없습니다: "-x"`, ""},
+		{fmt.Errorf("commit: %w", gitx.ErrNoCommit), 404, "not_found", "그런 커밋이 없습니다", ""},
 	}
 	for _, c := range cases {
 		got := toAPIError(c.err)

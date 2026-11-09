@@ -96,6 +96,8 @@ func toAPIError(err error) *apiError {
 		return &apiError{Status: http.StatusBadGateway, Kind: "push_failed", Message: se.Error()}
 	}
 	switch {
+	case errors.Is(err, gitx.ErrNoCommit):
+		return errorf(http.StatusNotFound, "not_found", "그런 커밋이 없습니다")
 	case errors.Is(err, push.ErrNoSubscription):
 		return &apiError{Status: http.StatusConflict, Kind: "conflict", Message: err.Error(), Hint: "이 기기에서 알림을 먼저 켜세요"}
 	case errors.Is(err, push.ErrUnknownDevice):

@@ -39,13 +39,19 @@ func newRepo(t *testing.T) string {
 	return real
 }
 
-func git(t *testing.T, dir string, args ...string) {
+// git runs git in dir as a test committer, fails the test when git fails,
+// and returns what git printed, trimmed.
+func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-c", "user.name=mori-test", "-c", "user.email=mori-test@example.com", "-c", "commit.gpgsign=false"}, args...)...)
 	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
+	out, err := cmd.Output()
+	if ee := (*exec.ExitError)(nil); errors.As(err, &ee) {
+		t.Fatalf("git %v: %v\n%s%s", args, err, out, ee.Stderr)
+	} else if err != nil {
+		t.Fatalf("git %v: %v", args, err)
 	}
+	return strings.TrimSpace(string(out))
 }
 
 func write(t *testing.T, path, s string) {

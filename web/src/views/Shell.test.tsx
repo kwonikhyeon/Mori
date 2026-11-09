@@ -9,6 +9,7 @@ import { route, type Route } from '../lib/router'
 import { conn, core, folders, hosts, ready, resetStore, terminals } from '../lib/store'
 import { theme } from '../lib/theme'
 import type { TerminalView } from '../lib/types'
+import { gitFrom } from './Git'
 import { phoneBack, Shell } from './Shell'
 
 // jsdom cannot lay out xterm's cells.
@@ -29,6 +30,18 @@ function at(width: number, r: Route) {
 
 const sidebar = () => screen.getByRole('separator', { name: '사이드바 너비' })
 
+/** A server whose worktrees have nothing changed. */
+function cleanRepo() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (u: string) => {
+      const path = new URL(u, 'http://mori.test').pathname
+      if (path === '/api/git/status') return Response.json({ head: 'a'.repeat(40), branch: 'main', detached: false, upstream: '', ahead: 0, behind: 0, changes: [] })
+      return Response.json({})
+    }),
+  )
+}
+
 beforeEach(() => {
   FakeWebSocket.reset()
   vi.stubGlobal('WebSocket', FakeWebSocket)
@@ -48,6 +61,7 @@ afterEach(() => {
   theme.value = 'system'
   route.value = { name: 'queue' }
   phoneBack.value = '#/'
+  gitFrom.value = ''
   vi.unstubAllGlobals()
 })
 
@@ -110,6 +124,19 @@ describe('PC', () => {
     expect(localStorage.getItem('mori.aside')).toBe('376')
     const links = within(screen.getByRole('navigation', { name: '세션 대기열' })).getAllByRole('link')
     expect(links.map((a) => a.getAttribute('href'))).toEqual(['#/t/t1/git', '#/t/t2/git'])
+  })
+
+  it("shows the session's Git beside it and closes it", async () => {
+    cleanRepo()
+    load([term({ address: 't1', status: status('idle') })])
+    at(1440, { name: 'terminal', addr: 't1', git: true })
+    render(<Shell />)
+    const aside = screen.getByRole('complementary', { name: 'Git' })
+    expect(await within(aside).findByRole('region', { name: '변경 0' })).toBeTruthy()
+    expect(within(aside).getByText('이 세션')).toBeTruthy()
+    fireEvent.click(within(aside).getByRole('button', { name: 'Git 닫기' }))
+    expect(route.value).toEqual({ name: 'terminal', addr: 't1', git: false })
+    expect(screen.queryByRole('complementary')).toBeNull()
   })
 
   it('lays the aside over the main area in a narrow window', () => {
@@ -182,6 +209,30 @@ describe('phone', () => {
     render(<Shell />)
     expect(screen.queryByRole('navigation', { name: '주 메뉴' })).toBeNull()
     expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/')
+  })
+
+  it('goes back from Git to where it was opened', async () => {
+    cleanRepo()
+    load([term({ address: 't1', status: status('idle') })])
+    at(390, { name: 'terminal', addr: 't1', git: false })
+    render(<Shell />)
+    const link = screen.getByRole('link', { name: 'Git' })
+    expect(link.getAttribute('href')).toBe('#/git/f1?path=%2FUsers%2Fme%2Fdev%2FMori')
+    fireEvent.click(link)
+    await act(() => {
+      route.value = { name: 'git', folder: 'f1', path: '/Users/me/dev/Mori' }
+    })
+    expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/t/t1')
+    expect(await screen.findByText('이 세션')).toBeTruthy()
+
+    await act(() => {
+      route.value = { name: 'folders' }
+    })
+    await act(() => {
+      route.value = { name: 'git', folder: 'f1' }
+    })
+    expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/folders')
+    expect(screen.queryByText('이 세션')).toBeNull()
   })
 
   it('goes back from a session to the tab it was opened from', async () => {

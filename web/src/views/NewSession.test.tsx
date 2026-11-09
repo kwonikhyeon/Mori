@@ -202,9 +202,9 @@ describe('NewSession', () => {
     expect((screen.getByRole('button', { name: '세션 만들기' }) as HTMLButtonElement).disabled).toBe(true)
 
     fireEvent.input(screen.getByLabelText('브랜치 이름'), { target: { value: 'pr-7' } })
-    expect(document.querySelector('.ns-hint')!.textContent).toBe('~/dev/Mori.wt/pr-7에 만듭니다 · origin/pr-7 추적')
+    expect(document.querySelector('.bf-hint')!.textContent).toBe('~/dev/Mori.wt/pr-7에 만듭니다 · origin/pr-7 추적')
     fireEvent.input(screen.getByLabelText('브랜치 이름'), { target: { value: 'old' } })
-    expect(document.querySelector('.ns-hint')!.textContent).toBe('기존 브랜치를 ~/dev/Mori.wt/old에 엽니다')
+    expect(document.querySelector('.bf-hint')!.textContent).toBe('기존 브랜치를 ~/dev/Mori.wt/old에 엽니다')
     expect(base.disabled).toBe(true)
     submit()
     await vi.waitFor(() => expect(route.value.name).toBe('terminal'))
@@ -215,7 +215,7 @@ describe('NewSession', () => {
     serve()
     render(<NewSession variant="pc" folder="f1" />)
     const base = await newBranch('smoke/new wt')
-    const hint = document.querySelector('.ns-hint')!
+    const hint = document.querySelector('.bf-hint')!
     expect(hint.textContent).toBe('브랜치 이름에 공백은 쓸 수 없습니다')
     expect(hint.classList.contains('is-bad')).toBe(true)
     // Still typing: the base stays free.

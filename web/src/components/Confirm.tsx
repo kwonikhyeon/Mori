@@ -1,6 +1,6 @@
 // Asks before something that cannot be undone, in a modal <dialog>: the
 // focus starts on 취소, and Escape or a press outside cancels.
-import { useEffect, useId, useRef } from 'preact/hooks'
+import { useEffect, useId, useLayoutEffect, useRef } from 'preact/hooks'
 
 export interface ConfirmProps {
   open: boolean
@@ -22,6 +22,11 @@ export function Confirm({ open, title, text, confirm, danger, busy, onConfirm, o
     if (open && !d.open) d.showModal()
     else if (!open && d.open) d.close()
   }, [open])
+  // Asked something else while it is open, it starts again from 취소 before
+  // another key can reach the button pressed, which may now do more.
+  useLayoutEffect(() => {
+    if (open) ref.current?.querySelector<HTMLElement>('[autofocus]')?.focus()
+  }, [title])
   return (
     <dialog
       ref={ref}

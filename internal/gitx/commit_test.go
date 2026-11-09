@@ -196,6 +196,14 @@ func TestCommitDiff(t *testing.T) {
 			}
 		}
 	}
+	// diff-tree, as plumbing, keeps a/ and b/ whatever the user's config says.
+	git(t, repo, "config", "diff.noprefix", "true")
+	git(t, repo, "config", "diff.mnemonicPrefix", "true")
+	if d, _, err := g.CommitDiff(ctx, repo, h["init"], []string{"a.txt"}, 0); err != nil || !strings.Contains(d, "--- /dev/null\n+++ b/a.txt\n") {
+		t.Errorf("prefixes (%v):\n%s", err, d)
+	}
+	git(t, repo, "config", "--unset", "diff.noprefix")
+	git(t, repo, "config", "--unset", "diff.mnemonicPrefix")
 	d, cut, err := g.CommitDiff(ctx, repo, rev, nil, 40)
 	if err != nil || !cut || len(d) > 40 || !strings.HasSuffix(d, "\n") {
 		t.Fatalf("cut (%v, %v): %d bytes\n%s", cut, err, len(d), d)

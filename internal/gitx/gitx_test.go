@@ -89,26 +89,26 @@ func TestStatusAndDiff(t *testing.T) {
 		t.Fatalf("%+v\n got %q\nwant %q", st, got, want)
 	}
 
-	d, truncated, err := g.Diff(ctx, repo, "문서/새 파일.md", false, 1<<20)
+	d, truncated, err := g.Diff(ctx, repo, "문서/새 파일.md", "", false, 1<<20)
 	if err != nil || truncated || !strings.Contains(d, "\n+b\n") {
 		t.Fatalf("tracked diff (%v, %v):\n%s", truncated, err, d)
 	}
-	if d, _, err := g.Diff(ctx, repo, "문서/새 파일.md", true, 1<<20); err != nil || d != "" {
+	if d, _, err := g.Diff(ctx, repo, "문서/새 파일.md", "", true, 1<<20); err != nil || d != "" {
 		t.Fatalf("nothing is staged, got (%v):\n%s", err, d)
 	}
-	d, _, err = g.Diff(ctx, repo, "추적 안 됨.txt", false, 1<<20)
+	d, _, err = g.Diff(ctx, repo, "추적 안 됨.txt", "", false, 1<<20)
 	if err != nil || !strings.Contains(d, "--- /dev/null") || !strings.Contains(d, "\n+new\n") {
 		t.Fatalf("untracked diff (%v):\n%s", err, d)
 	}
 	// "[ab].txt" is a name, not a pattern matching a.txt.
-	if d, _, err := g.Diff(ctx, repo, "[ab].txt", false, 1<<20); err != nil || d != "" {
+	if d, _, err := g.Diff(ctx, repo, "[ab].txt", "", false, 1<<20); err != nil || d != "" {
 		t.Fatalf("pathspec magic (%v):\n%s", err, d)
 	}
-	d, truncated, err = g.Diff(ctx, repo, "", false, 1<<20)
+	d, truncated, err = g.Diff(ctx, repo, "", "", false, 1<<20)
 	if err != nil || truncated || !strings.Contains(d, "+changed") || !strings.Contains(d, "+b") {
 		t.Fatalf("whole diff (%v, %v):\n%s", truncated, err, d)
 	}
-	d, truncated, err = g.Diff(ctx, repo, "", false, 64)
+	d, truncated, err = g.Diff(ctx, repo, "", "", false, 64)
 	if err != nil || !truncated || len(d) > 64 || !strings.HasSuffix(d, "\n") {
 		t.Fatalf("cut diff (%v, %v): %d bytes\n%s", truncated, err, len(d), d)
 	}
@@ -127,13 +127,67 @@ func TestDiffOfUntrackedDirectory(t *testing.T) {
 	if got := changePaths(st); !slices.Equal(got, []string{"untracked 새 폴더/"}) {
 		t.Fatalf("%q", got)
 	}
-	d, truncated, err := g.Diff(ctx, repo, "새 폴더/", false, 1<<20)
+	d, truncated, err := g.Diff(ctx, repo, "새 폴더/", "", false, 1<<20)
 	if err != nil || truncated || !strings.Contains(d, "+++ b/새 폴더/r.txt") || !strings.Contains(d, "+++ b/새 폴더/sub/q.txt") {
 		t.Fatalf("(%v, %v):\n%s", truncated, err, d)
 	}
-	d, truncated, err = g.Diff(ctx, repo, "새 폴더/", false, 100)
+	d, truncated, err = g.Diff(ctx, repo, "새 폴더/", "", false, 100)
 	if err != nil || !truncated || len(d) > 100 {
 		t.Fatalf("cut (%v, %v): %d bytes\n%s", truncated, err, len(d), d)
+	}
+}
+
+func TestDiffKeepsItsPrefixes(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	var g Runner
+	write(t, filepath.Join(repo, "a.txt"), "a\nstaged\n")
+	git(t, repo, "add", "a.txt")
+	write(t, filepath.Join(repo, "문서", "새 파일.md"), "a\nb\n")
+	write(t, filepath.Join(repo, "새것.txt"), "new\n")
+	// The web UI finds the names behind a/ and b/, whatever the user's config
+	// makes of them.
+	for _, kv := range [][2]string{{"diff.noprefix", "true"}, {"diff.mnemonicPrefix", "true"}, {"diff.srcPrefix", "s/"}, {"diff.dstPrefix", "d/"}} {
+		git(t, repo, "config", kv[0], kv[1])
+		for _, c := range []struct {
+			file   string
+			staged bool
+			want   string
+		}{
+			{"a.txt", true, "--- a/a.txt\n+++ b/a.txt\n"},
+			{"문서/새 파일.md", false, "--- a/문서/새 파일.md\t\n+++ b/문서/새 파일.md\t\n"},
+			{"새것.txt", false, "--- /dev/null\n+++ b/새것.txt\n"},
+		} {
+			if d, _, err := g.Diff(ctx, repo, c.file, "", c.staged, 1<<20); err != nil || !strings.Contains(d, c.want) {
+				t.Fatalf("%s=%s, %s (%v):\n%s", kv[0], kv[1], c.file, err, d)
+			}
+		}
+		git(t, repo, "config", "--unset", kv[0])
+	}
+}
+
+func TestDiffOfStagedRename(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	var g Runner
+	git(t, repo, "mv", "a.txt", "문서/옮김.txt")
+	st, err := g.Status(ctx, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := changePaths(st); !slices.Equal(got, []string{"renamed 문서/옮김.txt"}) || st.Changes[0].Orig != "a.txt" {
+		t.Fatalf("%q %+v", got, st.Changes)
+	}
+	// The two paths show one rename, whatever the user's config says.
+	git(t, repo, "config", "diff.renames", "false")
+	d, _, err := g.Diff(ctx, repo, "문서/옮김.txt", "a.txt", true, 1<<20)
+	if err != nil || !strings.Contains(d, "rename from a.txt\n") || !strings.Contains(d, "rename to 문서/옮김.txt\n") || strings.Contains(d, "new file mode") {
+		t.Fatalf("(%v):\n%s", err, d)
+	}
+	// Without the old path, only the new one shows, as a new file.
+	d, _, err = g.Diff(ctx, repo, "문서/옮김.txt", "", true, 1<<20)
+	if err != nil || !strings.Contains(d, "new file mode") || strings.Contains(d, "a.txt") {
+		t.Fatalf("(%v):\n%s", err, d)
 	}
 }
 

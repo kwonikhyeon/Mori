@@ -102,6 +102,9 @@ pre,
   font-family: var(--font-mono);
 }
 
+/* Read out, not seen. Its box is placed against the nearest positioned one,
+   so inside a scrolling list that one must be in the list too, or the page
+   itself grows and scrolls. */
 .sr-only {
   position: absolute;
   width: 1px;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { folder, status, term, worktree } from '../../test/fixtures'
-import { appName, askText, branchOf, chip, endText, finishedLine, place, shortHash, shortPath } from './format'
-import type { Preset } from './types'
+import { appName, askText, branchLine, branchOf, changeGroups, chip, endText, fileParts, finishedLine, homeWorktree, place, shortHash, shortPath } from './format'
+import type { Change, Preset } from './types'
 
 const presets: Preset[] = [
   { id: 'claude', name: 'Claude Code', argv: ['claude'], task: true },
@@ -63,10 +63,23 @@ describe('branchOf', () => {
   })
 })
 
+describe('homeWorktree', () => {
+  const main = worktree()
+  const sub = worktree({ path: '/Users/me/dev/Mori/web', branch: 'web', main: false })
+  const gone = worktree({ path: '/Users/me/dev/Mori.wt/gone', branch: 'gone', main: false, prunable: true })
+  it('is the folder’s own, else the main one, else any that is there', () => {
+    expect(homeWorktree(folder({ path: sub.path }), [main, sub])).toBe(sub)
+    expect(homeWorktree(folder({ path: '/Users/me/dev/elsewhere' }), [sub, main])).toBe(main)
+    expect(homeWorktree(folder({ path: '/Users/me/dev/elsewhere' }), [gone, sub])).toBe(sub)
+    expect(homeWorktree(folder({ path: gone.path }), [gone])).toBeUndefined()
+    expect(homeWorktree(folder(), [])).toBeUndefined()
+  })
+})
+
 describe('shortPath', () => {
   it('writes the home folder as ~', () => {
-    expect(shortPath('/Users/ikhyeon/dev/proj')).toBe('~/dev/proj')
-    expect(shortPath('/Users/ikhyeon')).toBe('~')
+    expect(shortPath('/Users/me/dev/proj')).toBe('~/dev/proj')
+    expect(shortPath('/Users/me')).toBe('~')
     expect(shortPath('/home/me/x')).toBe('~/x')
     expect(shortPath('C:\\Users\\me\\dev')).toBe('~\\dev')
     expect(shortPath('/opt/x')).toBe('/opt/x')
@@ -106,5 +119,106 @@ describe('askText', () => {
     expect(askText(term({ status: status('blocked', { kind: 'auth' }) }), 'blocked')).toBe('인증이 필요합니다')
     expect(askText(term({ status: status('blocked') }), 'blocked')).toBe('응답을 기다립니다')
     expect(askText(term({ status: status('error') }), 'error')).toBe('오류가 났습니다')
+  })
+})
+
+
+const ch = (path: string, xy: string, kind = 'changed', orig?: string): Change => ({
+  path,
+  index: xy[0],
+  worktree: xy[1],
+  kind,
+  ...(orig ? { orig } : {}),
+})
+
+describe('changeGroups', () => {
+  it('puts conflicts first, then the staged, changed and untracked files', () => {
+    const gs = changeGroups([
+      ch('web/a.ts', '.M'),
+      ch('new/', '??', 'untracked'),
+      ch('docs/b.md', 'MM'),
+      ch('x.go', 'UU', 'unmerged'),
+      ch('c.txt', 'A.'),
+    ])
+    expect(gs.map((g) => [g.label, g.items.map((i) => `${i.letter} ${i.path}`)])).toEqual([
+      ['충돌', ['U x.go']],
+      // A file changed again after it was staged is in both.
+      ['스테이징됨', ['M docs/b.md', 'A c.txt']],
+      ['변경', ['M web/a.ts', 'M docs/b.md']],
+      ['추적 안 함', ['? new/']],
+    ])
+    expect(new Set(gs.flatMap((g) => g.items.map((i) => i.key))).size).toBe(6)
+    expect(changeGroups([])).toEqual([])
+  })
+
+  it('asks for the diff each row shows', () => {
+    const [staged, changed] = changeGroups([ch('문서/새 이름.md', 'RM', 'renamed', 'old.md'), ch('i.txt', '.A')])
+    expect(staged.items.map((i) => i.diff)).toEqual([{ file: '문서/새 이름.md', orig: 'old.md', staged: true }])
+    expect(changed.items.map((i) => i.diff)).toEqual([{ file: '문서/새 이름.md' }, { file: 'i.txt' }])
+    const [conflict, untracked] = changeGroups([ch('x.go', 'AA', 'unmerged'), ch('n/', '??', 'untracked')])
+    expect(conflict.items[0].diff).toEqual({ file: 'x.go' })
+    expect(untracked.items[0].diff).toEqual({ file: 'n/' })
+  })
+
+  it('says in words what the letter says, and what else to know', () => {
+    const items = changeGroups([
+      ch('a', 'M.'),
+      ch('b', 'A.'),
+      ch('c', 'D.'),
+      ch('d', 'R.', 'renamed', 'docs/d0'),
+      ch('e', 'C.', 'renamed', 'e0'),
+      ch('f', 'T.'),
+      ch('g/h/', '??', 'untracked'),
+      ch('i', '??', 'untracked'),
+    ]).flatMap((g) => g.items)
+    expect(items.map((i) => [i.letter, i.word, i.tone, i.note])).toEqual([
+      ['M', '수정', 'm', ''],
+      ['A', '추가', 'a', ''],
+      ['D', '삭제', 'd', ''],
+      ['R', '이름 바꿈', 'r', 'docs/d0에서 옮김'],
+      ['C', '복사', 'r', 'e0에서 복사'],
+      ['T', '종류 바뀜', 'm', ''],
+      ['?', '추적 안 함', 'u', '새 폴더'],
+      ['?', '추적 안 함', 'u', ''],
+    ])
+  })
+
+  it('says how a conflict came about', () => {
+    const xys = ['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU']
+    const [g] = changeGroups(xys.map((xy) => ch(xy, xy, 'unmerged')))
+    expect(g.items.map((i) => [i.letter, i.word, i.tone, i.note])).toEqual([
+      ['U', '충돌', 'x', '양쪽에서 삭제'],
+      ['U', '충돌', 'x', '우리가 추가'],
+      ['U', '충돌', 'x', '상대가 삭제'],
+      ['U', '충돌', 'x', '상대가 추가'],
+      ['U', '충돌', 'x', '우리가 삭제'],
+      ['U', '충돌', 'x', '양쪽에서 추가'],
+      ['U', '충돌', 'x', '양쪽에서 수정'],
+    ])
+  })
+})
+
+describe('fileParts', () => {
+  it('is the name and the folder it is in', () => {
+    expect(fileParts('internal/push/notify.go')).toEqual({ name: 'notify.go', dir: 'internal/push' })
+    expect(fileParts('README.md')).toEqual({ name: 'README.md', dir: '' })
+    expect(fileParts('internal/push/testdata/')).toEqual({ name: 'testdata/', dir: 'internal/push' })
+    expect(fileParts('new/')).toEqual({ name: 'new/', dir: '' })
+  })
+})
+
+describe('branchLine', () => {
+  const s = { head: 'a1b2c3d4e5f6', branch: 'main', detached: false, upstream: 'origin/main', ahead: 0, behind: 0 }
+  it('says how the branch stands to its remote', () => {
+    expect(branchLine(s)).toEqual({ name: 'main', sub: '원격과 같음' })
+    expect(branchLine({ ...s, ahead: 2 }).sub).toBe('원격보다 2개 앞섬')
+    expect(branchLine({ ...s, behind: 3 }).sub).toBe('원격보다 3개 뒤처짐')
+    expect(branchLine({ ...s, ahead: 2, behind: 3 }).sub).toBe('원격보다 2개 앞서고 3개 뒤처짐')
+    expect(branchLine({ ...s, upstream: '' })).toEqual({ name: 'main', sub: '원격 브랜치 없음' })
+  })
+
+  it('names a commit off any branch, and a branch with no commit yet', () => {
+    expect(branchLine({ ...s, branch: '', detached: true, upstream: '' })).toEqual({ name: 'a1b2c3d', sub: '브랜치가 아닌 커밋에 있습니다' })
+    expect(branchLine({ ...s, head: '', upstream: '' })).toEqual({ name: 'main', sub: '아직 커밋이 없습니다' })
   })
 })

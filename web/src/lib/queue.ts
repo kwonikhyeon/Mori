@@ -76,3 +76,13 @@ export function groupByFolder(ts: Iterable<TerminalView>, folders: FolderView[])
   if (rest?.length) groups.push({ folder: null, items: rest.sort(order) })
   return groups
 }
+
+/** The sessions still running in each worktree of a folder, by its path. */
+export function sessionsByWorktree(ts: Iterable<TerminalView>, folderId: string): Map<string, number> {
+  const n = new Map<string, number>()
+  for (const t of ts) {
+    if (t.state === 'finished' || t.folder_id !== folderId) continue
+    n.set(t.worktree, (n.get(t.worktree) ?? 0) + 1)
+  }
+  return n
+}

@@ -5,16 +5,18 @@
 import { Fragment, type ComponentChildren } from 'preact'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Icon } from '../components/Icon'
-import { api, type NewWorktree } from '../lib/api'
+import { api } from '../lib/api'
 import { hostLabel } from '../lib/boot'
-import { shortHash, shortPath } from '../lib/format'
+import { homeWorktree, shortPath, wtLabel } from '../lib/format'
 import { isApple } from '../lib/platform'
 import { navigate } from '../lib/router'
-import { branchProblem, worktreePath } from '../lib/slug'
+import { sessionsByWorktree } from '../lib/queue'
+import { planOf, worktreeRequest } from '../lib/slug'
 import { load, save } from '../lib/storage'
 import { apply, folders, presets, ready, terminals } from '../lib/store'
 import { errorText } from '../lib/toast'
-import type { Branches, FolderView, Worktree } from '../lib/types'
+import type { Branches, Worktree } from '../lib/types'
+import { BranchFields } from './BranchFields'
 import { FolderPicker } from './FolderPicker'
 import { Loading, type Variant } from './rows'
 import './newsession.css'
@@ -39,40 +41,6 @@ const LAST = 'mori.new'
 // 새 브랜치 among the worktree paths; no absolute path looks like it.
 const NEW = ':new'
 
-/** What a branch name does: refused by git, taken by a worktree, an existing branch, one of a remote, or new. */
-type Plan =
-  | { kind: 'empty' }
-  | { kind: 'bad'; why: string }
-  | { kind: 'taken'; path: string }
-  | { kind: 'local'; path: string }
-  | { kind: 'remote'; path: string; remote: string }
-  | { kind: 'new'; path: string }
-
-const wtLabel = (w: Worktree) => (w.detached || !w.branch ? shortHash(w.head) : w.branch)
-
-/** The worktree a session runs in unless another is chosen: the folder's own, the main one, any. */
-function defaultWt(f: FolderView, ws: Worktree[]): string {
-  const ok = ws.filter((w) => !w.prunable)
-  return (ok.find((w) => w.path === f.path) ?? ok.find((w) => w.main) ?? ok[0])?.path ?? NEW
-}
-
-function planOf(name: string, ws: Worktree[], main: string, b: Branches | null): Plan {
-  if (!name) return { kind: 'empty' }
-  const why = branchProblem(name)
-  if (why) return { kind: 'bad', why }
-  const has = ws.find((w) => !w.detached && w.branch === name)
-  if (has) return { kind: 'taken', path: has.path }
-  // Where the server puts it, past the worktrees there are.
-  const path = worktreePath(main, name, ws.filter((w) => !w.prunable).map((w) => w.path))
-  if (b?.local.some((x) => x.name === name)) return { kind: 'local', path }
-  // A branch is a file under refs/heads, so fix and fix/a cannot both be.
-  const clash = b?.local.find((x) => name.startsWith(x.name + '/') || x.name.startsWith(name + '/'))
-  if (clash) return { kind: 'bad', why: `‘${clash.name}’ 브랜치가 있어서 이 이름은 쓸 수 없습니다` }
-  // git makes a branch that follows the remote one of the same short name.
-  const r = b?.remote.find((x) => x.name.slice(x.name.indexOf('/') + 1) === name)
-  if (r) return { kind: 'remote', path, remote: r.name }
-  return { kind: 'new', path }
-}
 
 export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
   const id = useId()
@@ -105,7 +73,7 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
     ? undefined
     : wtPick === NEW
       ? NEW
-      : (ws.find((w) => w.path === wtPick && !w.prunable)?.path ?? defaultWt(f, ws))
+      : (ws.find((w) => w.path === wtPick && !w.prunable)?.path ?? homeWorktree(f, ws)?.path ?? NEW)
   const main = ws.find((w) => w.main)
 
   const fid = f?.id
@@ -136,19 +104,13 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
   const plan = planOf(name, ws, main?.path ?? f?.path ?? '', b)
   const defaultBase = main && !main.detached && main.branch ? main.branch : ''
   const baseValue = base ?? defaultBase
-  // A name being typed may be wrong for a moment; the base stays as it is.
-  const baseFree = plan.kind === 'new' || plan.kind === 'empty' || plan.kind === 'bad'
+  const req = worktreeRequest(plan, name, baseValue)
 
   // The sessions running in each worktree, so a busy one shows.
-  const counts = new Map<string, number>()
-  for (const t of terminals.value.values()) {
-    if (t.state === 'finished' || t.folder_id !== fid) continue
-    counts.set(t.worktree, (counts.get(t.worktree) ?? 0) + 1)
-  }
+  const counts = fid ? sessionsByWorktree(terminals.value.values(), fid) : new Map<string, number>()
 
   const takesTask = !!preset?.task
-  const ok =
-    !!f && !!preset && !busy && (choice !== NEW || (!needBr && (plan.kind === 'new' || plan.kind === 'local' || plan.kind === 'remote')))
+  const ok = !!f && !!preset && !busy && (choice !== NEW || (!needBr && !!req))
 
   const pickWt = (path: string) => {
     if (path === NEW) focusName.current = true
@@ -162,9 +124,7 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
     setError(null)
     try {
       let at = choice
-      if (choice === NEW) {
-        const req: NewWorktree =
-          plan.kind === 'new' ? { branch: name, create: true, ...(baseValue ? { base: baseValue } : {}) } : { branch: name, create: false }
+      if (choice === NEW && req) {
         let w: Worktree
         try {
           w = await api.folders.addWorktree(f.id, req)
@@ -306,64 +266,20 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
                         </span>
                       </label>
                       {choice === NEW && (
-                        <>
-                          <div class="ns-new-row">
-                            <div class="field ns-new-name">
-                              <label class="field-label" for={id + '-br'}>
-                                브랜치 이름
-                              </label>
-                              <input
-                                ref={nameRef}
-                                id={id + '-br'}
-                                class="input mono"
-                                value={branch}
-                                placeholder="예: fix/login"
-                                autoComplete="off"
-                                autoCapitalize="off"
-                                spellcheck={false}
-                                aria-describedby={id + '-hint'}
-                                onInput={(e) => {
-                                  setBranch(e.currentTarget.value)
-                                  setError(null)
-                                }}
-                              />
-                            </div>
-                            <div class="field ns-new-base">
-                              <label class="field-label" for={id + '-base'}>
-                                기준
-                              </label>
-                              <span class="ns-select">
-                                <select id={id + '-base'} class="input mono" value={baseValue} disabled={!baseFree} onChange={(e) => setBase(e.currentTarget.value)}>
-                                  {b ? (
-                                    <>
-                                      {defaultBase === '' && <option value="">HEAD</option>}
-                                      {b.local.map((x) => (
-                                        <option key={x.name} value={x.name}>
-                                          {x.name}
-                                        </option>
-                                      ))}
-                                      {b.remote.length > 0 && (
-                                        <optgroup label="원격">
-                                          {b.remote.map((x) => (
-                                            <option key={x.name} value={x.name}>
-                                              {x.name}
-                                            </option>
-                                          ))}
-                                        </optgroup>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <option value={defaultBase}>{defaultBase || 'HEAD'}</option>
-                                  )}
-                                </select>
-                                <Icon name="chevron-down" size={16} class="ns-select-icon" />
-                              </span>
-                            </div>
-                          </div>
-                          <p id={id + '-hint'} class={'ns-hint' + (plan.kind === 'taken' || plan.kind === 'bad' ? ' is-bad' : '')}>
-                            <Hint plan={plan} />
-                          </p>
-                        </>
+                        <BranchFields
+                          id={id}
+                          name={branch}
+                          onName={(v) => {
+                            setBranch(v)
+                            setError(null)
+                          }}
+                          base={baseValue}
+                          onBase={setBase}
+                          defaultBase={defaultBase}
+                          branches={b}
+                          plan={plan}
+                          inputRef={nameRef}
+                        />
                       )}
                     </div>
                   </div>
@@ -467,37 +383,4 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
       />
     </div>
   )
-}
-
-function Hint({ plan }: { plan: Plan }) {
-  switch (plan.kind) {
-    case 'empty':
-      return <>브랜치 이름을 적으세요</>
-    case 'bad':
-      return <>{plan.why}</>
-    case 'taken':
-      return (
-        <>
-          이미 워크트리가 있는 브랜치입니다: <span class="mono">{shortPath(plan.path)}</span>
-        </>
-      )
-    case 'local':
-      return (
-        <>
-          기존 브랜치를 <span class="mono">{shortPath(plan.path)}</span>에 엽니다
-        </>
-      )
-    case 'remote':
-      return (
-        <>
-          <span class="mono">{shortPath(plan.path)}</span>에 만듭니다 · <span class="mono">{plan.remote}</span> 추적
-        </>
-      )
-    case 'new':
-      return (
-        <>
-          <span class="mono">{shortPath(plan.path)}</span>에 만듭니다
-        </>
-      )
-  }
 }

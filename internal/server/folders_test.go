@@ -380,6 +380,18 @@ func TestGitStatusAndDiff(t *testing.T) {
 	if !strings.Contains(d.Diff, "+changed") {
 		t.Fatalf("%+v", d)
 	}
+	// A staged rename shows as one when the old path comes along.
+	gittest.Git(t, repo, "commit", "-q", "-m", "changed")
+	gittest.Git(t, repo, "mv", "README.md", "읽어 보기.md")
+	e.json("GET", "/api/git/diff"+at(repo)+"&staged=1&file="+url.QueryEscape("읽어 보기.md")+"&orig=README.md", nil, 200, &d)
+	if !strings.Contains(d.Diff, "rename from README.md\n") || !strings.Contains(d.Diff, "rename to 읽어 보기.md\n") {
+		t.Fatalf("%+v", d)
+	}
+	for _, q := range []string{"&orig=README.md", "&staged=1&orig=README.md", "&file=x&orig=README.md"} {
+		if eb := e.expectError("GET", "/api/git/diff"+at(repo)+q, nil, 400); eb.Error.Kind != "invalid_params" {
+			t.Fatal(q, eb)
+		}
+	}
 
 	for _, file := range []string{"../x", "a/../../x", filepath.Join(repo, "README.md")} {
 		if eb := e.expectError("GET", "/api/git/diff"+at(repo)+"&file="+url.QueryEscape(file), nil, 400); eb.Error.Kind != "invalid_params" {

@@ -271,63 +271,8 @@ legend.ns-h2 {
   background: none;
 }
 
-.ns-new-row {
-  display: flex;
-  gap: 10px;
-}
-
-.ns-new-name {
-  flex: 2 1 0;
-  min-width: 0;
-}
-
-.ns-new-base {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
 .ns-new .input {
   background: var(--surface);
-}
-
-.ns-select {
-  position: relative;
-  display: block;
-}
-
-.ns-select select {
-  padding-right: 32px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  appearance: none;
-}
-
-.ns-select select:disabled {
-  color: var(--text-3);
-}
-
-.ns-select-icon {
-  position: absolute;
-  top: 50%;
-  right: 10px;
-  color: var(--text-3);
-  pointer-events: none;
-  transform: translateY(-50%);
-}
-
-.ns-hint {
-  color: var(--text-2);
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-.ns-hint .mono {
-  color: var(--text);
-}
-
-.ns-hint.is-bad,
-.ns-hint.is-bad .mono {
-  color: var(--danger);
 }
 
 /* ---------- 작업 and 이름 ---------- */

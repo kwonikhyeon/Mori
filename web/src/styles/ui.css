@@ -607,8 +607,11 @@ dialog.confirm::backdrop {
   font-weight: 700;
 }
 
+/* git's own message can hold a long path. */
 .confirm-text {
   color: var(--text-2);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 .confirm-actions {

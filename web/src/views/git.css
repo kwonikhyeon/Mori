@@ -1,0 +1,862 @@
+/* Git: the panel beside a session (the B-PC board's aside), the screen of
+   its own on a PC, and the phone's screen (the B-Git board). */
+
+/* ---------- the panel ---------- */
+
+.gp {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.gp-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.gp-head-icon {
+  flex: none;
+  color: var(--text-2);
+}
+
+.gp-title {
+  flex: none;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.gp-folder {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gp-head .gp-refresh {
+  margin-left: auto;
+}
+
+.gp-head .btn-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+/* The list over the diff takes at most half the height, and scrolls. */
+.gp-top {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.gp-top.has-diff {
+  max-height: 50%;
+  border-bottom: 1px solid var(--border);
+}
+
+.gp-empty {
+  flex: 1;
+}
+
+.gp-error {
+  padding: 12px 16px;
+  color: var(--danger);
+  font-size: 13px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.gp .qnote,
+.gs-list .qnote {
+  padding: 12px 16px;
+}
+
+/* ---------- the branch ---------- */
+
+.gp-branch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.gp-branch-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gp-branch-line,
+.gs-branch-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gp-branch-name,
+.gs-branch-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gp-branch-name {
+  font-size: 15px;
+}
+
+.gp-ab {
+  flex: none;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.gp-branch-sub {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.gp-graph {
+  gap: 6px;
+  padding: 0 12px;
+}
+
+/* ---------- the worktrees ---------- */
+
+.gw {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+}
+
+.gw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gw-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.gw-row {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.gw-row:hover {
+  background: var(--surface-2);
+}
+
+.gw-row[aria-current='true'] {
+  background: var(--bg);
+}
+
+.gw-row:disabled {
+  background: transparent;
+  color: var(--text-2);
+  cursor: default;
+}
+
+.gw-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gw-branch,
+.gw-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gw-path {
+  color: var(--text-3);
+}
+
+.gw-chip {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--selected);
+  color: var(--pressed-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.gw-tag,
+.gw-count {
+  flex: none;
+  color: var(--text-2);
+}
+
+.gw-menu {
+  flex: none;
+}
+
+.gw-pc {
+  gap: 2px;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.gw-pc .gw-head {
+  padding: 0 8px 4px;
+}
+
+.gw-pc .gw-title {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.gw-add {
+  border-radius: 6px;
+}
+
+.gw-pc .gw-row {
+  min-height: 40px;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.gw-pc .gw-branch {
+  font-size: 12px;
+}
+
+.gw-pc .gw-path,
+.gw-pc .gw-tag,
+.gw-pc .gw-count {
+  font-size: 11px;
+}
+
+.gw-pc .gw-chip {
+  padding: 0 6px;
+  font-size: 11px;
+}
+
+.gw-pc .gw-menu {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.gw-phone {
+  gap: 4px;
+  padding: 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.gw-phone .gw-head {
+  padding: 0 0 4px 8px;
+}
+
+.gw-phone .gw-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.gw-add-phone {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.gw-add-phone:hover {
+  background: var(--surface-2);
+}
+
+.gw-phone .gw-row {
+  min-height: 56px;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.gw-phone .gw-branch {
+  font-size: 13px;
+}
+
+.gw-phone .gw-path,
+.gw-phone .gw-tag,
+.gw-phone .gw-count {
+  font-size: 12px;
+}
+
+.gw-phone .gw-menu {
+  width: 44px;
+  height: 44px;
+}
+
+.gw-form {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.gw-foot {
+  justify-content: flex-end;
+}
+
+.gw-foot .form-error {
+  flex: 1;
+}
+
+/* ---------- the changes ---------- */
+
+.gc-letter {
+  flex: none;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  text-align: center;
+}
+
+.gc-letter.tone-m {
+  color: var(--kind-m);
+}
+
+.gc-letter.tone-a {
+  color: var(--kind-a);
+}
+
+.gc-letter.tone-d {
+  color: var(--kind-d);
+}
+
+.gc-letter.tone-r {
+  color: var(--kind-r);
+}
+
+.gc-letter.tone-u {
+  color: var(--kind-u);
+}
+
+.gc-letter.tone-x {
+  color: var(--danger);
+}
+
+/* Positioned, so the word read out stays inside the list as it scrolls
+   instead of stretching the page. */
+.gc-text {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.gc-sub {
+  color: var(--text-3);
+}
+
+.gc-empty {
+  gap: 2px;
+  padding: 16px 8px;
+}
+
+.gc-empty .empty-title {
+  font-size: 13px;
+}
+
+.gc-empty .empty-text {
+  margin: 0;
+  font-size: 12px;
+}
+
+.gc {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 12px 8px;
+}
+
+.gc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 4px;
+}
+
+.gc-title {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.gc-ro {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.gc-group {
+  margin: 0;
+  padding: 6px 8px 2px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.gc-head + .gc-group {
+  padding-top: 4px;
+}
+
+.gc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.gc-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: left;
+}
+
+.gc-file:hover {
+  background: var(--surface-2);
+}
+
+.gc-file[aria-current='true'] {
+  background: var(--selected);
+}
+
+.gc-file .gc-letter {
+  width: 16px;
+}
+
+.gc-file .gc-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gc-file[aria-current='true'] .gc-sub {
+  color: var(--text-2);
+}
+
+/* ---------- the diff beside the list ---------- */
+
+.gp-diff {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 200px;
+}
+
+.gp-diff-head {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 12px;
+}
+
+.gp-diff-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gp-diff-counts,
+.gcc-counts {
+  flex: none;
+}
+
+.gp-diff-counts .add,
+.gcc-counts .add {
+  color: var(--count-add);
+}
+
+.gp-diff-counts .del,
+.gcc-counts .del {
+  color: var(--count-del);
+}
+
+.gp-diff-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 0;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  background: var(--diff-bg);
+  font-size: 12px;
+  scrollbar-width: thin;
+}
+
+/* ---------- the screen ---------- */
+
+.gs {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.gs-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: 60px;
+  padding: env(safe-area-inset-top, 0px) calc(4px + env(safe-area-inset-right, 0px)) 0 calc(4px + env(safe-area-inset-left, 0px));
+}
+
+.gs-titles {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gs-titles h1 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.gs-sub {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gs-back,
+.gs-phone .gp-refresh {
+  width: 44px;
+  height: 44px;
+}
+
+.gs-banner:not(:empty) {
+  flex: none;
+  padding: 0 16px 8px;
+}
+
+.gs-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 4px calc(16px + env(safe-area-inset-right, 0px)) calc(32px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.gs-card {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.gs-card-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.gs-pill {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--chip-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.gs-branch {
+  gap: 8px;
+  padding: 16px;
+}
+
+.gs-branch-line {
+  gap: 10px;
+}
+
+.gs-branch-name {
+  font-size: 20px;
+}
+
+.gs-branch .gp-ab {
+  font-size: 13px;
+}
+
+.gs-branch-sub {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.gs-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text-4);
+  font-size: 13px;
+}
+
+.gs-note svg {
+  flex: none;
+}
+
+.gs-graph,
+.gs-graph:hover {
+  color: var(--text);
+}
+
+.gs-graph {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 10px 14px 10px 16px;
+  text-decoration: none;
+}
+
+.gs-graph:hover {
+  background: var(--surface-2);
+}
+
+.gs-graph-icon {
+  flex: none;
+  color: var(--accent);
+}
+
+.gs-graph-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gs-graph-title {
+  font-weight: 600;
+}
+
+.gs-graph-sub {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.gs-graph-go {
+  flex: none;
+  color: var(--text-3);
+}
+
+/* The changes on a phone: each opens its diff under it. */
+.gcc {
+  gap: 4px;
+  padding: 14px 8px 10px;
+}
+
+.gcc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 6px;
+}
+
+.gcc-group {
+  padding: 8px 8px 0;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.gcc-head + .gcc-group {
+  padding-top: 4px;
+}
+
+.gcc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gcc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.gcc-row[aria-expanded='true'] {
+  background: var(--choice-bg);
+}
+
+.gcc-row .gc-letter {
+  width: 18px;
+}
+
+.gcc-row .gc-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.gcc-row .gc-name,
+.gcc-row .gc-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gcc-row .gc-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.gcc-row .gc-sub {
+  font-size: 12px;
+}
+
+.gcc-row[aria-expanded='true'] .gc-sub {
+  color: var(--text-2);
+}
+
+.gcc-counts {
+  font-size: 12px;
+}
+
+.gcc-chev {
+  flex: none;
+  color: var(--text-3);
+}
+
+.gcc-box {
+  margin: 2px 0 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.gcc-box .gp-error,
+.gcc-box .qnote {
+  padding: 10px 12px;
+}
+
+.gcc-diff {
+  padding: 8px 0;
+  overflow-x: auto;
+  background: var(--diff-bg);
+  font-size: 11.5px;
+}
+
+/* On a PC the screen holds the list on the left and the diff beside it. */
+.gs-pc .gs-head {
+  gap: 8px;
+  min-height: 0;
+  padding: 14px 12px 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.gs-pc .gs-titles h1 {
+  font-size: 16px;
+}
+
+.gs-cols {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.gs-list {
+  flex: none;
+  width: 360px;
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  scrollbar-width: thin;
+}
+
+.gs-cols .gp-diff {
+  min-height: 0;
+}
+
+.gs-cols .gp-diff-head {
+  padding: 12px 20px;
+}
+
+.gs-cols .gp-diff-body {
+  padding: 10px 0;
+  font-size: 12.5px;
+}
+
+.gs-nodiff {
+  flex: 1;
+  background: var(--diff-bg);
+}
+
+.gs-pc .gp-empty {
+  flex: 1;
+}

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { branchProblem, branchSlug, worktreePath } from './slug'
+import { worktree } from '../../test/fixtures'
+import type { Branch, Branches } from './types'
+import { branchProblem, branchSlug, planOf, worktreePath, worktreeRequest } from './slug'
 
 describe('branchSlug', () => {
   // The table of internal/gitx TestBranchSlugAndPath: the preview and the
@@ -89,5 +91,56 @@ describe('branchProblem', () => {
     ['a.', '브랜치 이름은 ‘.’으로 끝날 수 없습니다'],
   ])('refuses %j', (name, why) => {
     expect(branchProblem(name)).toBe(why)
+  })
+})
+
+describe('planOf', () => {
+  const MAIN = '/r/app'
+  const ws = [
+    worktree({ path: MAIN, branch: 'main' }),
+    worktree({ path: '/r/app.wt/feat-a', branch: 'feat/a', main: false }),
+    worktree({ path: '/r/app.wt/x', branch: 'x', main: false, prunable: true }),
+    worktree({ path: '/r/app.wt/d', branch: '', detached: true, main: false }),
+  ]
+  const br = (name: string, remote = false): Branch => ({ name, head: 'h', current: false, remote })
+  const b: Branches = { local: [br('main'), br('feat/a'), br('old'), br('ui/candidates')], remote: [br('origin/main', true), br('origin/pr-7', true)] }
+
+  it('says what a name does', () => {
+    expect(planOf('', ws, MAIN, b)).toEqual({ kind: 'empty' })
+    expect(planOf('a b', ws, MAIN, b)).toEqual({ kind: 'bad', why: '브랜치 이름에 공백은 쓸 수 없습니다' })
+    expect(planOf('feat/a', ws, MAIN, b)).toEqual({ kind: 'taken', path: '/r/app.wt/feat-a' })
+    expect(planOf('old', ws, MAIN, b)).toEqual({ kind: 'local', path: '/r/app.wt/old' })
+    expect(planOf('pr-7', ws, MAIN, b)).toEqual({ kind: 'remote', path: '/r/app.wt/pr-7', remote: 'origin/pr-7' })
+    expect(planOf('fix/b', ws, MAIN, b)).toEqual({ kind: 'new', path: '/r/app.wt/fix-b' })
+  })
+
+  it('refuses a name beside a branch that is its directory or in it', () => {
+    expect(planOf('old/x', ws, MAIN, b)).toEqual({ kind: 'bad', why: '‘old’ 브랜치가 있어서 이 이름은 쓸 수 없습니다' })
+    expect(planOf('ui', ws, MAIN, b)).toEqual({ kind: 'bad', why: '‘ui/candidates’ 브랜치가 있어서 이 이름은 쓸 수 없습니다' })
+    expect(planOf('uix', ws, MAIN, b).kind).toBe('new')
+  })
+
+  it('goes past the worktrees there are, but not one whose folder is gone', () => {
+    // feat-a is the directory feat/a has already.
+    expect(planOf('feat-a', ws, MAIN, b)).toEqual({ kind: 'new', path: '/r/app.wt/feat-a-2' })
+    expect(planOf('x2', [...ws, worktree({ path: '/r/app.wt/x2', branch: '', detached: true, main: false })], MAIN, b)).toEqual({ kind: 'new', path: '/r/app.wt/x2-2' })
+    // x's folder is gone, but git keeps its branch until a prune.
+    expect(planOf('x', ws, MAIN, b)).toEqual({ kind: 'taken', path: '/r/app.wt/x' })
+    expect(planOf('y', ws, MAIN, b)).toEqual({ kind: 'new', path: '/r/app.wt/y' })
+  })
+
+  it('takes any name git does while the branches are not known', () => {
+    expect(planOf('old/x', ws, MAIN, null)).toEqual({ kind: 'new', path: '/r/app.wt/old-x' })
+    expect(planOf('pr-7', ws, MAIN, null).kind).toBe('new')
+  })
+})
+
+describe('worktreeRequest', () => {
+  it('asks for a new branch from its base, or for one there is', () => {
+    expect(worktreeRequest({ kind: 'new', path: '/p' }, 'fix/b', 'main')).toEqual({ branch: 'fix/b', create: true, base: 'main' })
+    expect(worktreeRequest({ kind: 'new', path: '/p' }, 'fix/b', '')).toEqual({ branch: 'fix/b', create: true })
+    expect(worktreeRequest({ kind: 'local', path: '/p' }, 'old', 'main')).toEqual({ branch: 'old', create: false })
+    expect(worktreeRequest({ kind: 'remote', path: '/p', remote: 'origin/pr-7' }, 'pr-7', 'main')).toEqual({ branch: 'pr-7', create: false })
+    for (const p of [{ kind: 'empty' }, { kind: 'bad', why: 'x' }, { kind: 'taken', path: '/p' }] as const) expect(worktreeRequest(p, 'n', 'main')).toBeNull()
   })
 })

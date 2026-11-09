@@ -25,6 +25,7 @@ import { relTime } from '../lib/time'
 import { toast, toastError } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
 import { openScreen, type Screen } from '../lib/xterm'
+import { gitFrom } from './Git'
 import { titleOf, type Variant } from './rows'
 import './terminal.css'
 
@@ -419,7 +420,13 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
           )}
         </div>
         {t && repo && !renaming && (
-          <a class="btn btn-ghost term-git" href={href({ name: 'git', folder: t.folder_id, path: t.worktree || undefined })}>
+          <a
+            class="btn btn-ghost term-git"
+            href={href({ name: 'git', folder: t.folder_id, path: t.worktree || undefined })}
+            onClick={() => {
+              gitFrom.value = addr
+            }}
+          >
             <Icon name="git" size={18} />
             Git
           </a>

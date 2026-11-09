@@ -177,17 +177,25 @@ func (g Runner) Branches(ctx context.Context, dir string) (Branches, error) {
 	return ParseBranches(out)
 }
 
+// diffFlags make git diff print what diff-tree does whatever the user's
+// config: no colour, no external diff, and a/ and b/ before the names.
+var diffFlags = []string{"--no-color", "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/"}
+
 // Diff is the diff of file in the worktree at dir, or of every tracked
 // file when file is "": of the index against HEAD when staged, else of
-// the worktree against the index. Unstaged, the untracked files at file
-// show as new ones, up to maxNewFiles. It keeps limit bytes when limit >
-// 0, cut back to a whole line, and truncated says so.
-func (g Runner) Diff(ctx context.Context, dir, file string, staged bool, limit int) (diff string, truncated bool, err error) {
-	args := []string{"diff", "--no-color", "--no-ext-diff"}
+// the worktree against the index. orig, the path a renamed file had, makes
+// the rename show as one. Unstaged, the untracked files at file show as
+// new ones, up to maxNewFiles. It keeps limit bytes when limit > 0, cut
+// back to a whole line, and truncated says so.
+func (g Runner) Diff(ctx context.Context, dir, file, orig string, staged bool, limit int) (diff string, truncated bool, err error) {
+	args := append([]string{"diff"}, diffFlags...)
 	if staged {
 		args = append(args, "--cached")
 	}
-	if file != "" {
+	if orig != "" {
+		// diff.renames may be off; the two paths are one file all the same.
+		args = append(args, "-M", "--", orig, file)
+	} else if file != "" {
 		args = append(args, "--", file)
 	}
 	out, truncated, err := g.output(ctx, dir, limit, args...)
@@ -213,7 +221,7 @@ func (g Runner) Diff(ctx context.Context, dir, file string, staged bool, limit i
 		}
 		// diff --no-index takes /dev/null for nothing on every system, and
 		// exits with 1 when the files differ.
-		d, cut, err := g.output(ctx, dir, room, "diff", "--no-color", "--no-ext-diff", "--no-index", "--", "/dev/null", f)
+		d, cut, err := g.output(ctx, dir, room, append(append([]string{"diff"}, diffFlags...), "--no-index", "--", "/dev/null", f)...)
 		if err != nil && exitCode(err) != 1 {
 			return "", false, err
 		}

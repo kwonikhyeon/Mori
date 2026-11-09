@@ -1,8 +1,9 @@
 // How terminals read on screen: the state chip, the program's name, where
-// it runs and why it ended.
+// it runs and why it ended; and how a worktree's branch and changes read.
 
+import type { DiffQuery } from './api'
 import { relTime } from './time'
-import type { FolderView, Preset, TerminalView } from './types'
+import type { Change, FolderView, Preset, TerminalView, Worktree } from './types'
 
 export type ChipKind = 'blocked' | 'error' | 'waiting' | 'working' | 'none' | 'exited'
 
@@ -66,11 +67,21 @@ export function machineOf(addr: string): string {
   return i < 0 ? '' : addr.slice(0, i)
 }
 
+/** A worktree by its branch, or by its commit's short hash when it has none. */
+export function wtLabel(w: Worktree): string {
+  return w.detached || !w.branch ? shortHash(w.head) : w.branch
+}
+
+/** The worktree a folder opens in: the one at its own path, else the main one, else any; none that is gone. */
+export function homeWorktree(f: FolderView, ws: Worktree[]): Worktree | undefined {
+  const ok = ws.filter((w) => !w.prunable)
+  return ok.find((w) => w.path === f.path) ?? ok.find((w) => w.main) ?? ok[0]
+}
+
 /** The branch of the worktree t runs in, its short hash when detached, else "". */
 export function branchOf(t: TerminalView, f: FolderView): string {
   const w = f.worktrees.find((x) => x.path === t.worktree)
-  if (!w) return ''
-  return w.detached || !w.branch ? shortHash(w.head) : w.branch
+  return w ? wtLabel(w) : ''
 }
 
 /** "Mori / main": the folder and the branch of the worktree it runs in. */
@@ -125,4 +136,122 @@ export function finishedLine(t: TerminalView, presets: Preset[], now: number): s
   const parts = [appName(t, presets), endText(t)]
   if (t.finished_ms != null) parts.push(relTime(t.finished_ms, now))
   return parts.join(' · ')
+}
+
+interface BranchFacts {
+  head: string
+  branch: string
+  detached: boolean
+  upstream: string
+  ahead: number
+  behind: number
+}
+
+/** The branch a worktree is on, and how it stands to the remote one it follows. */
+export function branchLine(s: BranchFacts): { name: string; sub: string } {
+  if (s.detached) return { name: shortHash(s.head), sub: '브랜치가 아닌 커밋에 있습니다' }
+  if (!s.head) return { name: s.branch, sub: '아직 커밋이 없습니다' }
+  return { name: s.branch, sub: upstreamText(s) }
+}
+
+function upstreamText({ upstream, ahead, behind }: BranchFacts): string {
+  if (!upstream) return '원격 브랜치 없음'
+  if (ahead && behind) return `원격보다 ${ahead}개 앞서고 ${behind}개 뒤처짐`
+  if (ahead) return `원격보다 ${ahead}개 앞섬`
+  if (behind) return `원격보다 ${behind}개 뒤처짐`
+  return '원격과 같음'
+}
+
+/** The name of a file, a folder keeping its slash, and the folder it is in ("" at the top). */
+export function fileParts(path: string): { name: string; dir: string } {
+  const slash = path.endsWith('/') ? '/' : ''
+  const p = slash ? path.slice(0, -1) : path
+  const i = p.lastIndexOf('/')
+  return { name: p.slice(i + 1) + slash, dir: i < 0 ? '' : p.slice(0, i) }
+}
+
+export type ChangeGroupKey = 'conflict' | 'staged' | 'changed' | 'untracked'
+
+/** How a change letter is coloured: --kind-m and the like, x for a conflict. */
+export type ChangeTone = 'm' | 'a' | 'd' | 'r' | 'u' | 'x'
+
+export interface ChangeItem {
+  /** One per row of the list: the group and the path. */
+  key: string
+  path: string
+  letter: string
+  /** The letter in words, for whoever does not see it. */
+  word: string
+  tone: ChangeTone
+  /** What else there is to know: a new folder, the path before, how a conflict came about. */
+  note: string
+  /** The diff the row opens. */
+  diff: DiffQuery
+}
+
+export interface ChangeGroup {
+  key: ChangeGroupKey
+  label: string
+  items: ChangeItem[]
+}
+
+const WORDS: Record<string, [string, ChangeTone]> = {
+  M: ['수정', 'm'],
+  A: ['추가', 'a'],
+  D: ['삭제', 'd'],
+  R: ['이름 바꿈', 'r'],
+  C: ['복사', 'r'],
+  T: ['종류 바뀜', 'm'],
+  '?': ['추적 안 함', 'u'],
+}
+
+// git status's XY of an unmerged path: what our side and theirs did.
+const CONFLICTS: Record<string, string> = {
+  DD: '양쪽에서 삭제',
+  AU: '우리가 추가',
+  UD: '상대가 삭제',
+  UA: '상대가 추가',
+  DU: '우리가 삭제',
+  AA: '양쪽에서 추가',
+  UU: '양쪽에서 수정',
+}
+
+const GROUPS: [ChangeGroupKey, string][] = [
+  ['conflict', '충돌'],
+  ['staged', '스테이징됨'],
+  ['changed', '변경'],
+  ['untracked', '추적 안 함'],
+]
+
+function item(group: ChangeGroupKey, c: Change, letter: string, note: string, diff: DiffQuery): ChangeItem {
+  const [word, tone] = group === 'conflict' ? ['충돌', 'x' as const] : (WORDS[letter] ?? ['바뀜', 'm' as const])
+  return { key: `${group}:${c.path}`, path: c.path, letter, word, tone, note, diff }
+}
+
+/**
+ * A worktree's changes as the Git panel lists them: the conflicts, what is
+ * staged, what changed since and what git does not track. A file staged
+ * and then changed again is in both of the middle groups.
+ */
+export function changeGroups(cs: Change[]): ChangeGroup[] {
+  const by: Record<ChangeGroupKey, ChangeItem[]> = { conflict: [], staged: [], changed: [], untracked: [] }
+  for (const c of cs) {
+    const file = c.path
+    if (c.kind === 'unmerged') {
+      by.conflict.push(item('conflict', c, 'U', CONFLICTS[c.index + c.worktree] ?? '', { file }))
+      continue
+    }
+    if (c.kind === 'untracked') {
+      by.untracked.push(item('untracked', c, '?', file.endsWith('/') ? '새 폴더' : '', { file }))
+      continue
+    }
+    if (c.index !== '.') {
+      // Only the index knows the path before, so only its diff shows the rename.
+      const moved = c.orig && (c.index === 'R' || c.index === 'C')
+      const note = moved ? `${c.orig}에서 ${c.index === 'R' ? '옮김' : '복사'}` : ''
+      by.staged.push(item('staged', c, c.index, note, moved ? { file, orig: c.orig, staged: true } : { file, staged: true }))
+    }
+    if (c.worktree !== '.') by.changed.push(item('changed', c, c.worktree, '', { file }))
+  }
+  return GROUPS.filter(([k]) => by[k].length > 0).map(([key, label]) => ({ key, label, items: by[key] }))
 }

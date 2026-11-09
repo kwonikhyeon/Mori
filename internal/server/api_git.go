@@ -240,7 +240,7 @@ func (s *Server) handleGitStatus(w http.ResponseWriter, r *http.Request) {
 // handleGitDiff shows the diff of a file or directory of a worktree, or of
 // every tracked file when file is empty (spec §3 decision 62). With rev it
 // shows the commit's instead, and orig, the path a renamed file had, makes
-// it show the rename (decisions 109, 110).
+// it show the rename, of a commit or of the index (decisions 109, 110, 135).
 func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	file, orig, rev := q.Get("file"), q.Get("orig"), q.Get("rev")
@@ -260,8 +260,8 @@ func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request) {
 		err = badRev(rev)
 	case rev != "" && staged:
 		err = invalid("rev와 staged는 함께 쓸 수 없습니다")
-	case orig != "" && (rev == "" || file == ""):
-		err = invalid("orig는 rev와 file이 있을 때만 씁니다")
+	case orig != "" && (rev == "" && !staged || file == ""):
+		err = invalid("orig는 file과 함께, rev나 staged가 있을 때만 씁니다")
 	}
 	if err != nil {
 		writeError(w, err)
@@ -283,7 +283,7 @@ func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request) {
 		}
 		diff, truncated, err = s.d.Git.CommitDiff(r.Context(), wt.Path, rev, paths, maxDiff)
 	} else {
-		diff, truncated, err = s.d.Git.Diff(r.Context(), wt.Path, file, staged, maxDiff)
+		diff, truncated, err = s.d.Git.Diff(r.Context(), wt.Path, file, orig, staged, maxDiff)
 	}
 	if err != nil {
 		writeError(w, err)

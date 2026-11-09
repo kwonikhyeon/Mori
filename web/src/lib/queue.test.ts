@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { folder, status, term } from '../../test/fixtures'
-import { groupByFolder, groupQueue, needsCount } from './queue'
+import { groupByFolder, groupQueue, needsCount, sessionsByWorktree } from './queue'
 
 const NOW = 1_800_000_000_000
 const H = 3_600_000
@@ -81,5 +81,18 @@ describe('groupByFolder', () => {
   it('has no 기타 when every session has a folder', () => {
     const groups = groupByFolder([term()], [folder()])
     expect(groups).toHaveLength(1)
+  })
+})
+
+describe('sessionsByWorktree', () => {
+  it('counts the running sessions of a folder by worktree', () => {
+    const n = sessionsByWorktree([
+      term({ address: 'a', worktree: '/r' }),
+      term({ address: 'b', worktree: '/r' }),
+      term({ address: 'c', worktree: '/r.wt/x' }),
+      term({ address: 'fin', worktree: '/r.wt/x', state: 'finished' }),
+      term({ address: 'other', worktree: '/r', folder_id: 'f2' }),
+    ], 'f1')
+    expect([...n]).toEqual([['/r', 2], ['/r.wt/x', 1]])
   })
 })

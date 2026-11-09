@@ -1,0 +1,55 @@
+/* The name and base of a new branch, and what making it does. */
+.bf-row {
+  display: flex;
+  gap: 10px;
+}
+
+.bf-name {
+  flex: 2 1 0;
+  min-width: 0;
+}
+
+.bf-base {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.bf-select {
+  position: relative;
+  display: block;
+}
+
+.bf-select select {
+  padding-right: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  appearance: none;
+}
+
+.bf-select select:disabled {
+  color: var(--text-3);
+}
+
+.bf-select-icon {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  color: var(--text-3);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.bf-hint {
+  color: var(--text-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.bf-hint .mono {
+  color: var(--text);
+}
+
+.bf-hint.is-bad,
+.bf-hint.is-bad .mono {
+  color: var(--danger);
+}

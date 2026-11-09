@@ -15,9 +15,10 @@ import { otherHosts } from '../lib/hosts'
 import { isPhone, viewportWidth } from '../lib/media'
 import { ASIDE, layout, loadWidth, saveWidth, SIDEBAR, type Pane } from '../lib/resize'
 import { href, navigate, route, type Route } from '../lib/router'
-import { conn, core, host, hosts } from '../lib/store'
+import { conn, core, host, hosts, terminals } from '../lib/store'
 import { setTheme, theme, type ThemePref } from '../lib/theme'
 import { FolderList } from './Folders'
+import { GitPanel, GitScreen, gitFrom } from './Git'
 import { NewSession } from './NewSession'
 import { Pending } from './Pending'
 import { QueueList } from './Queue'
@@ -48,7 +49,7 @@ function pcMain(r: Route): ComponentChildren {
     case 'terminal':
       return <Terminal key={r.addr} addr={r.addr} git={r.git} variant="pc" />
     case 'git':
-      return <Pending title="Git" />
+      return <GitScreen key={r.folder} variant="pc" folder={r.folder} path={r.path} />
     case 'graph':
       return <Pending title="Git 그래프" />
   }
@@ -61,8 +62,20 @@ interface AsideView {
 
 /** What the PC aside shows, if anything. */
 function pcAside(r: Route): AsideView | null {
-  if (r.name === 'terminal' && r.git) return { label: 'Git', body: <Pending title="Git 패널" /> }
-  return null
+  if (r.name !== 'terminal' || !r.git) return null
+  const t = terminals.value.get(r.addr)
+  return {
+    label: 'Git',
+    body: (
+      <GitPanel
+        key={r.addr}
+        folder={t?.folder_id ?? ''}
+        path={t?.worktree || undefined}
+        pulse={t?.status_ms}
+        onClose={() => navigate({ name: 'terminal', addr: r.addr, git: false })}
+      />
+    ),
+  }
 }
 
 /** The phone screens without the tab bar. */
@@ -73,7 +86,15 @@ function phoneFull(r: Route): ComponentChildren {
     case 'terminal':
       return <Terminal key={r.addr} addr={r.addr} variant="phone" back={phoneBack.value} />
     case 'git':
-      return <Pending title="Git" back="#/folders" />
+      return (
+        <GitScreen
+          key={r.folder}
+          variant="phone"
+          folder={r.folder}
+          path={r.path}
+          back={gitFrom.value ? href({ name: 'terminal', addr: gitFrom.value, git: false }) : '#/folders'}
+        />
+      )
     case 'graph':
       return <Pending title="Git 그래프" back={href({ name: 'git', folder: r.folder, path: r.path })} />
     default:
@@ -288,6 +309,8 @@ function PhoneTab({ tab, title, sub, fab = false, children }: PhoneTabProps) {
   useEffect(() => {
     if (tab === 'queue') phoneBack.value = '#/'
     else if (tab === 'folders') phoneBack.value = '#/folders'
+    // Git opened from a list goes back to the list.
+    gitFrom.value = ''
   }, [tab])
   return (
     <div class="ph">

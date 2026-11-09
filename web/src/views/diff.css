@@ -1,0 +1,98 @@
+/* The lines of a diff. Whoever holds it gives the box, the size of the type
+   and the scrolling. */
+.dv {
+  font-family: var(--font-mono);
+  line-height: 1.6;
+}
+
+.dv-lines {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sideways the lines stay as wide as the longest, so their colour does too. */
+.dv-pre .dv-lines {
+  display: inline-flex;
+  min-width: 100%;
+}
+
+.dv-line {
+  padding: 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dv-pre .dv-line,
+.dv-pre .dv-file {
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.dv-hunk {
+  color: var(--diff-hunk);
+}
+
+.dv-del {
+  background: var(--diff-del-bg);
+  color: var(--diff-del);
+}
+
+.dv-add {
+  background: var(--diff-add-bg);
+  color: var(--diff-add);
+}
+
+.dv-ctx {
+  color: var(--diff-ctx);
+}
+
+/* Not slanted: Korean has no italic, and a browser only skews it. */
+.dv-note,
+.dv-say {
+  color: var(--text-3);
+  font-family: var(--font-sans);
+}
+
+.dv-say {
+  padding: 4px 12px;
+}
+
+/* Positioned for the counts read out: see .gc-text. */
+.dv-file {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 4px;
+  padding: 6px 12px;
+  border-block: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.dv-file:first-child {
+  margin-top: 0;
+  border-top: 0;
+}
+
+.dv-file-path {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dv-counts {
+  flex: none;
+}
+
+.dv-n-add {
+  color: var(--count-add);
+}
+
+.dv-n-del {
+  color: var(--count-del);
+}
+
+.dv-more {
+  padding: 8px 12px 0;
+}

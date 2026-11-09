@@ -22,6 +22,14 @@ func deviceFrom(ctx context.Context) (store.Device, bool) {
 	return d, ok
 }
 
+// isWS reports whether path is a socket: the hub's own, or one it relays.
+func isWS(path string) bool {
+	if strings.HasPrefix(path, "/h/") {
+		path = stripHost(path)
+	}
+	return strings.HasPrefix(path, "/ws/")
+}
+
 // requireDevice guards /api/ and /ws/. Requests that change state and every
 // WebSocket must come from this server's own origin (403 otherwise). API
 // requests need a paired device (401), except the public ones. A WebSocket
@@ -29,7 +37,7 @@ func deviceFrom(ctx context.Context) (store.Device, bool) {
 // can read where it cannot read a refused upgrade.
 func (s *Server) requireDevice(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ws := strings.HasPrefix(r.URL.Path, "/ws/")
+		ws := isWS(r.URL.Path)
 		if (ws || changesState(r.Method)) && !auth.SameOrigin(r) {
 			writeError(w, errorf(http.StatusForbidden, "forbidden_origin", "다른 출처에서 온 요청은 받지 않습니다"))
 			return

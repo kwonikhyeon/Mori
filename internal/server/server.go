@@ -4,6 +4,7 @@ package server
 import (
 	"log/slog"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 	"sync/atomic"
 
@@ -54,8 +55,9 @@ type Server struct {
 	log     *slog.Logger
 	mux     *http.ServeMux
 	hub     *hub
-	folders signal       // fired by FoldersChanged
-	viewers atomic.Int64 // numbers attach sockets for Presence
+	proxy   *httputil.ReverseProxy // nil without Deps.Links
+	folders signal                 // fired by FoldersChanged
+	viewers atomic.Int64           // numbers attach sockets for Presence
 }
 
 func New(d Deps) *Server {
@@ -78,6 +80,9 @@ func New(d Deps) *Server {
 		d.Presence = presence.New()
 	}
 	s := &Server{d: d, log: d.Logger, mux: http.NewServeMux(), hub: newHub()}
+	if d.Links != nil {
+		s.proxy = s.newProxy()
+	}
 	d.Auth.OnRevoke(s.hub.closeDevice)
 	d.Folders.OnChange(s.FoldersChanged)
 	s.routes()
@@ -138,6 +143,13 @@ func (s *Server) routes() {
 	api.HandleFunc("PUT /api/push/settings", s.needPush(s.handlePutPushSettings))
 	api.HandleFunc("GET /ws/events", s.handleEventsWS)
 	api.HandleFunc("GET /ws/attach", s.handleAttachWS)
+	for _, p := range proxied {
+		method, path, _ := strings.Cut(p, " ")
+		api.HandleFunc(method+" /h/{host}"+path, s.serveProxy)
+	}
+	api.HandleFunc("/h/", func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, errorf(http.StatusNotFound, "not_found", "허브가 중계하지 않는 API입니다: %s %s", r.Method, r.URL.Path))
+	})
 	notFound := func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, errorf(http.StatusNotFound, "not_found", "없는 API입니다: %s %s", r.Method, r.URL.Path))
 	}
@@ -147,6 +159,7 @@ func (s *Server) routes() {
 	guarded := s.requireDevice(api)
 	s.mux.Handle("/api/", guarded)
 	s.mux.Handle("/ws/", guarded)
+	s.mux.Handle("/h/", guarded)
 	s.mux.Handle("/", s.d.UI)
 }
 

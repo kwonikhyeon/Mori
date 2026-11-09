@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { folder, status, term, worktree } from '../../test/fixtures'
-import { appName, chip, endText, finishedLine, place, shortHash, shortPath } from './format'
+import { appName, branchOf, chip, endText, finishedLine, place, shortHash, shortPath } from './format'
 import type { Preset } from './types'
 
 const presets: Preset[] = [
@@ -49,6 +49,17 @@ describe('place', () => {
   it('is the shortened path outside the folders', () => {
     expect(place(term({ folder_id: '', cwd: '/Users/me/tmp' }), fs)).toBe('~/tmp')
     expect(place(term({ address: 'desktop/t3', folder_id: '', cwd: 'C:\\Users\\me\\work' }), fs)).toBe('desktop · ~\\work')
+  })
+})
+
+describe('branchOf', () => {
+  const f = folder({
+    worktrees: [worktree(), worktree({ path: '/w/x', branch: '', detached: true, head: 'ffeeddccbbaa99887766554433221100ffeeddcc', main: false })],
+  })
+  it('is the branch of the worktree, its hash when detached, else nothing', () => {
+    expect(branchOf(term(), f)).toBe('main')
+    expect(branchOf(term({ worktree: '/w/x' }), f)).toBe('ffeeddc')
+    expect(branchOf(term({ worktree: '/elsewhere' }), f)).toBe('')
   })
 })
 

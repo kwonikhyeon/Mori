@@ -1,0 +1,397 @@
+/* The frames of B-PC and B-Home. */
+
+/* ---------- PC ---------- */
+.pc {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pc-head {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  min-height: 60px;
+  padding: 10px max(20px, env(safe-area-inset-right, 0px)) 10px max(20px, env(safe-area-inset-left, 0px));
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.wordmark,
+a.wordmark,
+a.wordmark:hover {
+  color: var(--text);
+}
+
+.wordmark {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.hostnav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  min-width: 0;
+}
+
+.host-cur {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--chip);
+  font-weight: 600;
+}
+
+.host-cur-state {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.host-link,
+a.host-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+a.host-link:hover {
+  color: var(--text);
+}
+
+.pc-head-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.pc-banner:not(:empty) {
+  flex: none;
+  padding: 12px 16px 0;
+}
+
+/* The sidebar, a 16 px gap holding its handle, the main area and, when
+   open, another gap with the aside's handle and the aside. */
+.pc-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 16px max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+
+.pc-side {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pc-list {
+  flex: 1;
+  min-height: 0;
+  margin: -2px;
+  padding: 2px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.pc-work {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pc-main,
+.pc-aside {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.pc-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.pc-aside {
+  flex: none;
+}
+
+/* A window narrower than 1180 px lays the aside over the main area. */
+.pc-aside.is-over {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  box-shadow: var(--shadow-aside);
+}
+
+.splitter.splitter-over {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 6;
+}
+
+.pc-empty {
+  flex: 1;
+  justify-content: center;
+}
+
+/* ---------- phone ---------- */
+.ph {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ph-head {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 12px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) 6px calc(20px + env(safe-area-inset-left, 0px));
+}
+
+.ph-head-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ph-head h1 {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  line-height: 1.3;
+}
+
+.ph-sub {
+  padding: 2px 0 8px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.fab,
+a.fab,
+a.fab:hover {
+  color: var(--on-accent);
+}
+
+.fab {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: var(--shadow-fab);
+}
+
+a.fab:hover {
+  background: var(--accent-hover);
+}
+
+.ph-banner:not(:empty) {
+  flex: none;
+  padding: 4px 16px 8px;
+}
+
+.ph-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 8px calc(16px + env(safe-area-inset-right, 0px)) 24px calc(16px + env(safe-area-inset-left, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ph-full {
+  background: var(--bg);
+}
+
+.hostmenu {
+  position: relative;
+  align-self: flex-start;
+}
+
+.host-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.host-btn .host-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.host-btn svg {
+  transition: transform .15s;
+}
+
+.host-btn[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.host-pop {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: max-content;
+  min-width: 240px;
+  max-width: calc(100vw - 32px);
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.host-pop-title {
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.host-pop-cur {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.host-pop-ver {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.host-pop-link,
+a.host-pop-link,
+a.host-pop-link:hover {
+  color: var(--text);
+}
+
+.host-pop-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  margin: 0 -8px;
+  padding: 0 8px;
+  border-radius: 8px;
+}
+
+a.host-pop-link:hover {
+  background: var(--surface-2);
+}
+
+.host-pop-none {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.tabbar {
+  display: flex;
+  flex: none;
+  padding: 6px calc(8px + env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) calc(8px + env(safe-area-inset-left, 0px));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.tab {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 52px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+a.tab,
+a.tab:hover {
+  color: var(--text-2);
+}
+
+a.tab[aria-current="page"] {
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+.tab-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tab-badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* ---------- a screen still to come ---------- */
+.pending {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pending-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px 8px;
+}
+
+.pending-head h1 {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.pending .empty {
+  flex: 1;
+  justify-content: center;
+}

@@ -1,14 +1,28 @@
 import './styles/fonts.css'
 import './styles/tokens.css'
 import './styles/base.css'
+import './styles/ui.css'
+import { effect } from '@preact/signals'
 import { render } from 'preact'
 import { App } from './app'
+import { needs, showNeeds } from './lib/badge'
+import { boot } from './lib/boot'
+import { startClock } from './lib/clock'
+import { trackWidth } from './lib/media'
+import { initRouter } from './lib/router'
 import { initTheme } from './lib/theme'
 import { trackViewport } from './lib/viewport'
+import { startWake } from './lib/wake'
 
 initTheme()
 trackViewport()
+trackWidth()
+initRouter()
+startClock()
+startWake()
+effect(() => showNeeds(needs.value))
 render(<App />, document.getElementById('app')!)
+void boot()
 
 // The service worker only shows pushes (public/sw.js). A click on a
 // notification while Mori is open asks this page to go to the terminal.

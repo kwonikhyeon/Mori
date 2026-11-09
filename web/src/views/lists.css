@@ -1,0 +1,407 @@
+/* 지금 볼 것 and 폴더 (B-Home, B-PC sidebar). The phone draws them roomier:
+   bigger cards, rows joined in one box. */
+
+.qv,
+.fv {
+  display: flex;
+  flex-direction: column;
+}
+
+.qv-phone,
+.fv-phone {
+  gap: 22px;
+}
+
+.qv-pc,
+.fv-pc {
+  gap: 18px;
+}
+
+.qnote {
+  padding: 12px 4px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.qsec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qv-phone .qsec {
+  gap: 10px;
+}
+
+.qsec-title {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.qv-phone .qsec-title {
+  padding: 0 4px;
+}
+
+/* A card: an alert or a working terminal. */
+a.qcard,
+a.qcard:hover,
+a.qrow,
+a.qrow:hover {
+  color: var(--text);
+}
+
+.qcard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  transition: border-color .12s;
+}
+
+.qcard:hover {
+  border-color: var(--grabber);
+}
+
+.qcard.is-selected,
+.qrow.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 .5px var(--accent);
+}
+
+.qv-phone .qcard {
+  padding: 16px;
+  border-radius: 16px;
+}
+
+.qv-phone .qcard-blocked {
+  box-shadow: var(--shadow-card);
+}
+
+.qcard-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.qcard-app {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qcard-go {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-3);
+}
+
+.qcard-seeing {
+  flex: none;
+  margin-left: auto;
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.qcard-title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.qv-phone .qcard-title {
+  font-size: 17px;
+}
+
+.qcard-sub {
+  color: var(--text-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.qv-phone .qcard-sub {
+  font-size: 13px;
+}
+
+.qcard-msg {
+  display: -webkit-box;
+  padding: 8px 10px;
+  overflow: hidden;
+  border-radius: 8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.qv-phone .qcard-msg {
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.qcard-blocked .qcard-msg {
+  background: var(--blocked-box);
+  color: var(--blocked-box-text);
+}
+
+.qcard-error .qcard-msg {
+  background: var(--error-box);
+  color: var(--error-box-text);
+}
+
+.qcard-foot {
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.qwork {
+  padding: 12px 14px;
+}
+
+.qv-phone .qwork {
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.qwork-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* A one-line terminal: separate cards on PC, one joined box on the phone
+   and on the folder screen. */
+.qrows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  transition: border-color .12s, background-color .12s;
+}
+
+.qrow:hover {
+  border-color: var(--grabber);
+}
+
+.qrows-joined {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.qv-phone .qrows-joined,
+.fv-phone .qrows-joined {
+  border-radius: 16px;
+}
+
+.qrows-joined .qrow {
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--divider);
+  border-radius: 0;
+  background: none;
+}
+
+.qv-phone .qrows-joined .qrow,
+.fv-phone .qrows-joined .qrow {
+  min-height: 64px;
+  padding: 10px 16px;
+}
+
+.qrows-joined > li:last-child .qrow {
+  border-bottom: 0;
+}
+
+.qrows-joined .qrow:hover {
+  background: var(--surface-2);
+}
+
+.qrows-joined .qrow.is-selected {
+  background: var(--selected);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.qrow-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.qrow-title {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qrow-sub {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qrow.is-finished .qrow-title {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.qrow-end {
+  flex: none;
+  color: var(--text-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* The folded groups. */
+.qfolds {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.qv-phone .qfolds {
+  gap: 0;
+}
+
+.qfold-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qfold-h {
+  font: inherit;
+}
+
+.qfold {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.qv-phone .qfold {
+  height: auto;
+  min-height: 48px;
+  padding: 0 4px;
+  font-weight: 700;
+}
+
+.qfold:hover {
+  color: var(--text);
+}
+
+.qfold svg {
+  flex: none;
+  transition: transform .15s;
+}
+
+.qfold[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.qfold-title {
+  flex: none;
+}
+
+.qfold-sub {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-3);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The folder screen. */
+.fsec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fsec-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 0 4px;
+}
+
+.fsec-icon {
+  flex: none;
+  color: var(--text-2);
+}
+
+.fsec-name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 120px;
+}
+
+.fsec-name h2 {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fsec-path {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fsec-none {
+  padding: 14px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--text-3);
+  font-size: 13px;
+  text-align: center;
+}

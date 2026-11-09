@@ -66,6 +66,13 @@ export function machineOf(addr: string): string {
   return i < 0 ? '' : addr.slice(0, i)
 }
 
+/** The branch of the worktree t runs in, its short hash when detached, else "". */
+export function branchOf(t: TerminalView, f: FolderView): string {
+  const w = f.worktrees.find((x) => x.path === t.worktree)
+  if (!w) return ''
+  return w.detached || !w.branch ? shortHash(w.head) : w.branch
+}
+
 /** "Mori / main": the folder and the branch of the worktree it runs in. */
 export function place(t: TerminalView, folders: FolderView[]): string {
   const f = t.folder_id ? folders.find((x) => x.id === t.folder_id) : undefined
@@ -73,9 +80,8 @@ export function place(t: TerminalView, folders: FolderView[]): string {
     const m = machineOf(t.address)
     return (m ? m + ' · ' : '') + shortPath(t.cwd)
   }
-  const w = f.worktrees.find((x) => x.path === t.worktree)
-  if (!w) return f.name
-  return `${f.name} / ${w.detached || !w.branch ? shortHash(w.head) : w.branch}`
+  const b = branchOf(t, f)
+  return b ? `${f.name} / ${b}` : f.name
 }
 
 const REASONS: Record<string, string> = {

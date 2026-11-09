@@ -38,6 +38,7 @@
   --blocked-title: #7A4A00;
   --blocked-border: #F2D3A6;
   --blocked-key-text: #3D2A0F;
+  --blocked-key-border: #E0C9A6;
   --error: #B3123A;
   --error-text: #FFFFFF;
   --error-box: #FBEAEE;
@@ -84,12 +85,17 @@
   --grabber: #C9C4BA;
   --seg-track: #ECEAE5;
   --seg-active: #FFFFFF;
+  --count-pill: #1C1B19;
+  --count-pill-text: #FFFFFF;
+  --toast: #1C1B19;
+  --toast-text: #FFFFFF;
   --scrim: rgba(28, 27, 25, .32);
   --shadow-card: 0 2px 8px rgba(28, 27, 25, .06);
   --shadow-aside: 0 12px 32px rgba(28, 27, 25, .12);
   --shadow-sheet: 0 -8px 24px rgba(28, 27, 25, .12);
   --shadow-seg: 0 1px 2px rgba(28, 27, 25, .12);
   --shadow-pop: 0 8px 24px rgba(28, 27, 25, .16);
+  --shadow-fab: 0 6px 16px rgba(36, 87, 214, .28);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -123,6 +129,7 @@
     --blocked-title: #FFC07A;
     --blocked-border: #5C4220;
     --blocked-key-text: #FFE3BF;
+    --blocked-key-border: #6B4E26;
     --error: #C8203F;
     --error-text: #FFFFFF;
     --error-box: #3A1620;
@@ -163,12 +170,17 @@
     --grabber: #4A4843;
     --seg-track: #2B2A27;
     --seg-active: #3A3834;
+    --count-pill: #ECEAE5;
+    --count-pill-text: #151412;
+    --toast: #3A3834;
+    --toast-text: #ECEAE5;
     --scrim: rgba(0, 0, 0, .5);
     --shadow-card: 0 2px 8px rgba(0, 0, 0, .4);
     --shadow-aside: 0 12px 32px rgba(0, 0, 0, .4);
     --shadow-sheet: 0 -8px 24px rgba(0, 0, 0, .4);
     --shadow-seg: 0 1px 2px rgba(0, 0, 0, .4);
     --shadow-pop: 0 8px 24px rgba(0, 0, 0, .5);
+    --shadow-fab: 0 6px 16px rgba(0, 0, 0, .45);
   }
 }
 
@@ -202,6 +214,7 @@
   --blocked-title: #FFC07A;
   --blocked-border: #5C4220;
   --blocked-key-text: #FFE3BF;
+  --blocked-key-border: #6B4E26;
   --error: #C8203F;
   --error-text: #FFFFFF;
   --error-box: #3A1620;
@@ -242,10 +255,15 @@
   --grabber: #4A4843;
   --seg-track: #2B2A27;
   --seg-active: #3A3834;
+  --count-pill: #ECEAE5;
+  --count-pill-text: #151412;
+  --toast: #3A3834;
+  --toast-text: #ECEAE5;
   --scrim: rgba(0, 0, 0, .5);
   --shadow-card: 0 2px 8px rgba(0, 0, 0, .4);
   --shadow-aside: 0 12px 32px rgba(0, 0, 0, .4);
   --shadow-sheet: 0 -8px 24px rgba(0, 0, 0, .4);
   --shadow-seg: 0 1px 2px rgba(0, 0, 0, .4);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, .5);
+  --shadow-fab: 0 6px 16px rgba(0, 0, 0, .45);
 }

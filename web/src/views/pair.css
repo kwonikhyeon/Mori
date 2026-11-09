@@ -1,0 +1,73 @@
+/* The pairing screen: one card in the middle, in B's style. */
+.pair {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+}
+
+.pair-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 400px;
+  padding: 28px 24px 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.pair-brand {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.pair-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pair-intro h1 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+
+.pair-host {
+  color: var(--text-2);
+}
+
+.pair-host b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.pair-hint {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.pair-hint code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--chip);
+  color: var(--chip-text);
+  font-size: 12px;
+}
+
+.input.pair-code {
+  height: 56px;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: .12em;
+  text-align: center;
+}
+
+.pair-go {
+  height: 48px;
+}

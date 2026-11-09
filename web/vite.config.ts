@@ -9,6 +9,9 @@ export default defineConfig({
     emptyOutDir: true,
     target: 'es2022',
     assetsInlineLimit: 0,
+    // One bundle on purpose (spec §3 #157): hashed files are cached for a year,
+    // and a split makes the first terminal wait for a second file.
+    chunkSizeWarningLimit: 600,
   },
   plugins: [
     {

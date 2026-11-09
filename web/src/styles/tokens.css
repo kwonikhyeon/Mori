@@ -45,6 +45,7 @@
   --error-box-text: #7A0C27;
   --danger: #B3123A;
   --danger-border: #EBC3CD;
+  --on-danger: #FFFFFF;
   --working: #DCE8FF;
   --working-text: #1D4FC4;
   --track: #ECEAE5;
@@ -136,6 +137,7 @@
     --error-box-text: #FFB3C1;
     --danger: #FF8FA3;
     --danger-border: #5E2433;
+    --on-danger: #2B0A12;
     --working: #1F2E52;
     --working-text: #A9C1FF;
     --track: #2E2C29;
@@ -221,6 +223,7 @@
   --error-box-text: #FFB3C1;
   --danger: #FF8FA3;
   --danger-border: #5E2433;
+  --on-danger: #2B0A12;
   --working: #1F2E52;
   --working-text: #A9C1FF;
   --track: #2E2C29;

@@ -510,3 +510,110 @@ textarea.input {
     font-size: 16px;
   }
 }
+
+/* ---------- menu button ---------- */
+.menu {
+  position: relative;
+  flex: none;
+}
+
+.menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.menu-item svg {
+  flex: none;
+  color: var(--text-2);
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+
+.menu-item.is-danger,
+.menu-item.is-danger svg {
+  color: var(--danger);
+}
+
+.menu-label {
+  flex: 1;
+}
+
+.menu-item .menu-check {
+  color: var(--accent-text);
+}
+
+/* ---------- confirm dialog ---------- */
+.btn-danger-fill,
+.btn-danger-fill:hover,
+.btn-danger-fill:disabled:hover {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--on-danger);
+}
+
+dialog.confirm {
+  width: min(400px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+}
+
+dialog.confirm::backdrop {
+  background: var(--scrim, rgba(28, 27, 25, .32));
+}
+
+.confirm-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px 22px 18px;
+}
+
+.confirm-title {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.confirm-text {
+  color: var(--text-2);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}

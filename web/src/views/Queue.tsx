@@ -4,26 +4,13 @@ import { useState } from 'preact/hooks'
 import { Chip } from '../components/Chip'
 import { Icon } from '../components/Icon'
 import { now } from '../lib/clock'
-import { appName, chip, endText, finishedLine, place } from '../lib/format'
+import { appName, askText, chip, endText, finishedLine, place } from '../lib/format'
 import { groupQueue, type GroupKey, type QueueGroup } from '../lib/queue'
 import { folders, presets, ready, terminals } from '../lib/store'
 import { relTime } from '../lib/time'
 import type { TerminalView } from '../lib/types'
 import { Loading, TermRow, termHref, titleOf, type ListProps } from './rows'
 import './lists.css'
-
-const ASKS: Record<string, string> = {
-  permission: '실행 허가를 기다립니다',
-  question: '답을 기다립니다',
-  auth: '인증이 필요합니다',
-}
-
-function message(t: TerminalView, kind: 'blocked' | 'error'): string {
-  const m = t.status?.msg?.trim()
-  if (m) return m
-  if (kind === 'error') return '오류가 났습니다'
-  return ASKS[t.status?.kind ?? ''] ?? '응답을 기다립니다'
-}
 
 const appPlace = (t: TerminalView) => `${appName(t, presets.value)} · ${place(t, folders.value)}`
 
@@ -39,7 +26,7 @@ function AlertCard({ t, kind, p }: { t: TerminalView; kind: 'blocked' | 'error';
       </span>
       <span class="qcard-title">{titleOf(t)}</span>
       <span class="qcard-sub">{phone ? place(t, folders.value) : appPlace(t)}</span>
-      <span class="qcard-msg">{message(t, kind)}</span>
+      <span class="qcard-msg">{askText(t, kind)}</span>
       {phone && kind === 'blocked' && <span class="qcard-foot">열어서 키로 응답</span>}
     </a>
   )

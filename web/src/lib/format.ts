@@ -84,6 +84,20 @@ export function place(t: TerminalView, folders: FolderView[]): string {
   return b ? `${f.name} / ${b}` : f.name
 }
 
+const ASKS: Record<string, string> = {
+  permission: '실행 허가를 기다립니다',
+  question: '답을 기다립니다',
+  auth: '인증이 필요합니다',
+}
+
+/** What a blocked or failing program says, else what it waits for. */
+export function askText(t: TerminalView, kind: 'blocked' | 'error'): string {
+  const m = t.status?.msg?.trim()
+  if (m) return m
+  if (kind === 'error') return '오류가 났습니다'
+  return ASKS[t.status?.kind ?? ''] ?? '응답을 기다립니다'
+}
+
 const REASONS: Record<string, string> = {
   killed: '강제 종료',
   server_stop: '코어 종료',

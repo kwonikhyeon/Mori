@@ -76,6 +76,8 @@ export class AttachSession {
   private attachedOnce = false
   private stopped = false
   private want: Size | null
+  /** The size the newest socket asked for. */
+  private asked: Size | null = null
   private focused = false
   private sentFocus = false
   private facts: DisplayFacts | null = null
@@ -183,8 +185,10 @@ export class AttachSession {
   private connect(): void {
     this.retry = undefined
     const p = new URLSearchParams({ t: this.o.addr })
+    this.asked = null
     if (this.o.observe) p.set('observe', '1')
     else if (this.want) {
+      this.asked = this.want
       p.set('cols', String(this.want.cols))
       p.set('rows', String(this.want.rows))
     }
@@ -226,6 +230,12 @@ export class AttachSession {
         this.emit('attached', { terminal: m.terminal, cols: m.cols, rows: m.rows, resumed })
         if (this.facts) this.display(this.facts)
         if (this.focused) this.focus(true)
+        // A fit found after the socket went out was not asked for yet.
+        const w = this.want
+        const a = this.asked
+        if (!this.o.observe && w && (!a || a.cols !== w.cols || a.rows !== w.rows) && (w.cols !== m.cols || w.rows !== m.rows)) {
+          this.json({ type: 'resize', cols: w.cols, rows: w.rows })
+        }
         return
       }
       case 'size':

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { folder, status, term, worktree } from '../../test/fixtures'
-import { appName, branchOf, chip, endText, finishedLine, place, shortHash, shortPath } from './format'
+import { appName, askText, branchOf, chip, endText, finishedLine, place, shortHash, shortPath } from './format'
 import type { Preset } from './types'
 
 const presets: Preset[] = [
@@ -95,5 +95,16 @@ describe('endText', () => {
 describe('shortHash', () => {
   it('keeps seven characters', () => {
     expect(shortHash('a1b2c3d4e5f6')).toBe('a1b2c3d')
+  })
+})
+
+describe('askText', () => {
+  it("prefers the program's own words, else says what it waits for", () => {
+    expect(askText(term({ status: status('blocked', { msg: '  rm -rf build 실행?  ' }) }), 'blocked')).toBe('rm -rf build 실행?')
+    expect(askText(term({ status: status('blocked', { kind: 'permission' }) }), 'blocked')).toBe('실행 허가를 기다립니다')
+    expect(askText(term({ status: status('blocked', { kind: 'question' }) }), 'blocked')).toBe('답을 기다립니다')
+    expect(askText(term({ status: status('blocked', { kind: 'auth' }) }), 'blocked')).toBe('인증이 필요합니다')
+    expect(askText(term({ status: status('blocked') }), 'blocked')).toBe('응답을 기다립니다')
+    expect(askText(term({ status: status('error') }), 'error')).toBe('오류가 났습니다')
   })
 })

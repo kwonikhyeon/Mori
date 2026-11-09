@@ -100,6 +100,18 @@ describe('AttachSession', () => {
     ])
   })
 
+  it('sends a fit found while connecting once attached, not one it asked for', () => {
+    const { s } = session({ cols: undefined, rows: undefined })
+    s.resize(90, 28)
+    const ws = attached(80, 24)
+    expect(ws.messages()).toEqual([{ type: 'resize', cols: 90, rows: 28 }])
+    ws.drop()
+    vi.advanceTimersByTime(500)
+    // asked for 90×28 this time; a bigger screen elsewhere keeps its size
+    expect(FakeWebSocket.last().query().get('cols')).toBe('90')
+    expect(attached(120, 40).messages()).toEqual([])
+  })
+
   it('says the size another screen set', () => {
     const { s } = session()
     const sizes: unknown[] = []

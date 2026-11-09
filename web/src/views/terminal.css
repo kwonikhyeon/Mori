@@ -1,0 +1,531 @@
+/* The terminal screen of B-PC and B-Terminal. The screen itself is dark in
+   both themes (spec §3 #118); the bars around it follow the theme. */
+
+.term {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.term-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.term-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.term-sub {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.term-rename {
+  height: 34px;
+  max-width: 360px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ---------- PC: the toolbar ---------- */
+.term-bar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.term-bar .term-id {
+  flex: 1 1 220px;
+}
+
+.term-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.term-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---------- phone: the header ---------- */
+.term-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  min-height: 60px;
+  padding: env(safe-area-inset-top, 0px) calc(4px + env(safe-area-inset-right, 0px)) 0 calc(4px + env(safe-area-inset-left, 0px));
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.term-head .term-id {
+  flex: 1;
+  gap: 3px;
+}
+
+.term-head .term-title {
+  font-size: 15px;
+}
+
+.term-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.term-head .term-sub {
+  font-size: 12px;
+}
+
+.term-head .chip {
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+.term-back,
+.term-more {
+  width: 44px;
+  height: 44px;
+}
+
+a.term-back,
+a.term-back:hover,
+a.term-git,
+a.term-git:hover {
+  color: var(--text);
+}
+
+.term-git {
+  gap: 5px;
+  height: 44px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.term-banner:not(:empty) {
+  flex: none;
+  padding: 8px 12px;
+  background: var(--bg);
+}
+
+/* ---------- the screen ---------- */
+.term-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--term-bg);
+}
+
+.term-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--term-bg);
+}
+
+.term-scroll {
+  position: absolute;
+  inset: 0;
+  padding: 18px 20px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(255, 255, 255, .25) transparent;
+  scrollbar-width: thin;
+}
+
+.term-phone .term-scroll {
+  padding: 14px 14px 18px;
+}
+
+/* A terminal wider than the stage scrolls; the font stays (spec §3 #125). */
+.term-host {
+  width: max-content;
+  min-width: 100%;
+}
+
+/* xterm's scrollbar lies over the right of its box: give it its own lane,
+   so it never covers the last column. */
+.term-host .xterm-screen {
+  margin-right: 14px;
+}
+
+.term-status {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  left: 12px;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.term-note {
+  align-items: center;
+  max-width: 520px;
+  box-shadow: var(--shadow-pop);
+  pointer-events: auto;
+}
+
+/* A quick connect does not flash the note. */
+.term-note.is-late {
+  animation: term-late 0s .6s both;
+}
+
+@keyframes term-late {
+  from {
+    visibility: hidden;
+  }
+
+  to {
+    visibility: visible;
+  }
+}
+
+.term-note-link,
+a.term-note-link,
+a.term-note-link:hover {
+  flex: none;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.term-fit {
+  position: absolute;
+  top: 10px;
+  right: 26px;
+  z-index: 2;
+  box-shadow: var(--shadow-pop);
+}
+
+.term-drop {
+  position: absolute;
+  inset: 8px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--term-bg) 82%, transparent);
+  color: var(--term-fg);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* ---------- what a blocked program asks ---------- */
+.term-ask {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--blocked-border);
+  background: var(--blocked-box);
+  color: var(--blocked-box-text);
+}
+
+.term-ask-text {
+  display: flex;
+  flex: 1 1 300px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.term-ask-text svg {
+  flex: none;
+  color: var(--blocked-title);
+}
+
+.term-ask-title {
+  color: var(--blocked-title);
+  font-weight: 700;
+}
+
+.term-ask-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.term-ask-key {
+  min-width: 40px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--blocked-key-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--blocked-key-text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.term-ask-key:hover {
+  background: var(--surface-2);
+}
+
+.term-phone .term-ask {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+}
+
+.term-ask-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0 4px;
+}
+
+.term-ask-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--blocked-title);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.term-ask-head .term-ask-msg {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.term-ask-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.term-phone .term-ask-key {
+  height: 52px;
+  border-color: var(--blocked-border);
+  border-radius: 12px;
+  background: var(--blocked-box);
+  font-size: 17px;
+}
+
+.term-phone .term-ask-key.is-word {
+  font-size: 15px;
+}
+
+/* ---------- quick keys (phone) ---------- */
+.term-keys {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  margin: 0 -12px;
+  padding: 0 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.term-keys::-webkit-scrollbar {
+  display: none;
+}
+
+.term-key {
+  flex: none;
+  min-width: 48px;
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.term-key.is-arrow {
+  font-size: 15px;
+}
+
+.term-key:disabled {
+  opacity: .5;
+}
+
+/* ---------- several lines at once ---------- */
+.term-compose {
+  flex: none;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.term-send {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+textarea.term-send-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 62px;
+  max-height: 168px;
+  padding: 9px 12px;
+  background: var(--surface-2);
+  line-height: 1.5;
+  resize: none;
+  field-sizing: content;
+}
+
+.term-held {
+  padding: 10px 16px 0;
+  color: var(--blocked-title);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.term-phone .term-compose {
+  border: 0;
+  background: none;
+}
+
+.term-phone .term-send {
+  padding: 0;
+}
+
+.term-phone textarea.term-send-input {
+  min-height: 44px;
+  max-height: 120px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  line-height: 1.45;
+}
+
+.term-phone .term-send-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 12px;
+}
+
+.term-phone .term-held {
+  padding: 0 4px 8px;
+}
+
+/* ---------- only watching ---------- */
+.term-observe {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--info-box);
+  color: var(--info-box-text);
+  font-size: 13px;
+}
+
+.term-observe svg {
+  flex: none;
+}
+
+.term-observe > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.term-phone .term-observe {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+/* ---------- the program ended ---------- */
+.term-end {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 13px;
+}
+
+.term-end-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  color: var(--text-2);
+}
+
+.term-end-text b {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.term-end-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.term-phone .term-end {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.term-phone .term-end-actions {
+  flex: 1 1 100%;
+}
+
+.term-phone .term-end-actions .btn {
+  flex: 1;
+  height: 44px;
+}
+
+/* ---------- phone: the dock under the screen ---------- */
+.term-dock {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px calc(12px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
+  border-radius: 20px 20px 0 0;
+  background: var(--surface);
+}
+
+.term-dock:empty {
+  display: none;
+}

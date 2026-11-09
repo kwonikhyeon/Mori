@@ -1,6 +1,7 @@
 // The frame around the screens (spec §3 #119, #120). PC: a header, the
 // queue in a sidebar people can widen, the main area and an aside. Phone:
 // 지금 볼 것, 폴더 and 설정 over a tab bar; the other screens take it all.
+import { signal } from '@preact/signals'
 import type { ComponentChildren } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { ConnBanner } from '../components/ConnBanner'
@@ -19,6 +20,7 @@ import { setTheme, theme, type ThemePref } from '../lib/theme'
 import { FolderList } from './Folders'
 import { Pending } from './Pending'
 import { QueueList } from './Queue'
+import { Terminal } from './Terminal'
 import './shell.css'
 
 export function Shell() {
@@ -26,6 +28,9 @@ export function Shell() {
 }
 
 const thisHost = () => hostLabel.value || '이 호스트'
+
+/** The phone tab a full screen goes back to: the list it was opened from. */
+export const phoneBack = signal('#/')
 
 /* ---------- the screens of each route ---------- */
 
@@ -40,7 +45,7 @@ function pcMain(r: Route): ComponentChildren {
     case 'new':
       return <Pending title="새 세션" />
     case 'terminal':
-      return <Pending title="터미널" />
+      return <Terminal key={r.addr} addr={r.addr} git={r.git} variant="pc" />
     case 'git':
       return <Pending title="Git" />
     case 'graph':
@@ -65,7 +70,7 @@ function phoneFull(r: Route): ComponentChildren {
     case 'new':
       return <Pending title="새 세션" back="#/" />
     case 'terminal':
-      return <Pending title="터미널" back="#/" />
+      return <Terminal key={r.addr} addr={r.addr} variant="phone" back={phoneBack.value} />
     case 'git':
       return <Pending title="Git" back="#/folders" />
     case 'graph':
@@ -279,6 +284,10 @@ interface PhoneTabProps {
 }
 
 function PhoneTab({ tab, title, sub, fab = false, children }: PhoneTabProps) {
+  useEffect(() => {
+    if (tab === 'queue') phoneBack.value = '#/'
+    else if (tab === 'folders') phoneBack.value = '#/folders'
+  }, [tab])
   return (
     <div class="ph">
       <header class="ph-head">

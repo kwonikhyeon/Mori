@@ -85,7 +85,8 @@ async function loadOverview(): Promise<void> {
   }
 }
 
-function toPairing(): void {
+/** The server forgot this device: drop the state and pair again. */
+export function toPairing(): void {
   if (phase.value === 'pair') return
   shutdown()
   resetStore()

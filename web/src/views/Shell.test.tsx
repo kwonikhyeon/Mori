@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { FakeWebSocket } from '../../test/fakeWs'
 import { folder, status, term } from '../../test/fixtures'
 import { hello } from '../lib/boot'
 import { now } from '../lib/clock'
@@ -8,7 +9,13 @@ import { route, type Route } from '../lib/router'
 import { conn, core, folders, hosts, ready, resetStore, terminals } from '../lib/store'
 import { theme } from '../lib/theme'
 import type { TerminalView } from '../lib/types'
-import { Shell } from './Shell'
+import { phoneBack, Shell } from './Shell'
+
+// jsdom cannot lay out xterm's cells.
+vi.mock('../lib/xterm', async () => {
+  const { FakeScreen } = await import('../../test/fakeScreen')
+  return { openScreen: vi.fn(async () => new FakeScreen()) }
+})
 
 function load(ts: TerminalView[]) {
   terminals.value = new Map(ts.map((t) => [t.address, t]))
@@ -23,6 +30,8 @@ function at(width: number, r: Route) {
 const sidebar = () => screen.getByRole('separator', { name: '사이드바 너비' })
 
 beforeEach(() => {
+  FakeWebSocket.reset()
+  vi.stubGlobal('WebSocket', FakeWebSocket)
   localStorage.clear()
   history.replaceState(null, '', '/#/')
   now.value = 10 * 3_600_000
@@ -38,6 +47,8 @@ afterEach(() => {
   hello.value = null
   theme.value = 'system'
   route.value = { name: 'queue' }
+  phoneBack.value = '#/'
+  vi.unstubAllGlobals()
 })
 
 describe('PC', () => {
@@ -87,6 +98,8 @@ describe('PC', () => {
     load([term({ address: 't1', status: status('idle') }), term({ address: 't2', status: status('idle'), display_title: '둘째' })])
     at(1440, { name: 'terminal', addr: 't1', git: true })
     render(<Shell />)
+    expect(within(screen.getByRole('main')).getByRole('heading', { level: 1, name: 'Claude Code' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Git' }).getAttribute('aria-pressed')).toBe('true')
     const aside = screen.getByRole('complementary', { name: 'Git' })
     expect(aside.classList.contains('is-over')).toBe(false)
     expect(aside.style.width).toBe('360px')
@@ -169,5 +182,16 @@ describe('phone', () => {
     render(<Shell />)
     expect(screen.queryByRole('navigation', { name: '주 메뉴' })).toBeNull()
     expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/')
+  })
+
+  it('goes back from a session to the tab it was opened from', async () => {
+    load([term({ address: 't1', status: status('idle') })])
+    at(390, { name: 'folders' })
+    render(<Shell />)
+    await act(() => {
+      route.value = { name: 'terminal', addr: 't1', git: false }
+    })
+    expect(screen.getByRole('heading', { level: 1, name: 'Claude Code' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/folders')
   })
 })

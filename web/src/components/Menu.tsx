@@ -1,14 +1,17 @@
 // A button that opens a list of actions (the WAI-ARIA menu button): the
 // arrows move between the items, Escape closes and gives the focus back,
 // Tab and a press elsewhere close.
+import type { ComponentChildren } from 'preact'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Icon, type IconName } from './Icon'
 
 export interface MenuItem {
+  /** Tells apart items of one label; the label unless given. */
+  key?: string
   label: string
   icon?: IconName
   danger?: boolean
-  /** Makes the item a checkbox that says whether it is on. */
+  /** Makes the item a checkbox that says whether it is on, or one choice of the radio items. */
   checked?: boolean
   onSelect: () => void
 }
@@ -19,9 +22,13 @@ export interface MenuProps {
   icon?: IconName
   iconSize?: number
   buttonClass?: string
+  /** What the button shows in place of the icon; label still names it. */
+  trigger?: ComponentChildren
+  /** The checked items are one choice of many, not each on or off. */
+  radio?: boolean
 }
 
-export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass = 'btn btn-icon btn-ghost' }: MenuProps) {
+export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass = 'btn btn-icon btn-ghost', trigger, radio = false }: MenuProps) {
   const [open, setOpen] = useState<'first' | 'last' | null>(null)
   const id = useId()
   const box = useRef<HTMLDivElement>(null)
@@ -93,16 +100,16 @@ export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass =
         onClick={() => (open ? setOpen(null) : setOpen('first'))}
         onKeyDown={onButtonKey}
       >
-        <Icon name={icon} size={iconSize} />
+        {trigger ?? <Icon name={icon} size={iconSize} />}
       </button>
       {open && (
         <div id={id} ref={list} role="menu" aria-label={label} class="menu-list" onKeyDown={onListKey}>
           {items.map((it) => (
             <button
-              key={it.label}
+              key={it.key ?? it.label}
               type="button"
               tabIndex={-1}
-              role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+              role={it.checked === undefined ? 'menuitem' : radio ? 'menuitemradio' : 'menuitemcheckbox'}
               aria-checked={it.checked}
               class={'menu-item' + (it.danger ? ' is-danger' : '')}
               onClick={() => pick(it)}

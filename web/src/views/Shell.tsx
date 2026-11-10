@@ -3,26 +3,23 @@
 // 지금 볼 것, 폴더 and 설정 over a tab bar; the other screens take it all.
 import { signal } from '@preact/signals'
 import type { ComponentChildren } from 'preact'
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useState } from 'preact/hooks'
 import { ConnBanner } from '../components/ConnBanner'
 import { Icon, type IconName } from '../components/Icon'
 import { Segmented } from '../components/Segmented'
 import { Splitter } from '../components/Splitter'
-import { hello } from '../lib/boot'
-import { versionText } from '../lib/format'
-import { hostState } from '../lib/health'
-import { otherHosts } from '../lib/hosts'
 import { isPhone, viewportWidth } from '../lib/media'
 import { ASIDE, layout, loadWidth, saveWidth, SIDEBAR, type Pane } from '../lib/resize'
 import { href, navigate, parseHash, route, type Route } from '../lib/router'
 import { HostContext, hub, scopeOf, useHost, type HostScope } from '../lib/scope'
-import { hosts, hostsReady } from '../lib/store'
+import { hostsReady } from '../lib/store'
 import { setTheme, theme, THEME_LABEL, type ThemePref } from '../lib/theme'
 import { toast } from '../lib/toast'
 import { CommitPanel } from './Commit'
 import { FolderList } from './Folders'
 import { GitPanel, GitScreen, gitFrom } from './Git'
 import { GraphScreen } from './Graph'
+import { HostButton, HostPicker, HostSheet, nameOf, OthersBadge } from './HostSwitch'
 import { NewSession } from './NewSession'
 import { QueueList } from './Queue'
 import { Loading } from './rows'
@@ -48,8 +45,6 @@ export function Shell() {
     </HostContext.Provider>
   )
 }
-
-const thisHost = (h: HostScope) => h.name.value || '이 호스트'
 
 /** The phone tab a full screen goes back to: the list it was opened from. */
 export const phoneBack = signal('#/')
@@ -238,27 +233,16 @@ function PcShell() {
 
 function PcHeader() {
   const h = useHost()
-  const hs = hostState(h.conn.value, h.core.value)
-  const others = otherHosts(hosts.value)
   const r = route.value
   return (
     <header class="pc-head">
       <a class="wordmark" href={h.href({ name: 'queue' })}>
         Mori
       </a>
-      <nav class="hostnav" aria-label="호스트">
-        <span class="host-cur" aria-current="page">
-          <span class={`dot dot-${hs.dot}`} aria-hidden="true" />
-          <span class="host-cur-name">{thisHost(h)}</span>
-          <span class="host-cur-state">{hs.text}</span>
-        </span>
-        {others.map((o) => (
-          <a key={o.url} class="host-link" href={o.url}>
-            {o.name}
-            <Icon name="external" size={13} />
-          </a>
-        ))}
-      </nav>
+      <div class="hostbar">
+        <HostPicker />
+        <OthersBadge />
+      </div>
       <div class="pc-head-end">
         <a class="btn btn-primary" href={h.href({ name: 'new' })}>
           <Icon name="plus" stroke={2} />새 세션
@@ -332,7 +316,7 @@ function PhoneShell() {
           title="설정"
           sub={
             <>
-              <b>{thisHost(h)}</b> · 이 호스트의 알림과 기기
+              <b>{nameOf(h)}</b> · 이 호스트의 알림과 기기
             </>
           }
         >
@@ -365,7 +349,14 @@ function PhoneTab({ tab, title, sub, fab = false, children }: PhoneTabProps) {
       <header class="ph-head">
         <div class="ph-head-main">
           <h1>{title}</h1>
-          {sub ? <p class="ph-sub">{sub}</p> : <HostMenu />}
+          {sub ? (
+            <p class="ph-sub">{sub}</p>
+          ) : (
+            <div class="hostbar">
+              <HostButton />
+              <OthersBadge />
+            </div>
+          )}
         </div>
         {fab && (
           <a class="fab" href={h.href({ name: 'new' })} aria-label="새 세션">
@@ -376,75 +367,7 @@ function PhoneTab({ tab, title, sub, fab = false, children }: PhoneTabProps) {
       <ConnBanner class="ph-banner" />
       <div class="ph-scroll">{children}</div>
       <TabBar current={tab} />
-    </div>
-  )
-}
-
-/** The host's name and state; opens the other hosts. */
-function HostMenu() {
-  const [open, setOpen] = useState(false)
-  const box = useRef<HTMLDivElement>(null)
-  const btn = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    if (!open) return
-    const away = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
-    }
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      setOpen(false)
-      btn.current?.focus()
-    }
-    document.addEventListener('pointerdown', away)
-    document.addEventListener('keydown', key)
-    return () => {
-      document.removeEventListener('pointerdown', away)
-      document.removeEventListener('keydown', key)
-    }
-  }, [open])
-  const h = useHost()
-  const hs = hostState(h.conn.value, h.core.value)
-  const others = otherHosts(hosts.value)
-  const version = h.host.value?.version ?? (h.id === '' ? hello.value?.version : undefined)
-  const close = () => setOpen(false)
-  return (
-    <div class="hostmenu" ref={box}>
-      <button ref={btn} type="button" class="host-btn" aria-expanded={open} aria-controls={open ? 'host-pop' : undefined} onClick={() => setOpen(!open)}>
-        <span class={`dot dot-${hs.dot}`} aria-hidden="true" />
-        <span class="host-name">{thisHost(h)}</span>
-        <span>{hs.text}</span>
-        <Icon name="chevron-down" size={16} />
-      </button>
-      {open && (
-        <div id="host-pop" class="host-pop">
-          <p class="host-pop-title">이 호스트</p>
-          <p class="host-pop-cur">
-            <span class={`dot dot-${hs.dot}`} aria-hidden="true" />
-            <b>{thisHost(h)}</b>
-            <span class="host-pop-ver">{[hs.text, version && versionText(version)].filter(Boolean).join(' · ')}</span>
-          </p>
-          <p class="host-pop-title">다른 호스트</p>
-          {others.length > 0 ? (
-            <ul class="host-pop-list">
-              {others.map((o) => (
-                <li key={o.url}>
-                  <a class="host-pop-link" href={o.url} onClick={close}>
-                    {o.name}
-                    <Icon name="external" size={14} />
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p class="host-pop-none">
-              <a href="#/settings" onClick={close}>
-                설정
-              </a>
-              에서 다른 컴퓨터의 Mori를 추가할 수 있습니다.
-            </p>
-          )}
-        </div>
-      )}
+      {!sub && <HostSheet />}
     </div>
   )
 }

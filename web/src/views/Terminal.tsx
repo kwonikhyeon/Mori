@@ -16,7 +16,7 @@ import { appName, askText, chip, endText, place, type EndFacts } from '../lib/fo
 import { QUICK_KEYS } from '../lib/keys'
 import { isApple } from '../lib/platform'
 import { navigate, parseHash } from '../lib/router'
-import { useHost } from '../lib/scope'
+import { others, useHost } from '../lib/scope'
 import { TermLink } from '../lib/termlink'
 import { attachNote, BLOCKED_KEYS, quotePath, type AnswerKey, type AttachNote } from '../lib/termview'
 import { effectiveTheme, terminalTheme } from '../lib/theme'
@@ -25,6 +25,7 @@ import { toast, toastError } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
 import { openScreen, type Screen } from '../lib/xterm'
 import { gitFrom } from './Git'
+import { nameOf } from './HostSwitch'
 import { titleOf, type Variant } from './rows'
 import './terminal.css'
 
@@ -170,6 +171,8 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   // Git opens for a session in a folder that is a repository.
   const repo = !!t?.folder_id && !!h.folders.value.find((f) => f.id === t.folder_id)?.repo
   const sub = t ? `${appName(t, h.presets.value)} · ${place(t, h.folders.value)}` : ''
+  // With other hosts about, the header says which one the session runs on.
+  const hostTag = others.value.length > 0 ? nameOf(h) : ''
 
   const fail = (what: string) => (e: unknown) => toastError(e, what)
   const answer = (k: AnswerKey) => {
@@ -344,7 +347,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
                 </button>
               )}
             </div>
-            {sub && <p class="term-sub">{sub}</p>}
+            {sub && <p class="term-sub">{hostTag ? `${hostTag} · ${sub}` : sub}</p>}
           </div>
           <div class="term-tools">
             {canType && (
@@ -419,6 +422,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
           {titleEl}
           {t && !renaming && (
             <div class="term-sub-row">
+              {hostTag && <span class="term-host">{hostTag}</span>}
               <Chip info={chip(t)} />
               <span class="term-sub">{sub}</span>
             </div>

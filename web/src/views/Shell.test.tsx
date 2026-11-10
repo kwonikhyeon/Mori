@@ -1,14 +1,14 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../../test/fakeWs'
-import { folder, linkedHost, status, term } from '../../test/fixtures'
+import { folder, status, term } from '../../test/fixtures'
 import { COMMITS, diffOf, LOG } from '../../test/history'
-import { withHost } from '../../test/scopes'
+import { withHost, withHosts } from '../../test/scopes'
 import { hello } from '../lib/boot'
 import { now } from '../lib/clock'
 import { viewportWidth } from '../lib/media'
 import { href, route, type Route } from '../lib/router'
-import { conn, core, folders, hosts, hostsReady, ready, resetStore, terminals } from '../lib/store'
+import { conn, core, folders, hostsReady, ready, resetStore, terminals } from '../lib/store'
 import { theme } from '../lib/theme'
 import { toasts } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
@@ -202,15 +202,23 @@ describe('PC', () => {
     expect(screen.queryByRole('complementary')).toBeNull()
   })
 
-  it('says how the host is and links the other hosts', () => {
-    hosts.value = [linkedHost(), linkedHost({ id: 'h_self0001', name: 'self', url: location.origin })]
+  it('names the host it shows in the header and picks another there', () => {
+    withHosts({}, { id: 'h_self0001', name: 'self', url: location.origin })
     core.value = { connected: false }
     at(1440, { name: 'queue' })
     render(<Shell />)
-    const nav = screen.getByRole('navigation', { name: '호스트' })
-    expect(nav.textContent).toContain('macmini')
-    expect(nav.textContent).toContain('코어 연결 중')
-    expect(within(nav).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['https://desk.example.ts.net'])
+    fireEvent.click(screen.getByRole('button', { name: '호스트 macmini · 코어 연결 중' }))
+    expect(screen.getAllByRole('menuitemradio').map((e) => e.textContent)).toEqual(['macmini', 'desk'])
+  })
+
+  it('gives the focus to the picker of the host it switched to', () => {
+    withHost()
+    at(1440, { name: 'queue' })
+    render(<Shell />)
+    fireEvent.click(screen.getByRole('button', { name: /^호스트 macmini/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'desk' }))
+    expect(location.hash).toBe('#/h/h_desk0001')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /^호스트 desk/ }))
   })
 
   it('opens the settings in the main area', async () => {
@@ -287,20 +295,26 @@ describe('phone', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('지금 볼 것')
   })
 
-  it('opens the host menu and closes it with Escape', () => {
-    at(390, { name: 'folders' })
+  it('opens the host sheet from the header and closes it with Escape', () => {
+    withHost()
+    at(390, { name: 'queue' })
     render(<Shell />)
-    const btn = screen.getByRole('button', { name: /macmini/ })
-    expect(btn.getAttribute('aria-expanded')).toBe('false')
+    const btn = screen.getByRole('button', { name: /^호스트 macmini/ })
     fireEvent.click(btn)
-    expect(btn.getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByText('다른 호스트')).toBeTruthy()
-    const pop = document.getElementById(btn.getAttribute('aria-controls')!)!
-    expect(within(pop).getByRole('link', { name: '설정' }).getAttribute('href')).toBe('#/settings')
-    expect(pop.querySelector('.host-pop-ver')!.textContent).toBe('연결됨 · v0.1.0')
-    fireEvent.keyDown(document, { key: 'Escape' })
-    expect(btn.getAttribute('aria-expanded')).toBe('false')
+    const sheet = screen.getByRole('dialog', { name: '호스트' }) as HTMLDialogElement
+    fireEvent(sheet, new Event('cancel', { cancelable: true }))
+    expect(sheet.open).toBe(false)
     expect(document.activeElement).toBe(btn)
+  })
+
+  it('gives the focus to the host button of the host it switched to', () => {
+    withHost()
+    at(390, { name: 'queue' })
+    render(<Shell />)
+    fireEvent.click(screen.getByRole('button', { name: /^호스트 macmini/ }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: '호스트' })).getByRole('button', { name: /^desk/ }))
+    expect(location.hash).toBe('#/h/h_desk0001')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /^호스트 desk/ }))
   })
 
   it('opens the settings tab, with the host it is about in place of the host menu', async () => {
@@ -311,7 +325,7 @@ describe('phone', () => {
     expect(tabs.map((a) => a.getAttribute('aria-current'))).toEqual([null, null, 'page'])
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('설정')
     expect(document.querySelector('.ph-sub')!.textContent).toBe('macmini · 이 호스트의 알림과 기기')
-    expect(screen.queryByRole('button', { name: /macmini/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^호스트/ })).toBeNull()
     expect(await screen.findByRole('heading', { name: '기기 1' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '화면' })).toBeTruthy()
   })

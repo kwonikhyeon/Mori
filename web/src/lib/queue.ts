@@ -25,6 +25,9 @@ const GROUPS: [GroupKey, string][] = [
   ['finished', '최근 종료'],
 ]
 
+/** Each group's title, as the queue shows it. */
+export const GROUP_TITLE = Object.fromEntries(GROUPS) as Record<GroupKey, string>
+
 const changed = (t: TerminalView) => t.status_ms ?? t.created_ms
 const latestFirst = (key: (t: TerminalView) => number) => (a: TerminalView, b: TerminalView) => key(b) - key(a)
 

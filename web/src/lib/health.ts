@@ -1,5 +1,6 @@
 // What the screen says about the server and the core (spec §3 #131): a
 // banner while something is wrong, and the dot next to the host's name.
+import type { Problem } from './scope'
 import type { Conn } from './store'
 import type { CoreStatus } from './types'
 
@@ -41,4 +42,11 @@ export function hostState(c: Conn, core: CoreStatus): { dot: Dot; text: string }
     case 'down':
       return { dot: 'bad', text: '연결 끊김' }
   }
+}
+
+/** The same for a host of the hub: what keeps the page from it comes first. */
+export function scopeState(c: Conn, core: CoreStatus, problem: Problem): { dot: Dot; text: string } {
+  if (problem === 'unlinked') return { dot: 'off', text: '끊김' }
+  if (problem === 'unreachable') return { dot: 'bad', text: '닿지 못함' }
+  return hostState(c, core)
 }

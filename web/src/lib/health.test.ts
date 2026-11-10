@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { connBanner, hostState } from './health'
+import { connBanner, hostState, scopeState } from './health'
 
 describe('connBanner', () => {
   it('says nothing while all is well or in the first seconds', () => {
@@ -26,5 +26,13 @@ describe('hostState', () => {
     expect(hostState('connecting', { connected: false })).toEqual({ dot: 'off', text: '연결 중' })
     expect(hostState('restarting', { connected: true })).toEqual({ dot: 'warn', text: '재시작 중' })
     expect(hostState('down', { connected: true })).toEqual({ dot: 'bad', text: '연결 끊김' })
+  })
+})
+
+describe('scopeState', () => {
+  it('puts what is wrong with the host before how its stream is', () => {
+    expect(scopeState('open', { connected: true }, 'unlinked')).toEqual({ dot: 'off', text: '끊김' })
+    expect(scopeState('open', { connected: true }, 'unreachable')).toEqual({ dot: 'bad', text: '닿지 못함' })
+    expect(scopeState('open', { connected: false }, null)).toEqual({ dot: 'warn', text: '코어 연결 중' })
   })
 })

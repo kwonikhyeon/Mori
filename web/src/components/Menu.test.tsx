@@ -69,6 +69,34 @@ describe('Menu', () => {
     fireEvent.pointerDown(screen.getByRole('button', { name: '밖' }))
     expect(screen.queryByRole('menu')).toBeNull()
   })
+
+  it('shows what it is given in place of the icon', () => {
+    render(<Menu label="호스트" trigger={<span>macmini</span>} items={[{ label: 'desk', onSelect: () => {} }]} />)
+    const btn = screen.getByRole('button', { name: '호스트' })
+    expect(btn.textContent).toBe('macmini')
+    expect(btn.querySelector('svg')).toBeNull()
+  })
+
+  it('makes the checked items one choice of many', () => {
+    const none = () => {}
+    render(
+      <Menu
+        label="호스트"
+        radio
+        items={[
+          { label: 'macmini', checked: true, onSelect: none },
+          { label: 'desk', checked: false, onSelect: none },
+          { label: '호스트 관리', onSelect: none },
+        ]}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '호스트' }))
+    expect(screen.getAllByRole('menuitemradio').map((e) => [e.textContent, e.getAttribute('aria-checked')])).toEqual([
+      ['macmini', 'true'],
+      ['desk', 'false'],
+    ])
+    expect(screen.getByRole('menuitem', { name: '호스트 관리' })).toBeTruthy()
+  })
 })
 
 describe('Confirm', () => {

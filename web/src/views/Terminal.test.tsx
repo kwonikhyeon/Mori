@@ -269,6 +269,18 @@ describe('Terminal on a PC', () => {
     expect(FakeScreen.last().disposed).toBe(true)
     expect(ws.closedWith).not.toBeNull()
   })
+
+  it('names the host of the session when there are others', () => {
+    const s = withHost()
+    s.terminals.value = new Map([['t1', term()]])
+    s.folders.value = [folder()]
+    s.ready.value = true
+    render(inHost(s, <Terminal addr="t1" variant="pc" />))
+    expect(document.querySelector('.term-sub')!.textContent).toMatch(/^desk · /)
+    cleanup()
+    render(inHost(s, <Terminal addr="t1" variant="phone" back="#/h/h_desk0001" />))
+    expect(within(document.querySelector('.term-head') as HTMLElement).getByText('desk')).toBeTruthy()
+  })
 })
 
 describe('An ended program', () => {

@@ -31,6 +31,11 @@
 3. **8 MB 파일 올리기.** 허브를 지나는 8 MB 업로드는 통과한다. 길이를 밝힌 10 MiB 넘는 본문은 호스트에 닿기 전에, 길이를 모르는 본문은 10 MiB에서 끊겨 413이다 → Task 5 `TestProxyBodyLimit`.
 4. **호스트가 허브를 철회.** 그 호스트의 401이 폰의 로그아웃으로 보이지 않는다: 허브는 409 `host_unlinked`로 답하고 그 호스트를 `linked:false`로 둔다. 폰의 허브 페어링은 그대로다 → Task 5 `TestProxyHostErrors`, Task 6 `TestHubRelaysHostNotifications`.
 5. **`kind`가 없는 옛 Mori.** 중계받은 알림에 `kind`가 없으면 제목 끝 ` · <라벨>`로 종류를 읽는다 → Task 2 `TestRelayed`.
+6. **호스트 목록보다 먼저 온 알림 링크.** 알림으로 `#/h/<ID>/t/<주소>`가 처음 열리면, 목록을 받기 전에는 "불러오는 중"이고 받은 뒤에는 그 터미널이다. 목록에 없는 호스트면 허브의 지금 볼 것과 "이 허브에 없는 호스트입니다"다 → Task 10c Shell "waits for the host list before a host's link", "goes to the hub's queue from a host it does not have".
+7. **두 호스트의 같은 폴더 ID·경로.** 돌아갈 곳, 커밋 캐시, 그래프가 호스트끼리 섞이지 않는다 → Task 10c Graph "keeps where it was opened apart for each host", Commit "reads the same commit of two hosts apart".
+8. **보는 중에 끊긴 호스트.** 중계 소켓이 4401로 닫혔는데 허브가 이 기기를 아직 페어링하고 있으면, 그 호스트만 끊김이다 → Task 10b "marks only that host unlinked on a 4401 the hub still pairs", Task 10f 끊김 화면.
+9. **허브의 hello도 실패한 4401.** 페어링 화면으로 가지 않고 백오프 뒤 다시 연다 → Task 10b "tries again after a 4401 while the hub's hello fails".
+10. **보는 중에 목록에서 빠진 호스트.** 그 소켓을 닫고(4404면 목록을 다시 읽는다) 허브의 지금 볼 것으로 간다 → Task 10b "closes the socket of a host taken off the list", "reads the list again on a 4404", Task 10c Shell의 없는 호스트.
 
 ---
 
@@ -49,12 +54,18 @@ internal/admin/admin.go                  hosts, link_host, unlink_host — Task 
 cmd/mori/hostscmd.go, main.go, serve.go  mori hosts, 조립 — Task 7
 web/src/lib/{types,api}.ts, web/src/views/SettingsEdit.tsx, web/test/fixtures.ts   호스트 뷰 타입, 읽기 전용 카드(임시) — Task 4
 web/vite.config.ts, README.md, 스펙      /h/ 개발 프록시, 허브 안내, 스펙 반영 — Task 8
-web/src/…                                여러 호스트 화면 — Task 10(Task 9의 선택 뒤)
+web/src/lib/{api,router}.ts              호스트 앞머리, apiFor, #/h/<ID>/… 경로 — Task 10a
+web/src/lib/{store,hello,events,hosts,scope,boot}.ts, web/src/main.tsx   호스트마다 상태와 스트림, totalNeeds — Task 10b
+web/src/views/*, web/src/components/ConnBanner.tsx, web/test/scopes.tsx   고른 호스트의 화면 — Task 10c
+web/src/views/HostSwitch.tsx, web/src/components/Menu.tsx, web/src/lib/health.ts   호스트 전환 — Task 10d
+web/src/views/{SettingsHosts,Settings}.tsx   호스트 잇기와 관리 — Task 10e
+web/src/views/HostProblem.tsx            끊긴·닿지 않는 호스트 — Task 10f
+README.md, 스펙                           여러 호스트 화면 안내 — Task 10g
 ```
 
 ## 실행 방식
 
-사용자 지시로 승인 대기 없이 바로 실행한다(2026-11-10). 이 세션에서 직접 구현한다(Native, `superpowers:executing-plans`). 각 태스크는 실패하는 테스트 → 구현 → 통과 → 커밋 순서다. 태스크가 끝날 때마다 푸시한다. Task 9(UI 후보)에서 사용자의 선택을 기다리고, Task 10은 그 선택을 받은 뒤 이 계획에 자세히 적는다.
+사용자 지시로 승인 대기 없이 바로 실행한다(2026-11-10). 이 세션에서 직접 구현한다(Native, `superpowers:executing-plans`). 각 태스크는 실패하는 테스트 → 구현 → 통과 → 커밋 순서다. 태스크가 끝날 때마다 푸시한다. Task 9(UI 후보)에서 사용자의 선택을 기다리고, Task 10은 그 선택을 받은 뒤 이 계획에 자세히 적는다. Task 9에서 사용자가 후보 A(호스트 전환)를 골랐다(2026-11-10). Task 10a~10g가 그 화면이다.
 
 Go 테스트는 저장소 루트에서 `go test ./...`, 웹은 `web/`에서 `npm test`와 `npm run build`(`tsc --noEmit && vite build`)다.
 
@@ -4923,7 +4934,7 @@ git push
 
 ### Task 10: 여러 호스트 화면 구현 (단계 11, Task 9의 선택 뒤)
 
-**Files:** Task 9의 선택에 따라 정한다. 선택과 상관없이 바뀌는 것: `web/src/lib/{api,store,events,router,boot,hosts}.ts`, `web/src/views/SettingsEdit.tsx`, 그 테스트, `README.md`의 "화면" 절, 스펙 §12.
+**Files:** 후보 A(호스트 전환)로 정했고, 화면 단위로 Task 10a~10g에 나눠 적었다. 선택과 상관없이 바뀌는 것: `web/src/lib/{api,store,events,router,boot,hosts}.ts`, `web/src/views/SettingsEdit.tsx`, 그 테스트, `README.md`의 "화면" 절, 스펙 §12.
 
 **Interfaces:**
 - Consumes: Task 4의 `/api/hosts`·호스트 뷰, Task 5의 `/h/<ID>/api/…`·`/h/<ID>/ws/…`와 오류, Task 6의 알림 `url` `/#/h/<ID>/t/<주소>`, Task 8의 개발 프록시 `/h/`
@@ -4956,6 +4967,1530 @@ git push
 
 ---
 
+### Task 10a: 이은 호스트로 가는 API와 주소 (단계 11, 후보 A)
+
+**Files:**
+- Modify: `web/src/lib/api.ts`, `web/src/lib/router.ts`
+- Test: `web/src/lib/api.test.ts`, `web/src/lib/router.test.ts`
+
+**Interfaces:**
+- Consumes: Task 5의 `/h/<ID>/api/…`와 그 오류(409 `host_unlinked`, 502 `host_unreachable`), Task 6의 알림 `url` `/#/h/<ID>/t/<주소>`
+- Produces:
+  - `hostPrefix(id: string): string`: 허브는 `''`, 이은 호스트는 `'/h/' + encodeURIComponent(id)`
+  - `type HostError = 'host_unlinked' | 'host_unreachable'`
+  - `apiFor(prefix: string, onHostError?: (kind: HostError) => void)`: 허브가 중계하는 요청만 둔다(`hello`, `overview`, `folders`, `fs`, `git`, `terminals`, `presets`, `push.{settings, putSettings}`). 경로마다 앞에 `prefix`를 붙인다. `ApiError.kind`가 `HostError`면 훅을 부르고 같은 오류를 다시 던진다.
+  - `type HostApi = ReturnType<typeof apiFor>`
+  - `api`: 이름과 모양은 지금 그대로다. `apiFor('')`에 허브만의 `pair`, `logout`, `devices`, `revokeDevice`, `pairCode`, `hosts`, `push.{key, list, subscribe, unsubscribe, test}`를 더한다.
+  - `hubUnpaired(): void`: `onUnauthorized`로 건 훅을 부른다(Task 10b의 4401).
+  - `router.ts`:
+    - `type Page`는 지금의 `Route` 합집합이다. 이름만 바꾼다(xterm의 `Screen`과 겹치지 않게).
+    - `type Route = Page & { host?: string }`
+    - `pagePath(r: Page): string`는 지금 `href`의 `#` 뒤다.
+    - `parsePage(s: string[], p: URLSearchParams): Page | null`: 모르는 경로는 `null`이다.
+    - `href`, `parseHash`, `navigate`, `route`는 이름 그대로 `Route`를 받는다.
+
+- [ ] **Step 1: 실패하는 테스트**
+
+`web/src/lib/api.test.ts`: import를 `import { api, ApiError, apiFor, hostPrefix, hubUnpaired, onUnauthorized, request, termPath, wsURL, type HostApi } from './api'`로 바꾸고 끝에 더한다.
+
+```ts
+describe('another host', () => {
+  let desk: HostApi
+  beforeEach(() => {
+    desk = apiFor(hostPrefix('h_desk0001'))
+  })
+
+  it('goes through the hub under /h/<ID>', async () => {
+    await desk.terminals.send('machine/t7', 'hello')
+    await desk.git.log('/r', { head: true })
+    await desk.overview()
+    expect(calls.map((c) => c.url)).toEqual([
+      '/h/h_desk0001/api/terminals/machine%2Ft7/send',
+      '/h/h_desk0001/api/git/log?path=%2Fr&head=1',
+      '/h/h_desk0001/api/overview',
+    ])
+  })
+
+  it('keeps the hub at its own paths', async () => {
+    await api.overview()
+    await api.push.key()
+    await api.hosts.get()
+    expect(calls.map((c) => c.url)).toEqual(['/api/overview', '/api/push/key', '/api/hosts'])
+    expect(hostPrefix('')).toBe('')
+    expect(hostPrefix('h 1')).toBe('/h/h%201')
+  })
+
+  it('has only what the hub relays', () => {
+    expect(Object.keys(desk).sort()).toEqual(['folders', 'fs', 'git', 'hello', 'overview', 'presets', 'push', 'terminals'])
+    expect(Object.keys(desk.push).sort()).toEqual(['putSettings', 'settings'])
+  })
+
+  it('tells when the hub says the host is unlinked or out of reach', async () => {
+    const seen: string[] = []
+    const d = apiFor(hostPrefix('h_desk0001'), (k) => seen.push(k))
+    for (const [status, kind] of [[409, 'host_unlinked'], [502, 'host_unreachable'], [404, 'not_found']] as const) {
+      reply = () => json(status, { error: { kind, message: '안 됩니다' } })
+      await expect(d.overview()).rejects.toMatchObject({ status, kind })
+    }
+    expect(seen).toEqual(['host_unlinked', 'host_unreachable'])
+  })
+
+  it('takes a 401 under /h/ as the hub forgetting this device', async () => {
+    const hook = vi.fn()
+    onUnauthorized(hook)
+    reply = () => json(401, { error: { kind: 'unauthorized', message: '페어링이 필요합니다' } })
+    await expect(desk.overview()).rejects.toBeInstanceOf(ApiError)
+    expect(hook).toHaveBeenCalledTimes(1)
+    hubUnpaired()
+    expect(hook).toHaveBeenCalledTimes(2)
+  })
+})
+```
+
+`web/src/lib/router.test.ts`: import에 `type Route`가 없으면 더하고 끝에 더한다.
+
+```ts
+describe('another host', () => {
+  it('reads a route under #/h/<ID>', () => {
+    expect(parseHash('#/h/h_1/t/machine%2Ft7')).toEqual({ name: 'terminal', addr: 'machine/t7', git: false, host: 'h_1' })
+    expect(parseHash('#/h/h_1')).toEqual({ name: 'queue', host: 'h_1' })
+    expect(parseHash('#/h/h_1/settings')).toEqual({ name: 'settings', host: 'h_1' })
+  })
+
+  it('writes a host route back to the same hash', () => {
+    const routes: Route[] = [
+      { name: 'queue', host: 'h_1' },
+      { name: 'terminal', addr: 'machine/t7', git: true, host: 'h_1' },
+      { name: 'terminal', addr: 't1', git: false, host: 'h 1' },
+      { name: 'graph', folder: 'f1', path: '/r', head: true, c: 'abc', host: 'h_1' },
+      { name: 'new', folder: 'f1', host: 'h_1' },
+    ]
+    for (const r of routes) expect(parseHash(href(r))).toEqual(r)
+    expect(href({ name: 'queue', host: 'h_1' })).toBe('#/h/h_1')
+    expect(href({ name: 'terminal', addr: 't1', git: false, host: 'h 1' })).toBe('#/h/h%201/t/t1')
+    expect(href({ name: 'folders', host: '' })).toBe('#/folders')
+  })
+
+  it("takes a host route it does not know for the hub's queue", () => {
+    for (const h of ['#/h', '#/h/', '#/h/h_1/모르는것', '#/h/h_1/h/h_2', '#/h//t/t1']) expect(parseHash(h)).toEqual({ name: 'queue' })
+  })
+
+  it('opens the terminal of a relayed notification', () => {
+    const hash = new URL('https://macmini.example.ts.net/#/h/h_desk0001/t/machine%2Ft7').hash
+    expect(parseHash(hash)).toEqual({ name: 'terminal', addr: 'machine/t7', git: false, host: 'h_desk0001' })
+  })
+})
+```
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd web && npx vitest run src/lib/api.test.ts src/lib/router.test.ts`
+Expected: api의 새 테스트 다섯은 beforeEach에서 "hostPrefix is not a function"으로 실패한다. router의 1·2·4번은 `host`가 없는 결과로 실패한다. 3번("takes a host route it does not know …")은 지금도 통과한다. 지금의 동작을 지키는 테스트다.
+
+- [ ] **Step 3: 구현**
+
+`api.ts`:
+- 지금 `api` 중 허브가 중계하는 부분을 `apiFor` 안으로 옮긴다. 그 안의 요청 도우미가 `request(method, prefix + path, body)`를 부르고, 위 규칙대로 `onHostError`를 부른다. 파일 올리기(`terminals.upload`)도 같은 앞머리를 쓴다.
+- `api.push`는 `apiFor('').push`와 허브만의 것을 합친다.
+- `request`의 401 처리는 그대로다. 중계 요청에 오는 401은 허브 자신의 것뿐이다(그 호스트의 401은 허브가 409로 바꾼다).
+
+`router.ts`:
+- `href(r)`: `p = pagePath(r)`. `r.host`가 있으면 `'#/h/' + encodeURIComponent(r.host) + (p === '/' ? '' : p)`, 없으면 `'#' + p`다.
+- `parseHash`는 깨진 escape와 빈 조각 검사를 지금처럼 먼저 한다. `s[0] === 'h' && s.length >= 2`면 `parsePage(s.slice(2), p)`에 `host: s[1]`을 붙인다. 그 결과나 허브의 `parsePage(s, p)`가 `null`이면 허브의 지금 볼 것이다. 허브의 경로에는 `host` 키를 두지 않는다.
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `cd web && npm run build && npm test`
+Expected: 타입 오류 없이 빌드되고 테스트가 모두 통과한다.
+
+- [ ] **Step 5: 커밋**
+
+스테이징한 diff를 비밀 패턴으로 훑는다(Global Constraints). `<tailnet>`과 `example.ts.net`이 아닌 `.ts.net`이 없어야 하고, `secret`·`token`이 걸린 줄은 하나씩 본다.
+
+```bash
+git add web/src/lib/api.ts web/src/lib/api.test.ts web/src/lib/router.ts web/src/lib/router.test.ts
+git diff --cached | grep -n -E '\.ts\.net|claude\.ai/artifact|BEGIN (RSA|OPENSSH|EC) PRIVATE|api[_-]?key|secret|password|token=' | grep -v -E 'example\.ts\.net|<tailnet>\.ts\.net'
+git commit -m "feat(web): 이은 호스트로 가는 API와 주소
+
+이은 호스트의 요청은 허브의 /h/<ID> 아래로, 화면의 경로는 #/h/<ID>/… 아래로 간다(결정 170). 허브가 409·502로 알리는 그 호스트의 끊김과 닿지 않음은 훅으로 알린다.
+
+- api: hostPrefix, apiFor(허브가 중계하는 요청만), hubUnpaired
+- router: Route.host, #/h/<ID>/… 읽기와 쓰기
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git push
+```
+
+---
+
+### Task 10b: 호스트마다 상태와 이벤트 스트림 (단계 11, 후보 A)
+
+**Files:**
+- Create: `web/src/lib/hello.ts`, `web/src/lib/scope.ts`, `web/src/lib/scope.test.ts`
+- Modify: `web/src/lib/store.ts`, `web/src/lib/events.ts`, `web/src/lib/hosts.ts`, `web/src/lib/boot.ts`, `web/src/main.tsx`, `web/src/views/SettingsEdit.tsx`(`isHere`를 hosts.ts에서 가져온다)
+- Test: `web/src/lib/store.test.ts`, `web/src/lib/events.test.ts`, `web/src/lib/hosts.test.ts`, `web/src/lib/boot.test.ts`
+
+**Interfaces:**
+- Consumes: 10a의 `apiFor`, `hostPrefix`, `hubUnpaired`, `HostApi`, `Page`, `href`, `navigate`. Task 5의 소켓 종료 코드 4401·4404·4502.
+- Produces:
+  - `store.ts`:
+    - `interface HostStore { terminals; folders; core; conn; ready; host; presets; apply(msg: EventMessage): void; applyOverview(o: Overview): void; reset(): void }`. 신호의 타입은 지금 그대로다.
+    - `makeStore(): HostStore`: 그 `applyOverview`는 `o.hosts`를 버린다.
+    - `hubStore: HostStore`: 그 `applyOverview`는 `hosts`와 `hostsReady = true`를 쓰고, `reset`은 둘도 비운다.
+    - 새 신호 `hostsReady`
+    - 지금의 이름(`terminals`, `folders`, `core`, `conn`, `ready`, `host`, `presets`, `apply`, `applyOverview`, `resetStore`)은 `hubStore`의 것을 그대로 내보낸다.
+  - `hello.ts`: boot.ts의 `hello`와 `hostLabel`을 옮긴다. boot.ts가 둘을 다시 내보낸다(scope.ts와 boot.ts가 서로 부르지 않게).
+  - `hosts.ts`: `isHere(url: string, origin = location.origin): boolean`(SettingsEdit.tsx에서 옮긴다). `otherHosts`는 10d에서 지운다.
+  - `events.ts`: `EventStreamOptions.onDrop?: (code: number) => void`. 다시 붙을 끊김마다(4401은 빼고) 종료 코드를 알린다. 그 안에서 스트림을 멈추면 다시 붙지 않는다.
+  - `scope.ts`:
+    - `type Problem = 'unlinked' | 'unreachable' | null`
+    - `interface HostScope extends HostStore`에 더하는 것:
+      - `id: string`(허브는 `''`), `api: HostApi`, `ws(path: string): string`
+      - `name: ReadonlySignal<string>`, `unreachable: Signal<boolean>`, `problem: ReadonlySignal<Problem>`
+      - `counts: ReadonlySignal<Record<GroupKey, number>>`, `needs: ReadonlySignal<number>`(승인 대기+오류+입력 대기). 둘 다 `problem`이 있으면 0이다.
+      - `href(r: Page): string`, `go(r: Page, o?: { replace?: boolean }): void`
+      - `unauthorized(): Promise<boolean>`, `retry(): void`
+    - `hub: HostScope`, `makeScope(id: string): HostScope`
+    - `scopes: Signal<Map<string, HostScope>>`, `scopeOf(id: string): HostScope | undefined`
+    - `others: ReadonlySignal<Host[]>`: 허브의 `hosts` 중 `isHere`가 아닌 것
+    - `reloadHosts(): Promise<void>`, `totalNeeds: ReadonlySignal<number>`
+    - `HostContext`(`createContext(hub)`), `useHost(): HostScope`
+    - `startHosts(o?: { socket?: SocketCtor; backoff?: () => Backoff }): () => void`
+
+- [ ] **Step 1: 실패하는 테스트**
+
+`web/src/lib/scope.test.ts`(새 파일):
+
+```ts
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { FakeWebSocket } from '../../test/fakeWs'
+import { linkedHost, status, term } from '../../test/fixtures'
+import { onUnauthorized } from './api'
+import { Backoff } from './backoff'
+import type { SocketCtor } from './events'
+import { scopeOf, scopes, startHosts, totalNeeds } from './scope'
+import { hosts, hostsReady, hubStore } from './store'
+import type { Host, TerminalView } from './types'
+
+type Reply = () => Response
+let routes: Record<string, Reply>
+let stop: () => void
+const HELLO = { app: 'mori', version: '0.1.0', host: 'macmini', paired: true }
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+const DESK = { host: { name: 'desk', version: '0.11.0' }, core: { connected: true }, folders: [], terminals: [], presets: [], hosts: [] }
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] })
+  FakeWebSocket.reset()
+  routes = { 'GET /api/hello': () => json(200, HELLO) }
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+    const r = routes[`${init.method} ${url}`]
+    return r ? r() : json(404, { error: { kind: 'not_found', message: '없습니다' } })
+  }))
+  stop = startHosts({ socket: FakeWebSocket as unknown as SocketCtor, backoff: () => new Backoff(500, 10_000, 0.2, () => 0.5) })
+})
+
+afterEach(() => {
+  stop()
+  hosts.value = []
+  hostsReady.value = false
+  hubStore.reset()
+  onUnauthorized(null)
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
+
+function linked(over: Partial<Host> = {}) {
+  hosts.value = [linkedHost(over)]
+  return scopeOf('h_desk0001')!
+}
+const ws = () => FakeWebSocket.last()
+const snap = (...ts: TerminalView[]) => ws().json({ type: 'snapshot', core: { connected: true }, folders: [], terminals: ts })
+
+describe('startHosts', () => {
+  it("keeps each host's state apart", () => {
+    const s = linked()
+    expect(ws().url).toBe(`ws://${location.host}/h/h_desk0001/ws/events`)
+    ws().open()
+    snap(term({ address: 'd1' }))
+    expect([...s.terminals.value.keys()]).toEqual(['d1'])
+    expect(hubStore.terminals.value.size).toBe(0)
+    expect(s.conn.value).toBe('open')
+  })
+
+  it("does not take the hosts of a host's overview", async () => {
+    routes['GET /h/h_desk0001/api/overview'] = () =>
+      json(200, { ...DESK, hosts: [linkedHost({ id: 'h_lab00001', name: 'lab', url: 'https://lab.example.ts.net' })] })
+    const s = linked()
+    ws().open()
+    snap()
+    await vi.waitFor(() => expect(s.host.value?.name).toBe('desk'))
+    expect(hosts.value.map((h) => h.id)).toEqual(['h_desk0001'])
+  })
+
+  it('closes the socket of a host taken off the list', () => {
+    linked()
+    const w = ws()
+    hosts.value = []
+    expect(w.closedWith).not.toBeNull()
+    expect(scopeOf('h_desk0001')).toBeUndefined()
+  })
+
+  it('opens no stream for an unlinked host and says so', () => {
+    const s = linked({ linked: false, version: '', relay: false })
+    expect(FakeWebSocket.all).toHaveLength(0)
+    expect(s.problem.value).toBe('unlinked')
+  })
+
+  it('goes to pairing on a 4401 when the hub forgot this device', async () => {
+    routes['GET /api/hello'] = () => json(200, { ...HELLO, paired: false })
+    const toPairing = vi.fn()
+    onUnauthorized(toPairing)
+    linked()
+    ws().drop(4401)
+    await vi.waitFor(() => expect(toPairing).toHaveBeenCalledTimes(1))
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(FakeWebSocket.all).toHaveLength(1)
+  })
+
+  it('marks only that host unlinked on a 4401 the hub still pairs', async () => {
+    const toPairing = vi.fn()
+    onUnauthorized(toPairing)
+    const s = linked()
+    ws().open()
+    snap(term({ address: 'd1' }))
+    routes['GET /h/h_desk0001/api/overview'] = () => json(409, { error: { kind: 'host_unlinked', message: 'desk 연결이 끊겼습니다' } })
+    routes['GET /api/hosts'] = () => json(200, [linkedHost({ linked: false, version: '', relay: false })])
+    ws().drop(4401)
+    await vi.waitFor(() => expect(s.problem.value).toBe('unlinked'))
+    expect(s.terminals.value.size).toBe(0)
+    expect(toPairing).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(FakeWebSocket.all).toHaveLength(1)
+  })
+
+  it("tries again after a 4401 while the hub's hello fails", async () => {
+    routes['GET /api/hello'] = () => {
+      throw new TypeError('offline')
+    }
+    linked()
+    ws().drop(4401)
+    await vi.advanceTimersByTimeAsync(499)
+    expect(FakeWebSocket.all).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(FakeWebSocket.all).toHaveLength(2)
+  })
+
+  it('reads the list again on a 4404', async () => {
+    let reads = 0
+    routes['GET /api/hosts'] = () => (reads++, json(200, []))
+    linked()
+    ws().drop(4404)
+    await vi.waitFor(() => expect(reads).toBe(1))
+    await vi.waitFor(() => expect(scopeOf('h_desk0001')).toBeUndefined())
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(FakeWebSocket.all).toHaveLength(1)
+  })
+
+  it('shows a host out of reach on a 4502 until the next snapshot', async () => {
+    const s = linked()
+    ws().open()
+    snap(term({ address: 'd1' }))
+    ws().drop(4502)
+    expect(s.problem.value).toBe('unreachable')
+    expect([...s.terminals.value.keys()]).toEqual(['d1'])
+    await vi.advanceTimersByTimeAsync(500)
+    expect(FakeWebSocket.all).toHaveLength(2)
+    ws().open()
+    snap(term({ address: 'd1' }))
+    expect(s.problem.value).toBeNull()
+  })
+
+  it('counts a REST 502 as out of reach until a retry gets through', async () => {
+    const s = linked()
+    ws().open()
+    snap(term({ address: 'd1', status: status('blocked', { kind: 'permission' }) }))
+    expect(s.needs.value).toBe(1)
+    ws().drop(1006)
+    routes['GET /h/h_desk0001/api/terminals'] = () => json(502, { error: { kind: 'host_unreachable', message: 'desk에 닿지 못했습니다' } })
+    await s.api.terminals.list().catch(() => {})
+    expect(s.problem.value).toBe('unreachable')
+    expect(s.needs.value).toBe(0)
+    routes['GET /h/h_desk0001/api/overview'] = () => json(200, DESK)
+    s.retry()
+    expect(FakeWebSocket.all).toHaveLength(2)
+    await vi.waitFor(() => expect(s.problem.value).toBeNull())
+  })
+
+  it("adds up every host's needs, and one out of reach counts none", () => {
+    hubStore.apply({ type: 'snapshot', core: { connected: true }, folders: [], terminals: [term({ status: status('blocked', { kind: 'permission' }) })] })
+    const s = linked()
+    ws().open()
+    snap(term({ address: 'd1', status: status('idle') }), term({ address: 'd2', status: status('error', { msg: '중단됨' }) }))
+    expect(totalNeeds.value).toBe(3)
+    expect(s.counts.value).toMatchObject({ blocked: 0, error: 1, waiting: 1 })
+    ws().drop(4502)
+    expect(totalNeeds.value).toBe(1)
+  })
+
+  it('closes every stream when it stops', async () => {
+    linked()
+    const w = ws()
+    stop()
+    expect(w.closedWith).not.toBeNull()
+    expect(scopes.value.size).toBe(0)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(FakeWebSocket.all).toHaveLength(1)
+  })
+})
+```
+
+`web/src/lib/events.test.ts`: `import { …, type Mock } from 'vitest'`는 그대로다. `let dropped: Mock<(code: number) => void>`를 두고, beforeEach에서 스트림을 만들기 전에 `dropped = vi.fn<(code: number) => void>()`를 넣는다. 스트림 옵션에 `onDrop: dropped`를 더하고 `describe('EventStream', …)` 끝에 더한다.
+
+```ts
+  it('tells the close code of every drop it retries', async () => {
+    FakeWebSocket.last().drop(4502)
+    await vi.advanceTimersByTimeAsync(500)
+    FakeWebSocket.last().drop(4404)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(FakeWebSocket.all).toHaveLength(3)
+    FakeWebSocket.last().drop(4401)
+    expect(dropped.mock.calls).toEqual([[4502], [4404]])
+  })
+
+  it("stays stopped when the drop's handler stops it", async () => {
+    dropped.mockImplementation(() => stream.stop())
+    FakeWebSocket.last().drop(1006)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(FakeWebSocket.all).toHaveLength(1)
+  })
+```
+
+`web/src/lib/store.test.ts`: store import에 `hosts, hostsReady, makeStore`를, fixtures import에 `linkedHost`를 더하고 끝에 더한다.
+
+```ts
+it('takes the host list from the hub only', () => {
+  const o = { host: { name: 'desk', version: '0.11.0' }, core: { connected: true }, folders: [], terminals: [], presets: [], hosts: [linkedHost()] }
+  makeStore().applyOverview(o)
+  expect(hosts.value).toEqual([])
+  expect(hostsReady.value).toBe(false)
+  applyOverview(o)
+  expect(hosts.value.map((h) => h.id)).toEqual(['h_desk0001'])
+  expect(hostsReady.value).toBe(true)
+  resetStore()
+  expect(hosts.value).toEqual([])
+  expect(hostsReady.value).toBe(false)
+})
+```
+
+`web/src/lib/hosts.test.ts`: import를 `import { isHere, otherHosts } from './hosts'`로 바꾸고 끝에 더한다.
+
+```ts
+describe('isHere', () => {
+  it('tells a link to this page from one to another host', () => {
+    const here = 'https://macmini.example.ts.net'
+    expect(isHere('https://macmini.example.ts.net/pair', here)).toBe(true)
+    expect(isHere('https://desk.example.ts.net', here)).toBe(false)
+    expect(isHere('not a url', here)).toBe(false)
+  })
+})
+```
+
+`web/src/lib/boot.test.ts`: fixtures import에 `linkedHost`를 더하고 더한다.
+
+```ts
+it('opens a stream for each linked host', async () => {
+  routes['GET /api/overview'] = () => json(200, { ...OVERVIEW, hosts: [linkedHost()] })
+  await boot()
+  FakeWebSocket.last().open()
+  FakeWebSocket.last().json(snapshot())
+  await vi.waitFor(() =>
+    expect(FakeWebSocket.all.map((w) => new URL(w.url).pathname)).toEqual(['/ws/events', '/h/h_desk0001/ws/events']),
+  )
+})
+```
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd web && npx vitest run src/lib/scope.test.ts src/lib/events.test.ts src/lib/store.test.ts src/lib/hosts.test.ts src/lib/boot.test.ts`
+Expected:
+- scope.test는 `./scope`를 불러오지 못한다.
+- store.test는 "makeStore is not a function"으로 실패한다.
+- events.test는 새 테스트 둘이 실패한다.
+- hosts.test는 "isHere is not a function"으로 실패한다.
+- boot.test는 소켓이 하나뿐이어서 실패한다.
+
+- [ ] **Step 3: 구현**
+
+1. **store.ts:** `makeStore()`는 지금의 모듈 신호와 `apply`·`applyOverview`·`resetStore`를 닫힘 안으로 옮긴 것이다. `hubStore`는 그것에 `hosts`·`hostsReady`를 더한 것이다.
+2. **events.ts:** `dropped(code)`에서 4401 분기 뒤, 1001 분기 앞에 `this.o.onDrop?.(code)`를 부르고 `if (!this.running) return`이다.
+3. **scope.ts의 `hub`:** `{ ...hubStore, id: '', api, ws: wsURL, name: hostLabel, unreachable: signal(false), problem: computed(() => null), counts, needs, href, go: navigate, unauthorized: async () => { hubUnpaired(); return false }, retry: () => {} }`이다. `counts`는 `groupQueue(terminals, now)`의 묶음마다 개수이고, `needs`는 그 셋의 합이다.
+4. **`makeScope(id)`:**
+   - `name`은 `hosts`에서 찾은 그 호스트의 이름이고, 없으면 `id`다.
+   - `problem`: 그 호스트가 `linked: false`면 `'unlinked'`, `unreachable`이면 `'unreachable'`, 아니면 `null`이다.
+   - `api = apiFor(hostPrefix(id), (k) => (k === 'host_unlinked' ? void reloadHosts() : (unreachable.value = true)))`
+   - `ws = (p) => wsURL(hostPrefix(id) + p)`. `href`·`go`는 `host: id`를 붙인다.
+   - `unauthorized()`:
+     - 허브의 `api.hello()`가 `paired: false`면 `hubUnpaired()`를 부르고 `false`다.
+     - paired면 그 호스트의 overview를 읽는다. 되면 적용하고 `true`, `host_unlinked`면 `false`, 다른 오류면 `true`다.
+     - hello가 실패하면 `true`다.
+   - `retry()`: 그 호스트의 스트림을 `nudge()`하고 overview를 다시 읽는다. 되면 `unreachable = false`다.
+5. **`reloadHosts()`:** 허브의 `GET /api/hosts`로 `hosts`와 `hostsReady = true`를 쓴다. 이미 읽는 중이면 그 약속을 돌려준다.
+6. **`startHosts`:**
+   - 두 번 불러도 하나만 돈다.
+   - `others`를 보는 effect가 목록의 호스트마다 scope를 하나 둔다. `scopes.peek()`로 읽고, 구성원이 바뀔 때만 새 Map을 쓴다.
+   - 스트림(`hostPrefix(id) + '/ws/events'`)은 `linked`인 호스트에만 연다. 목록에서 빠지거나 `linked: false`가 되면 그 스트림을 멈추고 store를 비운다.
+   - 호스트 스트림의 옵션:
+     - `setConn`: `'open'`이면 `unreachable = false`로 두고, overview를 읽어 적용하고, 4401 뒤 다시 열기의 Backoff(`o.backoff?.() ?? new Backoff()`)를 되돌린다.
+     - `onDrop`: 4502면 `unreachable = true`, 4404면 `reloadHosts()`다.
+     - `onUnauthorized`: `await s.unauthorized()`가 `true`이고, 그 호스트가 아직 목록에 있고 `linked`이고, `startHosts`가 돌고 있으면 `setTimeout(() => stream.start(), restart.next())`다.
+   - `onWake`로 모든 스트림을 `nudge()`한다.
+   - 돌려주는 함수는 두 번 불러도 된다. 스트림을 모두 멈추고, scope를 비우고, `scopes`를 빈 Map으로 둔다.
+7. **`totalNeeds`:** `hub.needs`와 `scopes`의 `needs`를 모두 더한다.
+8. **boot.ts·main.tsx:** boot.ts의 `start()`가 `startHosts()`를 부르고 그 멈춤을 `stops`에 넣는다. `main.tsx`는 앱 배지(`showNeeds`)에 `totalNeeds`를 쓴다.
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `cd web && npm run build && npm test`
+Expected: 타입 오류 없이 빌드되고 테스트가 모두 통과한다.
+
+- [ ] **Step 5: 커밋**
+
+스테이징한 diff를 비밀 패턴으로 훑는다(Global Constraints). `<tailnet>`과 `example.ts.net`이 아닌 `.ts.net`이 없어야 하고, `secret`·`token`이 걸린 줄은 하나씩 본다.
+
+```bash
+git add web/src/lib web/src/main.tsx web/src/views/SettingsEdit.tsx
+git diff --cached | grep -n -E '\.ts\.net|claude\.ai/artifact|BEGIN (RSA|OPENSSH|EC) PRIVATE|api[_-]?key|secret|password|token=' | grep -v -E 'example\.ts\.net|<tailnet>\.ts\.net'
+git commit -m "feat(web): 호스트마다 상태와 이벤트 스트림
+
+이은 호스트마다 상태 한 벌과 /h/<ID>/ws/events 스트림을 둔다(결정 170). 호스트 목록은 허브의 것만 쓴다. 중계 소켓이 4401로 닫히면 허브의 hello로 이 기기의 페어링이 풀렸는지 그 호스트만 끊겼는지 가른다(결정 164).
+
+- store: makeStore, hubStore, hostsReady
+- scope: HostScope, startHosts, totalNeeds
+- events: onDrop
+- 앱 배지는 모든 호스트의 대기 수
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git push
+```
+
+---
+
+### Task 10c: 고른 호스트의 화면 (단계 11, 후보 A)
+
+**Files:**
+- Create: `web/test/scopes.tsx`
+- Modify:
+  - `web/src/views/{Shell,Queue,Folders,FolderPicker,GitWorktrees,NewSession,Git,Commit,Graph,rows,Terminal,Settings,SettingsEdit}.tsx`
+  - `web/src/views/{useGit,useLog}.ts`
+  - `web/src/components/ConnBanner.tsx`, `web/src/lib/termlink.ts`
+  - `web/src/lib/badge.ts`: `needs`를 지운다.
+- Test: `web/src/views/{Queue,NewSession,Terminal,Git,Graph,Commit,Shell}.test.tsx`
+
+**Interfaces:**
+- Consumes: 10b의 `HostScope`, `hub`, `makeScope`, `scopes`, `scopeOf`, `HostContext`, `useHost`, `hostsReady`. 10a의 `Route.host`, `parseHash`, `navigate`.
+- Produces:
+  - `web/test/scopes.tsx`:
+    - `withHosts(...over: Partial<Host>[]): HostScope[]`: `hosts = over.map(linkedHost)`, `hostsReady = true`로 두고, 호스트마다 `makeScope`로 `scopes`를 채운다. `onTestFinished`로 scope를 비우고 `scopes`·`hosts`·`hostsReady`를 되돌린다.
+    - `withHost(over: Partial<Host> = {}): HostScope`: `withHosts(over)[0]`
+    - `inHost(s: HostScope, node: ComponentChildren)`: `HostContext.Provider`로 감싼다.
+  - `rows.tsx`: `titleOf(t: TerminalView, presets: Preset[]): string`, `termHref(h: HostScope, t: TerminalView, p: ListProps): string`
+  - `useLog.ts`:
+    - `graphFrom: Signal<{ host: string; folder: string; href: string } | null>`
+    - `shownLog: Signal<{ host: string; path: string; byHash: Map<string, LogCommit> } | null>`
+    - 커밋 캐시의 열쇠는 `host + '\n' + path + '\n' + rev`다.
+  - `termlink.ts`: `TermLinkOptions`에 `api?: HostApi`와 `store?: Pick<HostStore, 'core' | 'terminals'>`를 더한다. 없으면 허브의 것이다.
+
+- [ ] **Step 1: 실패하는 테스트**
+
+`web/test/scopes.tsx`를 위 Interfaces대로 만든다. 아래 테스트는 각 파일의 import에 `withHost`(`withHosts`)·`inHost`를 더한다.
+
+`web/src/views/Queue.test.tsx`:
+
+```tsx
+describe('QueueList on another host', () => {
+  it("links that host's sessions", () => {
+    const s = withHost()
+    s.terminals.value = new Map([['t1', term({ status: status('blocked', { kind: 'permission' }) })]])
+    s.ready.value = true
+    render(inHost(s, <QueueList variant="pc" />))
+    const blocked = screen.getByRole('region', { name: '승인 대기 1' })
+    expect(within(blocked).getByRole('link').getAttribute('href')).toBe('#/h/h_desk0001/t/t1')
+  })
+
+  it('points at a new session on that host', () => {
+    const s = withHost()
+    s.ready.value = true
+    render(inHost(s, <QueueList variant="phone" />))
+    expect(screen.getByRole('link', { name: '새 세션' }).getAttribute('href')).toBe('#/h/h_desk0001/new')
+  })
+})
+```
+
+`web/src/views/NewSession.test.tsx`:
+
+```tsx
+it('starts the session on the host it was opened on', async () => {
+  const s = withHost()
+  s.folders.value = [mori()]
+  s.presets.value = PRESETS
+  s.ready.value = true
+  serve((c) => (c.url === '/h/h_desk0001/api/terminals' ? Response.json(made, { status: 201 }) : undefined))
+  render(inHost(s, <NewSession variant="pc" folder="f1" wt={WT} />))
+  submit()
+  await vi.waitFor(() => expect(location.hash).toBe('#/h/h_desk0001/t/t9'))
+  expect(route.value).toEqual({ name: 'terminal', addr: 't9', git: false, host: 'h_desk0001' })
+  expect(sent('/api/terminals')).toHaveLength(0)
+  expect(s.terminals.value.get('t9')?.display_title).toBe('새 세션')
+  expect(terminals.value.has('t9')).toBe(false)
+})
+```
+
+`web/src/views/Terminal.test.tsx`의 `describe('An ended program', …)`:
+
+```tsx
+it('attaches to the host it was opened on and reads its last text there', async () => {
+  const s = withHost()
+  s.terminals.value = new Map([['t1', ended()]])
+  s.folders.value = [folder()]
+  s.ready.value = true
+  reply = (c) => (c.url.includes('/text') ? Response.json({ text: 'done\nbye', complete: true, how: 'screen' }) : undefined)
+  render(inHost(s, <Terminal addr="t1" variant="pc" />))
+  await vi.waitFor(() => expect(FakeWebSocket.all.length).toBeGreaterThan(0))
+  const ws = FakeWebSocket.last()
+  expect(new URL(ws.url).pathname).toBe('/h/h_desk0001/ws/attach')
+  await act(() => {
+    ws.open()
+    ws.json({ type: 'closed', reason: 'exited', exit_code: 0, signal: null })
+    ws.drop(1000)
+  })
+  await vi.waitFor(() => expect(FakeScreen.last().text).toBe('done\r\nbye\x1b[?25l'))
+  expect(sent('/h/h_desk0001/api/terminals/t1/text?lines=1000', 'GET')).toHaveLength(1)
+  expect(sent('/api/terminals/t1/text?lines=1000', 'GET')).toHaveLength(0)
+})
+```
+
+`web/src/views/Git.test.tsx`의 `describe('GitPanel', …)`:
+
+```tsx
+it('reads the changes on the host it was opened on', async () => {
+  const s = withHost()
+  s.folders.value = [repo()]
+  s.ready.value = true
+  serve((c) => (url(c).pathname === '/h/h_desk0001/api/git/status' ? Response.json(status()) : undefined))
+  render(inHost(s, panel()))
+  await vi.waitFor(() => expect(calls.some((c) => url(c).pathname === '/h/h_desk0001/api/git/status')).toBe(true))
+  expect(statusCalls()).toEqual([])
+})
+```
+
+`web/src/views/Graph.test.tsx`: 돌아갈 곳을 쓰는 테스트(243~256행)의 `graphFrom` 세 곳에 `host: ''`를 더하고 더한다.
+
+```tsx
+it('keeps where it was opened apart for each host', async () => {
+  const s = withHost()
+  s.folders.value = [folder()]
+  s.ready.value = true
+  serve((c) => (url(c).pathname === '/h/h_desk0001/api/git/log' ? Response.json(LOG) : undefined))
+  graphFrom.value = { host: 'h_desk0001', folder: 'f1', href: s.href({ name: 'terminal', addr: 't1', git: true }) }
+  route.value = { name: 'graph', folder: 'f1', head: false, host: 'h_desk0001' }
+  render(inHost(s, <Routed variant="pc" />))
+  expect(screen.getByRole('link', { name: '작업 화면으로' }).getAttribute('href')).toBe('#/h/h_desk0001/t/t1/git')
+  cleanup()
+  graphFrom.value = { host: '', folder: 'f1', href: '#/t/t1/git' }
+  render(inHost(s, <Routed variant="pc" />))
+  expect(screen.getByRole('link', { name: 'Git 화면으로' }).getAttribute('href')).toBe('#/h/h_desk0001/git/f1')
+})
+```
+
+`web/src/views/Commit.test.tsx`: beforeEach의 `shownLog`(80행)에 `host: ''`를 더하고 더한다.
+
+```tsx
+it('reads the same commit of two hosts apart', async () => {
+  serve()
+  open(C)
+  await screen.findByRole('heading', { level: 3, name: 'fix/notify 병합' })
+  cleanup()
+  const s = withHost()
+  s.folders.value = [folder()]
+  s.ready.value = true
+  const hubReply = reply
+  reply = (c) => hubReply({ ...c, url: c.url.replace('/h/h_desk0001', '') })
+  shownLog.value = { host: 'h_desk0001', path: MAIN, byHash: new Map(LOG.commits.map((x) => [x.hash, x])) }
+  route.value = { ...at(C), host: 'h_desk0001' }
+  render(inHost(s, <Routed />))
+  await screen.findByRole('heading', { level: 3, name: 'fix/notify 병합' })
+  expect(reads('/api/git/commit')).toHaveLength(1)
+  expect(reads('/h/h_desk0001/api/git/commit')).toHaveLength(1)
+})
+```
+
+`web/src/views/Shell.test.tsx`: import에 `hostsReady`(store), `toasts`(toast)를 더한다. 첫 테스트의 `getByText('불러오는 중')`은 Shell이 보이는 것이다(ConnBanner도 `role="status"`라 역할로 찾지 않는다).
+
+```tsx
+it("waits for the host list before a host's link", async () => {
+  at(1440, { name: 'terminal', addr: 't1', git: false, host: 'h_desk0001' })
+  render(<Shell />)
+  expect(screen.getByText('불러오는 중')).toBeTruthy()
+  act(() => {
+    const s = withHost()
+    s.terminals.value = new Map([['t1', term()]])
+    s.ready.value = true
+  })
+  await vi.waitFor(() =>
+    expect(FakeWebSocket.all.map((w) => new URL(w.url).pathname)).toContain('/h/h_desk0001/ws/attach'),
+  )
+})
+
+it("goes to the hub's queue from a host it does not have", async () => {
+  hostsReady.value = true
+  at(1440, { name: 'terminal', addr: 't1', git: false, host: 'h_gone' })
+  render(<Shell />)
+  await vi.waitFor(() => expect(route.value).toEqual({ name: 'queue' }))
+  expect(toasts.value.map((t) => [t.text, t.kind])).toEqual([['이 허브에 없는 호스트입니다', 'error']])
+})
+```
+
+폰의 "gives a session the whole screen" 옆에 더한다.
+
+```tsx
+it("goes back to that host's queue from its session", () => {
+  const s = withHost()
+  s.terminals.value = new Map([['t1', term()]])
+  s.ready.value = true
+  at(390, { name: 'terminal', addr: 't1', git: false, host: 'h_desk0001' })
+  render(<Shell />)
+  expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/h/h_desk0001')
+})
+```
+
+Shell.test의 afterEach에 `hostsReady.value = false`와 `toasts.value = []`를 더한다.
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd web && npx vitest run src/views`
+Expected: 새 테스트가 모두 허브의 경로(`#/t/t1`, `/api/terminals`, `/ws/attach`, `/api/git/status`)나 허브의 캐시를 써서 실패한다. Graph는 "작업 화면으로"를 찾지 못한다(지금은 `#/t/`로 시작할 때만 그 글이다). Shell의 둘째 테스트는 경로가 `h_gone`에 남아 실패한다. 나머지 테스트는 통과한다.
+
+- [ ] **Step 3: 구현**
+
+1. **화면과 scope:** 데이터를 보이는 화면은 모두 `useHost()`의 scope에서 신호와 `api`, `href`, `go`를 쓴다. 허브 것만 다루는 `SettingsDevices`·`SettingsPush`·`Pair`는 그대로 둔다.
+2. **경로:** 경로를 글자로 쓰던 곳은 `h.href`·`h.go`로 바꾼다. 읽은 경로를 펼쳐 쓰는 곳은 `host`를 그대로 둔다.
+3. **Graph의 `BackLink`:** `graphFrom`은 `host`와 `folder`가 둘 다 맞을 때만 쓴다. 글은 `parseHash(to).name === 'terminal'`이면 "작업 화면으로"다. Git.tsx는 `graphFrom`에 `host: h.id`를 넣는다.
+4. **Terminal:**
+   - 닫으면 폰은 `navigate(parseHash(back), { replace: true })`, PC는 `h.go({ name: 'queue' }, { replace: true })`다.
+   - TermLink에 `api: h.api, store: h, url: h.ws('/ws/attach'), onUnauthorized: () => void h.unauthorized()`를 넘긴다.
+5. **NewSession:** 만든 터미널을 `h.terminals`에 넣고 `h.go`로 연다.
+6. **Shell이 고르는 scope:**
+   - `r.host`가 있으면 `scopeOf(r.host)`, 없으면 `hub`다. 그 scope를 `HostContext.Provider`(key는 `s.id`)로 내려 준다.
+   - 호스트 경로인데 `hostsReady`가 아니면 `Loading`을 보인다.
+   - 목록을 받은 뒤에도 없는 호스트면, effect로 허브의 `{ name: 'queue' }`로 `replace`하고 토스트 "이 허브에 없는 호스트입니다"(error)를 띄운다.
+7. **폰의 뒤로:**
+   - `PhoneTab`은 `phoneBack = h.href({ name: tab })`이다.
+   - 전체 화면 경로는 `parseHash(phoneBack.value).host ?? ''`가 `h.id`일 때만 `phoneBack`을 쓰고, 아니면 `h.href({ name: 'queue' })`다.
+   - Git의 뒤로는 `h.href({ name: 'terminal', addr: gitFrom.value, git: false })`, 그래프의 뒤로는 `h.href({ name: 'git', … })`다.
+8. **대기 수와 배너:** `Segmented`(PC)와 `TabBar`(폰)의 대기 수는 `h.needs`다. ConnBanner는 `h.conn`·`h.core`를 쓴다.
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `cd web && npm run build && npm test`
+Expected: 타입 오류 없이 빌드되고 테스트가 모두 통과한다.
+
+- [ ] **Step 5: 커밋**
+
+스테이징한 diff를 비밀 패턴으로 훑는다(Global Constraints). `<tailnet>`과 `example.ts.net`이 아닌 `.ts.net`이 없어야 하고, `secret`·`token`이 걸린 줄은 하나씩 본다.
+
+```bash
+git add web/src web/test
+git diff --cached | grep -n -E '\.ts\.net|claude\.ai/artifact|BEGIN (RSA|OPENSSH|EC) PRIVATE|api[_-]?key|secret|password|token=' | grep -v -E 'example\.ts\.net|<tailnet>\.ts\.net'
+git commit -m "feat(web): 고른 호스트의 화면
+
+#/h/<ID>/… 경로는 그 호스트의 상태와 요청으로 화면을 그린다(결정 170). 지금 볼 것, 폴더, 새 세션, 터미널, Git, 그래프, 커밋, 설정의 폴더와 프리셋이 같은 화면 그대로 고른 호스트의 것을 보인다.
+
+- Shell: 경로의 호스트로 scope를 골라 내려 준다. 목록 전에는 불러오는 중, 없는 호스트는 허브의 지금 볼 것
+- 돌아갈 곳과 커밋 캐시는 호스트마다 따로
+- 터미널은 그 호스트의 /ws/attach와 API
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git push
+```
+
+---
+
+### Task 10d: 호스트 전환 (단계 11, 후보 A)
+
+**Files:**
+- Create: `web/src/views/HostSwitch.tsx`, `web/src/views/HostSwitch.test.tsx`, `web/src/views/hostswitch.css`
+- Modify:
+  - `web/src/components/Menu.tsx`, `web/src/lib/health.ts`
+  - `web/src/views/Shell.tsx`(PC의 `nav.hostnav`와 폰의 `HostMenu`를 바꾼다), `web/src/views/shell.css`(`hostnav`·`host-pop` 규칙을 지운다)
+  - `web/src/lib/hosts.ts`(`otherHosts`를 지운다), `web/src/views/Terminal.tsx`(호스트 칩)
+- Test: `web/src/components/Menu.test.tsx`, `web/src/lib/health.test.ts`, `web/src/lib/hosts.test.ts`, `web/src/views/Shell.test.tsx`, `web/src/views/Terminal.test.tsx`
+
+**Interfaces:**
+- Consumes: 10b의 `hub`, `others`, `scopeOf`, `useHost`, `HostScope.{name, conn, core, problem, counts, href, go}`. `queue.ts`의 묶음 제목.
+- Produces:
+  - `Menu`:
+    - `trigger?: ComponentChildren`: 아이콘 대신 버튼에 보인다.
+    - `radio?: boolean`: `checked`가 있는 항목이 `menuitemradio`가 된다.
+    - `MenuItem.key?: string`
+  - `health.ts`: `scopeState(c: Conn, core: CoreStatus, problem: Problem): { dot: Dot; text: string }`. `'unlinked'`은 `{ dot: 'off', text: '끊김' }`, `'unreachable'`은 `{ dot: 'bad', text: '닿지 못함' }`, 아니면 `hostState(c, core)`다.
+  - `HostSwitch.tsx`:
+    - `countText(c: Record<GroupKey, number>): string`: 0이 아닌 것만 "승인 대기 N · 오류 N · 입력 대기 N · 작업 중 N" 순서로 잇는다.
+    - `switchTo(s: HostScope): void`: 폴더·설정 탭이면 그 탭 그대로, 아니면 지금 볼 것으로 `s.go`한다.
+    - `hostSheet: Signal<boolean>`
+    - `HostPicker`(PC 머리글), `HostButton`(폰 머리글), `HostSheet`(폰 시트), `OthersBadge`
+
+- [ ] **Step 1: 실패하는 테스트**
+
+`web/src/components/Menu.test.tsx`:
+
+```tsx
+it('shows what it is given in place of the icon', () => {
+  render(<Menu label="호스트" trigger={<span>macmini</span>} items={[{ label: 'desk', onSelect: () => {} }]} />)
+  const btn = screen.getByRole('button', { name: '호스트' })
+  expect(btn.textContent).toBe('macmini')
+  expect(btn.querySelector('svg')).toBeNull()
+})
+
+it('makes the checked items one choice of many', () => {
+  const none = () => {}
+  render(
+    <Menu
+      label="호스트"
+      radio
+      items={[
+        { label: 'macmini', checked: true, onSelect: none },
+        { label: 'desk', checked: false, onSelect: none },
+        { label: '호스트 관리', onSelect: none },
+      ]}
+    />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: '호스트' }))
+  expect(screen.getAllByRole('menuitemradio').map((e) => [e.textContent, e.getAttribute('aria-checked')])).toEqual([
+    ['macmini', 'true'],
+    ['desk', 'false'],
+  ])
+  expect(screen.getByRole('menuitem', { name: '호스트 관리' })).toBeTruthy()
+})
+```
+
+`web/src/lib/health.test.ts`:
+
+```ts
+it('puts what is wrong with the host before how its stream is', () => {
+  expect(scopeState('open', { connected: true }, 'unlinked')).toEqual({ dot: 'off', text: '끊김' })
+  expect(scopeState('open', { connected: true }, 'unreachable')).toEqual({ dot: 'bad', text: '닿지 못함' })
+  expect(scopeState('open', { connected: false }, null)).toEqual({ dot: 'warn', text: '코어 연결 중' })
+})
+```
+
+`web/src/views/HostSwitch.test.tsx`(새 파일):
+
+```tsx
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { status, term } from '../../test/fixtures'
+import { inHost, withHost, withHosts } from '../../test/scopes'
+import { hello } from '../lib/boot'
+import { now } from '../lib/clock'
+import { route } from '../lib/router'
+import { conn, core, ready, resetStore, terminals } from '../lib/store'
+import { HostButton, HostPicker, HostSheet, OthersBadge } from './HostSwitch'
+
+const LAB_UNLINKED = { id: 'h_lab00001', name: 'lab', url: 'https://lab.example.ts.net', linked: false, version: '0.10.2', relay: false }
+
+beforeEach(() => {
+  now.value = 10 * 3_600_000
+  hello.value = { app: 'mori', version: '0.1.0', host: 'macmini', paired: true }
+  conn.value = 'open'
+  core.value = { connected: true }
+  ready.value = true
+  route.value = { name: 'queue' }
+})
+
+afterEach(() => {
+  cleanup()
+  resetStore()
+  hello.value = null
+  route.value = { name: 'queue' }
+  history.replaceState(null, '', '/#/')
+})
+
+describe('HostPicker', () => {
+  it('picks another host from the header on a PC', () => {
+    terminals.value = new Map([['t1', term({ status: status('blocked', { kind: 'permission' }) })]])
+    const [desk] = withHosts({}, LAB_UNLINKED)
+    desk.terminals.value = new Map([
+      ['d1', term({ address: 'd1', status: status('error', { msg: '중단됨' }) })],
+      ['d2', term({ address: 'd2', status: status('idle') })],
+    ])
+    desk.conn.value = 'open'
+    desk.core.value = { connected: true }
+    route.value = { name: 'folders' }
+    render(<HostPicker />)
+    fireEvent.click(screen.getByRole('button', { name: '호스트 macmini · 연결됨' }))
+    expect(screen.getAllByRole('menuitemradio').map((e) => [e.textContent, e.getAttribute('aria-checked')])).toEqual([
+      ['macmini · 승인 대기 1', 'true'],
+      ['desk · 오류 1 · 입력 대기 1', 'false'],
+      ['lab · 끊김', 'false'],
+    ])
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /^desk/ }))
+    expect(location.hash).toBe('#/h/h_desk0001/folders')
+    fireEvent.click(screen.getByRole('button', { name: /^호스트 macmini/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '호스트 관리' }))
+    expect(location.hash).toBe('#/settings')
+  })
+})
+
+describe('HostSheet', () => {
+  it('opens the host sheet from the phone header and switches there', () => {
+    terminals.value = new Map([['t1', term({ status: status('working') })]])
+    const [desk] = withHosts({}, LAB_UNLINKED)
+    desk.terminals.value = new Map([['d1', term({ address: 'd1', status: status('blocked', { kind: 'permission' }) })]])
+    desk.conn.value = 'open'
+    desk.core.value = { connected: true }
+    render(
+      <>
+        <HostButton />
+        <HostSheet />
+      </>,
+    )
+    const btn = screen.getByRole('button', { name: /^호스트 macmini/ })
+    expect(btn.getAttribute('aria-haspopup')).toBe('dialog')
+    fireEvent.click(btn)
+    const sheet = screen.getByRole('dialog', { name: '호스트' }) as HTMLDialogElement
+    expect(within(sheet).getByText('이 폰은 허브 macmini에 페어링했습니다. 다른 호스트도 이 허브를 거쳐 엽니다.')).toBeTruthy()
+    const rows = within(within(sheet).getByRole('list', { name: '호스트 목록' })).getAllByRole('button')
+    expect(rows.map((r) => r.getAttribute('aria-current'))).toEqual(['true', null, null])
+    expect(rows[0].textContent).toContain('이 폰이 페어링한 곳')
+    expect(rows[0].textContent).toContain('작업 중 1')
+    expect(rows[1].textContent).toContain('연결됨 · v0.1.0')
+    expect(rows[1].textContent).toContain('승인 대기 1')
+    expect(rows[2].textContent).toContain('새 코드로 다시 연결해야 합니다')
+    expect(within(sheet).getByRole('link', { name: '설정에서 호스트 관리' }).getAttribute('href')).toBe('#/settings')
+    fireEvent.click(rows[1])
+    expect(location.hash).toBe('#/h/h_desk0001')
+    expect(sheet.open).toBe(false)
+  })
+})
+
+describe('OthersBadge', () => {
+  it('points at the other host where most waits', () => {
+    const [desk, lab] = withHosts({}, { id: 'h_lab00001', name: 'lab', url: 'https://lab.example.ts.net' })
+    desk.terminals.value = new Map([['d1', term({ address: 'd1', status: status('idle') })]])
+    lab.terminals.value = new Map([['l1', term({ address: 'l1', status: status('blocked', { kind: 'permission' }) })]])
+    render(<OthersBadge />)
+    expect(screen.getByRole('link', { name: 'lab 승인 대기 1' }).getAttribute('href')).toBe('#/h/h_lab00001')
+    act(() => {
+      lab.unreachable.value = true
+    })
+    expect(screen.getByRole('link', { name: 'desk 입력 대기 1' }).getAttribute('href')).toBe('#/h/h_desk0001')
+    act(() => {
+      desk.terminals.value = new Map()
+    })
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+
+  it('counts the hub when another host is shown', () => {
+    terminals.value = new Map([['t1', term({ status: status('blocked', { kind: 'permission' }) })]])
+    render(inHost(withHost(), <OthersBadge />))
+    expect(screen.getByRole('link', { name: 'macmini 승인 대기 1' }).getAttribute('href')).toBe('#/')
+  })
+})
+```
+
+`web/src/views/Shell.test.tsx`: PC의 "says how the host is and links the other hosts"(201~210행)를 바꾼다.
+
+```tsx
+it('names the host it shows in the header and picks another there', () => {
+  withHosts({}, { id: 'h_self0001', name: 'self', url: location.origin })
+  core.value = { connected: false }
+  at(1440, { name: 'queue' })
+  render(<Shell />)
+  fireEvent.click(screen.getByRole('button', { name: '호스트 macmini · 코어 연결 중' }))
+  expect(screen.getAllByRole('menuitemradio').map((e) => e.textContent)).toEqual(['macmini', 'desk'])
+})
+```
+
+폰의 "opens the host menu and closes it with Escape"(264~278행)를 바꾼다.
+
+```tsx
+it('opens the host sheet from the header and closes it with Escape', () => {
+  withHost()
+  at(390, { name: 'queue' })
+  render(<Shell />)
+  const btn = screen.getByRole('button', { name: /^호스트 macmini/ })
+  fireEvent.click(btn)
+  const sheet = screen.getByRole('dialog', { name: '호스트' }) as HTMLDialogElement
+  fireEvent(sheet, new Event('cancel', { cancelable: true }))
+  expect(sheet.open).toBe(false)
+  expect(document.activeElement).toBe(btn)
+})
+```
+
+폰의 설정 탭 테스트(280~291행)는 `queryByRole('button', { name: /macmini/ })`를 `queryByRole('button', { name: /^호스트/ })`로 바꾼다. 설정 탭의 머리글에는 호스트 버튼이 없다.
+
+`web/src/views/Terminal.test.tsx`:
+
+```tsx
+it('names the host of the session when there are others', () => {
+  const s = withHost()
+  s.terminals.value = new Map([['t1', term()]])
+  s.folders.value = [folder()]
+  s.ready.value = true
+  render(inHost(s, <Terminal addr="t1" variant="pc" />))
+  expect(document.querySelector('.term-sub')!.textContent).toMatch(/^desk · /)
+  cleanup()
+  render(inHost(s, <Terminal addr="t1" variant="phone" back="#/h/h_desk0001" />))
+  expect(within(document.querySelector('.term-head') as HTMLElement).getByText('desk')).toBeTruthy()
+})
+```
+
+`web/src/lib/hosts.test.ts`: `describe('otherHosts', …)`를 지우고 import를 `import { isHere } from './hosts'`로 바꾼다.
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd web && npx vitest run src/components/Menu.test.tsx src/lib/health.test.ts src/views/HostSwitch.test.tsx src/views/Shell.test.tsx src/views/Terminal.test.tsx`
+Expected:
+- HostSwitch.test는 `./HostSwitch`를 불러오지 못한다.
+- Menu의 새 테스트 둘이 실패한다(아이콘이 보이고, `menuitemradio`가 없다).
+- health.test는 "scopeState is not a function"으로 실패한다.
+- Shell의 두 테스트는 '호스트 macmini …' 버튼을 찾지 못한다.
+- Terminal의 새 테스트는 `desk · `를 찾지 못한다.
+
+- [ ] **Step 3: 구현**
+
+1. **HostPicker(PC 머리글, `nav.hostnav` 자리):**
+   - `Menu`의 `trigger`는 상태 점과 이름이다. 버튼 이름은 `호스트 ${name} · ${state.text}`이다.
+   - 항목은 허브 다음에 `others`의 순서다. 글은 이름에, 대기가 있으면 ` · ` + `countText`를, 문제가 있으면 ` · 끊김`·` · 닿지 못함`을 붙인다.
+   - 마지막 항목 "호스트 관리"는 허브의 `#/settings`로 간다.
+2. **HostButton(폰 머리글, `HostMenu` 자리):** `aria-haspopup="dialog"`이고 이름은 HostPicker와 같다. 누르면 `hostSheet = true`다.
+3. **HostSheet:**
+   - Sheet의 제목은 "호스트"이고, 설명은 "이 폰은 허브 {허브 이름}에 페어링했습니다. 다른 호스트도 이 허브를 거쳐 엽니다."다.
+   - `<ul aria-label="호스트 목록">`의 줄마다 `<button aria-current>`가 있다. 줄에는 이름(허브는 알약 "허브"), 아랫줄, `countText`가 있다.
+   - 아랫줄: 허브는 "이 폰이 페어링한 곳", 이은 호스트는 `${state.text} · v${version}`, 끊긴 호스트는 "새 코드로 다시 연결해야 합니다"다.
+   - 아래에 "설정에서 호스트 관리"(허브의 `#/settings`)가 있다.
+   - 줄을 누르면 `switchTo`하고 시트를 닫는다.
+4. **OthersBadge:**
+   - 지금 보는 호스트를 뺀 나머지 중 `problem`이 없는 호스트에서 고른다. 다른 호스트를 볼 때는 허브도 든다.
+   - 승인 대기, 오류, 입력 대기 순으로 가장 많은 곳을 고른다. 같으면 목록 순서다.
+   - 그 호스트의 지금 볼 것으로 가는 링크다. `aria-label`은 `${name} ${그 묶음 제목} ${n}`, 글은 `n`이다. 기다리는 것이 없으면 그리지 않는다.
+   - PC는 HostPicker 옆, 폰은 HostButton 옆에 둔다.
+5. **Terminal의 호스트 칩:** `others.value.length > 0`이면 폰 `.term-head`에 그 호스트 이름의 칩을 두고, PC `.term-sub`의 앞에 `${name} · `를 붙인다.
+6. **CSS:** hostswitch.css는 지금의 머리글·시트 토큰을 쓴다(밝은·어두운 모드). shell.css에서 쓰지 않게 된 `hostnav`·`host-pop` 규칙을 지운다.
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `cd web && npm run build && npm test`
+Expected: 타입 오류 없이 빌드되고 테스트가 모두 통과한다.
+
+- [ ] **Step 5: 커밋**
+
+스테이징한 diff를 비밀 패턴으로 훑는다(Global Constraints). `<tailnet>`과 `example.ts.net`이 아닌 `.ts.net`이 없어야 하고, `secret`·`token`이 걸린 줄은 하나씩 본다.
+
+```bash
+git add web/src
+git diff --cached | grep -n -E '\.ts\.net|claude\.ai/artifact|BEGIN (RSA|OPENSSH|EC) PRIVATE|api[_-]?key|secret|password|token=' | grep -v -E 'example\.ts\.net|<tailnet>\.ts\.net'
+git commit -m "feat(web): 호스트 전환
+
+한 번에 한 호스트를 보고 머리글에서 다른 호스트로 바꾼다(결정 170, 후보 A). PC는 머리글의 호스트 선택, 폰은 머리글의 호스트 이름을 누르면 열리는 시트다. 다른 호스트에서 기다리는 것은 배지로 보인다.
+
+- Menu: trigger, radio
+- health: scopeState(끊김, 닿지 못함)
+- HostPicker, HostButton, HostSheet, OthersBadge
+- 터미널 머리글의 호스트 칩
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git push
+```
+
+---
+
+### Task 10e: 설정에서 호스트 잇기와 관리 (단계 11, 후보 A)
+
+**Files:**
+- Create: `web/src/views/SettingsHosts.tsx`, `web/src/views/SettingsHosts.test.tsx`
+- Modify:
+  - `web/src/lib/api.ts`
+  - `web/src/views/Settings.tsx`
+  - `web/src/views/SettingsEdit.tsx`(`HostsCard`를 지운다)
+  - `web/src/views/SettingsPush.tsx`(하위 터미널 스위치를 `ChildrenSwitch`로 뺀다)
+- Test: `web/src/lib/api.test.ts`, `web/src/views/SettingsEdit.test.tsx`(HostsCard 테스트를 지운다), `web/src/views/Shell.test.tsx`
+
+**Interfaces:**
+- Consumes: Task 4의 `POST /api/hosts {url, code, name}`(201 새로, 200 다시 이음), `PATCH /api/hosts/{id} {name}`, `DELETE /api/hosts/{id}`(204), `POST /api/hosts/{id}/relay`. 10b의 `reloadHosts`, `useHost`, `hub`, `others`. 10d의 `scopeState`.
+- Produces:
+  - `api.hosts`:
+    - `get(): Promise<Host[]>`
+    - `link(url: string, code = '', name = ''): Promise<Host>`
+    - `rename(id: string, name: string): Promise<Host>`
+    - `unlink(id: string): Promise<void>`
+    - `relay(id: string): Promise<Host>`
+  - `SettingsHosts.tsx`:
+    - `HostsCard`, `LinkHostCard`
+    - `HostSettings`: 이은 호스트의 설정
+    - `settingsSub(h: HostScope): string`
+    - `relinkHost: Signal<string>`: 다시 이을 주소. 비면 없다.
+  - `SettingsPush.tsx`: `ChildrenSwitch({ api }: { api: HostApi })`
+
+- [ ] **Step 1: 실패하는 테스트**
+
+`web/src/lib/api.test.ts`:
+
+```ts
+it('links, renames, relays and unlinks a host', async () => {
+  await api.hosts.link('https://desk.example.ts.net', 'ABCD-EFGH', '책상')
+  await api.hosts.rename('h_desk0001', 'desk')
+  await api.hosts.relay('h_desk0001')
+  await api.hosts.unlink('h_desk0001')
+  expect(calls.map((c) => [c.init.method, c.url, c.init.body])).toEqual([
+    ['POST', '/api/hosts', JSON.stringify({ url: 'https://desk.example.ts.net', code: 'ABCD-EFGH', name: '책상' })],
+    ['PATCH', '/api/hosts/h_desk0001', JSON.stringify({ name: 'desk' })],
+    ['POST', '/api/hosts/h_desk0001/relay', undefined],
+    ['DELETE', '/api/hosts/h_desk0001', undefined],
+  ])
+})
+```
+
+`web/src/views/SettingsHosts.test.tsx`(새 파일):
+
+```tsx
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { linkedHost } from '../../test/fixtures'
+import { hello } from '../lib/boot'
+import { hosts, resetStore } from '../lib/store'
+import { toasts } from '../lib/toast'
+import { HostsCard, LinkHostCard, relinkHost } from './SettingsHosts'
+
+type Call = { method: string; url: string; body: unknown }
+let calls: Call[]
+let reply: (c: Call) => Response | undefined
+const toastTexts = () => toasts.value.map((t) => [t.text, t.kind])
+const field = (name: string) => screen.getByRole('textbox', { name }) as HTMLInputElement
+const LAB = linkedHost({ id: 'h_lab00001', name: 'lab', url: 'https://lab.example.ts.net', relay: false, relay_error: 'push service said 410' })
+const UNLINKED = linkedHost({ linked: false, version: '', relay: false })
+
+beforeEach(() => {
+  calls = []
+  reply = () => undefined
+  hello.value = { app: 'mori', version: '0.1.0', host: 'macmini', paired: true }
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit = {}) => {
+    const c = { method: init.method ?? 'GET', url, body: init.body ? JSON.parse(String(init.body)) : undefined }
+    calls.push(c)
+    const r = reply(c)
+    if (r) return r
+    return c.method === 'GET' && url === '/api/hosts' ? Response.json(hosts.value) : new Response(null, { status: 204 })
+  }))
+})
+
+afterEach(() => {
+  cleanup()
+  resetStore()
+  hello.value = null
+  toasts.value = []
+  relinkHost.value = ''
+  vi.unstubAllGlobals()
+})
+
+describe('HostsCard', () => {
+  it('lists the hub first and then each linked host', () => {
+    hosts.value = [linkedHost(), LAB]
+    render(<HostsCard />)
+    expect(screen.getByRole('heading', { name: '연결한 호스트 3곳' })).toBeTruthy()
+    const rows = screen.getAllByRole('listitem')
+    expect(rows.map((r) => r.querySelector('.st-name')!.textContent)).toEqual(['macmini', 'desk', 'lab'])
+    expect(within(rows[0]).getByText('이 호스트')).toBeTruthy()
+    expect(within(rows[0]).getByText('허브')).toBeTruthy()
+    expect(within(rows[1]).getByText('desk.example.ts.net')).toBeTruthy()
+    expect(within(rows[1]).getByText('연결됨 · 알림 켬 · v0.1.0')).toBeTruthy()
+    expect(within(rows[2]).getByText('연결됨 · 알림 꺼짐 · v0.1.0')).toBeTruthy()
+    expect(within(rows[2]).getByText('알림 중계를 켜지 못했습니다 — 이 호스트의 승인 대기 알림이 폰에 오지 않습니다')).toBeTruthy()
+    expect(within(rows[2]).getByText('push service said 410')).toBeTruthy()
+  })
+
+  it('relinks the relay and says so', async () => {
+    hosts.value = [LAB]
+    reply = (c) => (c.url === '/api/hosts/h_lab00001/relay' ? Response.json({ ...LAB, relay: true, relay_error: undefined }) : undefined)
+    render(<HostsCard />)
+    fireEvent.click(screen.getByRole('button', { name: '알림 다시 연결' }))
+    await vi.waitFor(() => expect(toastTexts()).toEqual([['알림을 다시 이었습니다: lab', 'info']]))
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual(['POST /api/hosts/h_lab00001/relay', 'GET /api/hosts'])
+  })
+
+  it('renames a host in place', async () => {
+    hosts.value = [linkedHost()]
+    reply = (c) => (c.method === 'PATCH' ? Response.json(linkedHost({ name: '책상' })) : undefined)
+    render(<HostsCard />)
+    fireEvent.click(screen.getByRole('button', { name: 'desk 이름 바꾸기' }))
+    expect(field('이름').maxLength).toBe(100)
+    fireEvent.input(field('이름'), { target: { value: '  ' } })
+    expect((screen.getByRole('button', { name: '저장' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.input(field('이름'), { target: { value: '책상' } })
+    fireEvent.click(screen.getByRole('button', { name: '저장' }))
+    await vi.waitFor(() => expect(calls.some((c) => c.method === 'GET')).toBe(true))
+    expect(calls[0]).toEqual({ method: 'PATCH', url: '/api/hosts/h_desk0001', body: { name: '책상' } })
+  })
+
+  it('unlinks a host after asking', async () => {
+    hosts.value = [linkedHost()]
+    render(<HostsCard />)
+    fireEvent.click(screen.getByRole('button', { name: 'desk 연결 해제' }))
+    const ask = screen.getByRole('dialog', { name: 'desk 연결을 해제할까요?' })
+    fireEvent.click(within(ask).getByRole('button', { name: '연결 해제' }))
+    await vi.waitFor(() => expect(toastTexts()).toEqual([['연결을 해제했습니다: desk', 'info']]))
+    expect(calls[0]).toMatchObject({ method: 'DELETE', url: '/api/hosts/h_desk0001' })
+  })
+
+  it('offers a new code for a host that is unlinked', () => {
+    hosts.value = [UNLINKED]
+    render(
+      <>
+        <HostsCard />
+        <LinkHostCard />
+      </>,
+    )
+    expect(screen.getByText('그 호스트가 이 허브의 연결을 해제했거나 아직 잇지 않았습니다')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '새 코드로 다시 연결' }))
+    expect(field('페어링 링크 또는 주소').value).toBe('https://desk.example.ts.net')
+    expect(document.activeElement).toBe(field('코드'))
+  })
+
+  it('only removes an old entry for the hub itself', () => {
+    hosts.value = [linkedHost({ id: 'h_self0001', name: 'self', url: location.origin })]
+    render(<HostsCard />)
+    expect(screen.getByRole('heading', { name: '연결한 호스트 1곳' })).toBeTruthy()
+    const row = screen.getByText('self', { selector: '.st-name' }).closest('li') as HTMLElement
+    expect(within(row).getByText('이 허브 자신을 가리키는 옛 항목입니다')).toBeTruthy()
+    expect(within(row).getAllByRole('button').map((b) => b.textContent)).toEqual(['연결 해제'])
+  })
+})
+
+describe('LinkHostCard', () => {
+  it('links a host from a pasted pairing link', async () => {
+    reply = (c) => (c.method === 'POST' ? Response.json(linkedHost(), { status: 201 }) : undefined)
+    render(<LinkHostCard />)
+    const link = screen.getByRole('button', { name: '연결' }) as HTMLButtonElement
+    expect(link.disabled).toBe(true)
+    fireEvent.input(field('페어링 링크 또는 주소'), { target: { value: 'https://desk.example.ts.net/pair#code=ABCD-EFGH' } })
+    fireEvent.click(link)
+    await vi.waitFor(() => expect(toastTexts()).toEqual([['호스트를 이었습니다: desk', 'info']]))
+    expect(calls[0]).toEqual({ method: 'POST', url: '/api/hosts', body: { url: 'https://desk.example.ts.net/pair#code=ABCD-EFGH', code: '', name: '' } })
+    expect(calls[1]).toMatchObject({ method: 'GET', url: '/api/hosts' })
+    expect(field('페어링 링크 또는 주소').value).toBe('')
+  })
+
+  it('says it linked again when the host was already there', async () => {
+    hosts.value = [UNLINKED]
+    reply = (c) => (c.method === 'POST' ? Response.json(linkedHost()) : undefined)
+    render(<LinkHostCard />)
+    fireEvent.input(field('페어링 링크 또는 주소'), { target: { value: 'https://desk.example.ts.net' } })
+    fireEvent.input(field('코드'), { target: { value: 'ABCD-EFGH' } })
+    fireEvent.click(screen.getByRole('button', { name: '연결' }))
+    await vi.waitFor(() => expect(toastTexts()).toEqual([['다시 이었습니다: desk', 'info']]))
+  })
+
+  it('shows why a link failed', async () => {
+    reply = (c) => (c.method === 'POST' ? Response.json({ error: { kind: 'bad_request', message: '코드가 맞지 않습니다' } }, { status: 400 }) : undefined)
+    render(<LinkHostCard />)
+    fireEvent.input(field('페어링 링크 또는 주소'), { target: { value: 'https://desk.example.ts.net' } })
+    fireEvent.input(field('코드'), { target: { value: 'WRONG-CODE' } })
+    fireEvent.click(screen.getByRole('button', { name: '연결' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('코드가 맞지 않습니다')
+    expect(field('페어링 링크 또는 주소').value).toBe('https://desk.example.ts.net')
+  })
+})
+```
+
+`web/src/views/SettingsEdit.test.tsx`: `describe('HostsCard', …)`(162~183행)와 쓰지 않게 된 import를 지운다.
+
+`web/src/views/Shell.test.tsx`:
+- PC의 "opens the settings in the main area"(212~233행): 제목 목록을 `['이렇게 알립니다', '알림', '기기 1', '새 기기 페어링', '화면', '폴더 1', '연결한 호스트 1곳', '호스트 연결', '프리셋 0', '정보']`로 바꾼다.
+- 그 옆에 더한다.
+
+```tsx
+it("opens a linked host's own settings", async () => {
+  settingsServer()
+  const s = withHost()
+  s.ready.value = true
+  at(1440, { name: 'settings' })
+  const { unmount } = render(<Shell />)
+  expect(document.querySelector('.st-sub')!.textContent).toBe('macmini · 이 기기가 페어링한 허브')
+  unmount()
+  at(1440, { name: 'settings', host: 'h_desk0001' })
+  render(<Shell />)
+  expect(document.querySelector('.st-sub')!.textContent).toBe('desk · 허브 macmini에 이은 호스트')
+  expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['알림과 기기', '화면', '폴더 0', '프리셋 0', '정보'])
+  fireEvent.click(await screen.findByRole('switch', { name: '하위 터미널도 알림' }))
+  await vi.waitFor(() =>
+    expect(calls.some((c) => c.method === 'PUT' && c.url === '/h/h_desk0001/api/push/settings')).toBe(true),
+  )
+})
+```
+
+`settingsServer()`는 `/h/h_desk0001/api/push/settings`의 GET에도 `{ children: false }`로 답하게 고친다. 위 테스트의 `calls`는 그 도우미가 받은 요청이다. Shell.test에 그런 목록이 없으면 `settingsServer()`가 요청을 모으게 고친다.
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd web && npx vitest run src/lib/api.test.ts src/views/SettingsHosts.test.tsx src/views/Shell.test.tsx`
+Expected:
+- SettingsHosts.test는 `./SettingsHosts`를 불러오지 못한다.
+- api.test는 "api.hosts.link is not a function"으로 실패한다.
+- Shell은 설정 제목 목록과 머리글 아랫줄이 달라 실패한다.
+
+- [ ] **Step 3: 구현**
+
+1. **허브의 설정 순서:** 알림(PushCards), 기기, 화면, 폴더, "연결한 호스트 N곳"(`HostsCard`), "호스트 연결"(`LinkHostCard`), 프리셋, 정보다. `N`은 1 + `others`의 수다.
+2. **HostsCard의 허브 줄:** 알약 "이 호스트"와 "허브"가 있고, 아랫줄은 `${location.host} · v${버전}`이다.
+3. **HostsCard의 이은 호스트 줄:**
+   - 아랫줄은 주소의 host 한 줄(mono)과 "연결됨 · 알림 켬 · v…"·"연결됨 · 알림 꺼짐 · v…" 한 줄이다.
+   - `!relay`면 "알림 중계를 켜지 못했습니다 — 이 호스트의 승인 대기 알림이 폰에 오지 않습니다", `relay_error`, 버튼 "알림 다시 연결"을 보인다.
+   - "이름 바꾸기"는 그 자리에서 고친다. `maxLength` 100이고, 앞뒤 공백을 뺀 이름이 비면 저장할 수 없다.
+   - "연결 해제"는 Confirm으로 묻는다. 제목은 "desk 연결을 해제할까요?", 본문은 "이 허브가 그 호스트에 둔 연결과 알림 중계를 지웁니다. 다시 이으려면 그 호스트에서 mori pair로 새 코드를 받아야 합니다.", 버튼은 "연결 해제"(danger)다.
+   - 버튼 이름에는 호스트 이름이 든다(`aria-label`: "desk 이름 바꾸기", "desk 연결 해제"). 글은 "이름 바꾸기", "연결 해제"다.
+4. **끊긴 호스트 줄:** 알약 "끊김", "그 호스트가 이 허브의 연결을 해제했거나 아직 잇지 않았습니다", 버튼 "새 코드로 다시 연결"과 "연결 해제"다. "새 코드로 다시 연결"은 `relinkHost`에 그 주소를 넣는다.
+5. **이 허브 자신을 가리키는 옛 항목:** "이 허브 자신을 가리키는 옛 항목입니다"와 "연결 해제"만 있다.
+6. **LinkHostCard:**
+   - 설명은 "그 호스트에서 mori pair로 받은 링크를 붙여 넣거나, 주소와 코드를 넣으세요."다.
+   - 칸은 셋이다. "페어링 링크 또는 주소"(placeholder `https://desk.example.ts.net/pair#code=…`), "코드"(placeholder "8자리 코드"), "이름"(힌트 "이름은 1~100자. 비우면 그 호스트의 이름")이다.
+   - 주소 칸이 비면 "연결"을 누를 수 없다.
+   - 실패하면 서버의 메시지를 `role="alert"`로 보이고 칸은 그대로 둔다.
+   - 되면 칸을 비운다.
+   - `relinkHost`가 바뀌면 주소 칸에 그 주소를 넣고, 코드 칸에 초점을 준다.
+7. **토스트:** "호스트를 이었습니다: desk", "다시 이었습니다: desk", "연결을 해제했습니다: desk", "알림을 다시 이었습니다: lab"이다. 잇기 전 목록에 그 ID가 있었으면 "다시 이었습니다"다. 되면 모두 `reloadHosts()`를 부른다.
+8. **`settingsSub`:**
+   - 허브이고 `others`가 있으면 "macmini · 이 기기가 페어링한 허브", 없으면 지금처럼 "macmini · 이 호스트의 알림과 기기"다.
+   - 이은 호스트는 "desk · 허브 macmini에 이은 호스트"다.
+   - Shell의 PC `.st-sub`과 폰 `.ph-sub`이 이것을 쓴다.
+9. **이은 호스트의 설정(`HostSettings`):**
+   - 순서는 "알림과 기기", 화면, 폴더, 프리셋, 정보다.
+   - "알림과 기기"에는 `ChildrenSwitch api={h.api}`가 있다. 그 호스트의 `/h/<ID>/api/push/settings`를 쓴다. 그 아래 "알림, 기기, 호스트 연결은 허브 설정에 있습니다."와 링크 "허브 설정 열기"(`#/settings`)가 있다.
+   - 정보는 그 호스트의 이름과 버전(`h.host`)이다.
+   - Settings.tsx는 `useHost().id`가 있으면 `HostSettings`를 그린다.
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `cd web && npm run build && npm test`
+Expected: 타입 오류 없이 빌드되고 테스트가 모두 통과한다.
+
+- [ ] **Step 5: 커밋**
+
+스테이징한 diff를 비밀 패턴으로 훑는다(Global Constraints). `<tailnet>`과 `example.ts.net`이 아닌 `.ts.net`이 없어야 하고, `secret`·`token`이 걸린 줄은 하나씩 본다.
+
+```bash
+git add web/src
+git diff --cached | grep -n -E '\.ts\.net|claude\.ai/artifact|BEGIN (RSA|OPENSSH|EC) PRIVATE|api[_-]?key|secret|password|token=' | grep -v -E 'example\.ts\.net|<tailnet>\.ts\.net'
+git commit -m "feat(web): 설정에서 호스트 잇기와 관리
+
+설정에서 다른 호스트를 잇고, 이름을 바꾸고, 연결을 해제하고, 알림 중계를 다시 잇는다(결정 168). 이은 호스트의 설정은 그 호스트의 화면·폴더·프리셋과 하위 터미널 알림이다.
+
+- 연결한 호스트 카드: 허브와 이은 호스트, 끊김, 알림 중계 오류
+- 호스트 연결 카드: 페어링 링크 또는 주소와 코드
+- api.hosts: link, rename, unlink, relay
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git push
+```
+
+---
+
+### Task 10f: 끊긴 호스트와 닿지 않는 호스트 (단계 11, 후보 A)
+
+**Files:**
+- Create: `web/src/views/HostProblem.tsx`, `web/src/views/HostProblem.test.tsx`, `web/src/components/ConnBanner.test.tsx`
+- Modify: `web/src/components/ConnBanner.tsx`, `web/src/views/Shell.tsx`, `web/src/views/Queue.tsx`, CSS(`hostswitch.css`, `queue.css`)
+- Test: `web/src/views/Shell.test.tsx`, `web/src/views/Queue.test.tsx`
+
+**Interfaces:**
+- Consumes: 10b의 `HostScope.{problem, retry}`. 10d의 `hostSheet`. 10e의 `relinkHost`.
+- Produces: `HostProblem({ variant }: { variant: 'pc' | 'phone' })`
+
+- [ ] **Step 1: 실패하는 테스트**
+
+`web/src/views/HostProblem.test.tsx`(새 파일, `cleanup`과 `history.replaceState(null, '', '/#/')`, `relinkHost.value = ''`, `hostSheet.value = false`를 afterEach에 둔다):
+
+```tsx
+it('says the host was unlinked and offers a new code', () => {
+  const s = withHost({ linked: false, version: '', relay: false })
+  render(inHost(s, <HostProblem variant="phone" />))
+  expect(screen.getByRole('heading', { name: 'desk 연결이 끊겼습니다' })).toBeTruthy()
+  expect(screen.getByText('그 호스트가 이 허브의 연결을 해제했거나 아직 잇지 않았습니다. 그 호스트에서 mori pair로 새 코드를 받아 다시 연결하세요.')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '다른 호스트 보기' }))
+  expect(hostSheet.value).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: '새 코드로 다시 연결' }))
+  expect(relinkHost.value).toBe('https://desk.example.ts.net')
+  expect(location.hash).toBe('#/settings')
+})
+
+it('leaves picking another host to the header on a PC', () => {
+  render(inHost(withHost({ linked: false, version: '', relay: false }), <HostProblem variant="pc" />))
+  expect(screen.queryByRole('button', { name: '다른 호스트 보기' })).toBeNull()
+})
+```
+
+`web/src/components/ConnBanner.test.tsx`(새 파일, fetch를 받아 경로를 모은다):
+
+```tsx
+it('says a host is out of reach and tries again', async () => {
+  const seen: string[] = []
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => (seen.push(url), Response.json({}))))
+  const s = withHost()
+  s.unreachable.value = true
+  render(inHost(s, <ConnBanner />))
+  expect(screen.getByRole('status').textContent).toContain('desk에 닿지 못했습니다')
+  expect(screen.getByRole('status').textContent).toContain('마지막으로 본 목록입니다')
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
+  await vi.waitFor(() => expect(seen).toContain('/h/h_desk0001/api/overview'))
+})
+```
+
+`web/src/views/Queue.test.tsx`:
+
+```tsx
+it("greys a host's list that may be stale", () => {
+  const s = withHost()
+  s.ready.value = true
+  s.unreachable.value = true
+  render(inHost(s, <QueueList variant="pc" />))
+  const qv = document.querySelector('.qv')!
+  expect(qv.getAttribute('aria-disabled')).toBe('true')
+  expect(qv.classList.contains('is-stale')).toBe(true)
+})
+```
+
+`web/src/views/Shell.test.tsx`:
+
+```tsx
+it("shows an unlinked host's problem in place of its screen", () => {
+  withHost({ linked: false, version: '', relay: false })
+  at(1440, { name: 'terminal', addr: 't1', git: false, host: 'h_desk0001' })
+  render(<Shell />)
+  expect(screen.getByRole('heading', { name: 'desk 연결이 끊겼습니다' })).toBeTruthy()
+  expect(FakeWebSocket.all.filter((w) => w.url.includes('/ws/attach'))).toHaveLength(0)
+})
+
+it("takes a phone from an unlinked host's session to its problem", () => {
+  withHost({ linked: false, version: '', relay: false })
+  at(390, { name: 'terminal', addr: 't1', git: false, host: 'h_desk0001' })
+  render(<Shell />)
+  expect(location.hash).toBe('#/h/h_desk0001')
+  expect(screen.getByRole('heading', { name: 'desk 연결이 끊겼습니다' })).toBeTruthy()
+})
+```
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd web && npx vitest run src/views/HostProblem.test.tsx src/components/ConnBanner.test.tsx src/views/Queue.test.tsx src/views/Shell.test.tsx`
+Expected:
+- HostProblem.test는 `./HostProblem`을 불러오지 못한다.
+- ConnBanner는 "desk에 닿지 못했습니다"가 없어 실패한다.
+- Queue는 `aria-disabled`가 `null`이라 실패한다.
+- Shell의 새 테스트 둘은 제목이 없어 실패한다.
+
+- [ ] **Step 3: 구현**
+
+1. **끊김(`problem === 'unlinked'`):**
+   - 제목은 "desk 연결이 끊겼습니다"(h2)이고, 본문은 Step 1의 글이다.
+   - "새 코드로 다시 연결"은 `relinkHost`에 그 호스트의 주소를 넣고 허브의 `{ name: 'settings' }`로 간다.
+   - "다른 호스트 보기"는 폰에만 있고 `hostSheet = true`다.
+   - PC는 그 호스트의 본문 자리를 이것으로 바꾼다. 머리글과 HostPicker는 그대로다.
+   - 폰은 전체 화면 경로를 `{ name: 'queue', host }`로 `replace`하고, `PhoneTab`의 내용 자리에 이것을 둔다. 새 세션 버튼(fab)은 없다.
+2. **닿지 않음(`problem === 'unreachable'`):**
+   - ConnBanner가 "desk에 닿지 못했습니다 · 마지막으로 본 목록입니다"와 버튼 "다시 시도"(`h.retry()`)를 보인다. 연결 상태 배너보다 앞선다.
+   - QueueList의 바깥 `div.qv`에 `aria-disabled="true"`와 `is-stale`을 단다. 목록은 마지막으로 본 그대로다.
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `cd web && npm run build && npm test`
+Expected: 타입 오류 없이 빌드되고 테스트가 모두 통과한다.
+
+- [ ] **Step 5: 커밋**
+
+스테이징한 diff를 비밀 패턴으로 훑는다(Global Constraints). `<tailnet>`과 `example.ts.net`이 아닌 `.ts.net`이 없어야 하고, `secret`·`token`이 걸린 줄은 하나씩 본다.
+
+```bash
+git add web/src
+git diff --cached | grep -n -E '\.ts\.net|claude\.ai/artifact|BEGIN (RSA|OPENSSH|EC) PRIVATE|api[_-]?key|secret|password|token=' | grep -v -E 'example\.ts\.net|<tailnet>\.ts\.net'
+git commit -m "feat(web): 끊긴 호스트와 닿지 않는 호스트
+
+연결이 끊긴 호스트는 그 화면 대신 새 코드로 다시 잇는 길을 보인다. 닿지 않는 호스트는 마지막으로 본 목록을 흐리게 두고 다시 시도를 보인다(결정 163·164).
+
+- HostProblem: 끊김, 새 코드로 다시 연결, 다른 호스트 보기(폰)
+- ConnBanner: 닿지 못함과 다시 시도
+- QueueList: 마지막으로 본 목록 흐리게
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git push
+```
+
+---
+
+### Task 10g: 여러 호스트 화면 확인과 안내 (단계 11, 후보 A)
+
+**Files:**
+- Modify: `README.md`, `docs/superpowers/specs/2026-11-08-mori-design.md`
+
+**Interfaces:**
+- Consumes: 10a~10f의 화면, Task 8 Step 4의 두 서버 띄우기
+- Produces: 확인한 화면과 문서
+
+- [ ] **Step 1: 전체 확인**
+
+Run: `make test-web && make web && go test ./...`(저장소 루트)
+Expected: 모두 통과한다.
+
+- [ ] **Step 2: 두 Mori로 화면 확인**
+
+1. Task 8 Step 4의 1~4대로 격리 코어 두 개와 `mori serve` 둘을 띄우고 잇는다. hubdesk는 7771, hubhub는 7772다.
+2. hubhub를 헤드리스 Chrome으로 연다. 페어링은 그 Chrome 안에서 `/pair#code=…`로 하거나, Step 4처럼 curl로 받은 쿠키를 DevTools 프로토콜로 넣는다.
+3. PC(1440×900)와 폰(390×844)에서, 밝은·어두운 모드로 본다.
+   - 머리글의 호스트 선택과 폰의 호스트 시트, 다른 호스트의 대기 배지
+   - desk(hubdesk)의 지금 볼 것, 폴더, 터미널. 입력이 hubdesk의 셸에 닿는다.
+   - 설정의 "연결한 호스트"와 "호스트 연결"
+   - hubdesk에서 허브 기기를 철회한 뒤의 끊김 화면
+   - hubdesk를 멈춘 뒤의 "닿지 못했습니다"와 다시 시도
+4. Task 8 Step 4의 7처럼 치운다(`pkill -f "$K"; pkill -f "$H"`, `make -C "$R" test-clean`).
+
+어느 것이라도 기대와 다르면 커밋하지 않는다. 그 화면의 태스크로 돌아가 테스트부터 고친다.
+
+- [ ] **Step 3: README**
+
+- "화면" 절에 호스트 전환을 쓴다. PC는 머리글의 호스트 선택, 폰은 머리글의 호스트 이름과 시트, 다른 호스트의 대기 배지, 설정의 호스트 잇기와 관리, 끊김과 닿지 않음이다.
+- 배너(9행)의 상태를 바꾼다.
+
+- [ ] **Step 4: 스펙**
+
+1. 3행(상태 줄)의 단계 11을 "단계 11(여러 호스트를 한 앱에서) 구현 (2026-11-10)"으로 바꾼다.
+2. §12 단계 11 상태에 화면을 더한다. 후보 A(호스트 전환)를 골라 Task 10a~10f로 만들었고, 두 Mori로 PC·폰 화면을 확인했다는 것이다.
+3. 결정 156의 설정 카드 순서에서 "다른 호스트"를 "연결한 호스트", "호스트 연결"로 바꾼다.
+4. 결정 173을 더한다. 후보 A(호스트 전환)의 내용이다.
+   - 한 번에 한 호스트를 본다. PC는 머리글의 호스트 선택, 폰은 머리글의 호스트 이름을 누르면 열리는 시트다.
+   - 다른 호스트에서 기다리는 것은 배지로 보이고, 앱 배지는 모든 호스트의 대기 수다.
+   - 호스트를 바꾸면 폴더·설정 탭은 그대로, 나머지는 지금 볼 것으로 간다.
+   - 4401은 허브의 `hello`로 가른다. 끊김은 그 화면 대신 다시 잇는 길이고, 닿지 않음은 마지막 목록과 다시 시도다.
+   - 목록에 없는 호스트의 경로는 허브의 지금 볼 것으로 간다.
+
+- [ ] **Step 5: 커밋**
+
+스테이징한 diff를 비밀 패턴으로 훑는다(Global Constraints). `<tailnet>`과 `example.ts.net`이 아닌 `.ts.net`이 없어야 하고, `secret`·`token`이 걸린 줄은 하나씩 본다.
+
+```bash
+git add README.md docs/superpowers/specs/2026-11-08-mori-design.md
+git diff --cached | grep -n -E '\.ts\.net|claude\.ai/artifact|BEGIN (RSA|OPENSSH|EC) PRIVATE|api[_-]?key|secret|password|token=' | grep -v -E 'example\.ts\.net|<tailnet>\.ts\.net'
+git commit -m "docs: 여러 호스트 화면 안내
+
+README에 호스트 전환과 설정의 호스트 관리를 쓰고, 스펙에 고른 후보(A 호스트 전환)를 결정 173으로 적는다.
+
+- README: 화면 절, 배너
+- 스펙: 상태 줄, 결정 156의 순서, 결정 173, §12 단계 11 상태
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git push
+```
+
+---
+
 ## 스펙 반영 (구현 중 확정)
 
 Task 8의 커밋에서 스펙을 고친다. 결정은 그 줄의 결정 칸 끝에 붙이고, 절은 그 절에 한 줄로 넣는다.
@@ -4972,6 +6507,6 @@ Task 8의 커밋에서 스펙을 고친다. 결정은 그 줄의 결정 칸 끝�
 ## Self-Review
 
 1. **스펙 범위:** 결정 158(허브)은 Task 4~7의 서버와 명령, Task 10의 화면이다. 159·160(잇기, 주소)은 Task 3(`Link`, `ParseTarget`), Task 4(`POST /api/hosts`), Task 7(`mori hosts link`)이다. 161~164(중계의 경로, 헤더, 오류, WS)는 Task 5, 165(중계 구독)는 Task 3(`SetupRelay`)과 Task 4(`POST /api/hosts/{id}/relay`), 166(중계 받기)은 Task 6, 167(종류)은 Task 2(`Payload.Kind`, `Relayed`)다. 168(호스트 API)은 Task 1(옛 호스트에 ID)과 Task 4, 169(CLI)는 Task 7, 170(UI 주소)은 Task 10이다. 171(버전)은 Task 3(이을 때 읽은 버전), Task 7(`mori hosts`의 버전 칸), Task 10(없는 API의 오류)이다. §6.9~6.11은 Task 3·5·6, §8의 허브·중계 엔드포인트·비밀은 Task 5·6과 README의 보안(Task 8), §13의 TLS 허브 통합 테스트는 Task 6, 손으로 하는 확인은 Task 8 Step 4다. 실제 iPhone으로 다른 호스트의 알림을 받아 그 터미널로 가는 확인(§13)은 https 허브와 화면이 있어야 하므로 Task 10 뒤에 한다.
-2. **자리표시:** Task 10만 일부러 단계를 비워 두었다. 화면이 Task 9의 선택에 달렸기 때문이고, 선택과 상관없는 부분(1~8)은 Task 10에 적었다. 그 밖의 단계에는 코드, 명령, 기대 결과가 있다.
+2. **자리표시:** Task 10의 1~8은 Task 10a~10g의 단계에 들어갔다(1·3·7은 10a, 2·4는 10b, 5는 10b·10f, 6은 10e, 8은 10g). 모든 단계에 코드, 명령, 기대 결과가 있다.
 3. **타입 일관성:** `peer.View`의 필드(`id`, `name`, `url`, `linked`, `version`, `relay`, `relay_error`, `linked_ms`)를 Task 4의 웹 `Host`가 그대로, Task 7의 `admin.HostInfo`가 `linked_ms`만 빼고 같은 이름으로 쓴다. `Link(ctx, rawURL, code, name) (View, bool, error)`를 Task 4의 `POST /api/hosts`와 Task 7의 `LinkHost`가 같은 순서로 부르고, `Relay(secret) (id, key, authSecret, ok)`의 네 값을 Task 6의 `handleRelay`가, `MarkUnlinked(id, token)`을 Task 5의 `modifyResponse`가 쓴다. 테스트 도우미 `fakeMori(t, code)`·`withLinks(c)`(Task 4), `(*testEnv).linkHost(origin)`(Task 5), `startTestEnv(t, srv, useTLS, opts...)`(Task 6)는 정의와 부르는 곳의 인자가 맞다.
-4. **Review Focus:** 다섯 줄 모두 그 태스크에 테스트가 있다. 말없이 사라진 폰과 먼저 닫는 호스트는 `TestTunnelEndsWhenHostCloses`, `%2F` 주소는 `TestProxyForwardsWithHubCookie`, 8 MB 올리기와 10 MiB 상한은 `TestProxyBodyLimit`(이상 Task 5), 허브를 철회한 호스트는 `TestProxyHostErrors`(Task 5)와 `TestHubRelaysHostNotifications`(Task 6), `kind`가 없는 옛 Mori는 `TestRelayed`(Task 2)다.
+4. **Review Focus:** 열 줄 모두 그 태스크에 테스트가 있다. 말없이 사라진 폰과 먼저 닫는 호스트는 `TestTunnelEndsWhenHostCloses`, `%2F` 주소는 `TestProxyForwardsWithHubCookie`, 8 MB 올리기와 10 MiB 상한은 `TestProxyBodyLimit`(이상 Task 5), 허브를 철회한 호스트는 `TestProxyHostErrors`(Task 5)와 `TestHubRelaysHostNotifications`(Task 6), `kind`가 없는 옛 Mori는 `TestRelayed`(Task 2)다. 6~10(목록보다 먼저 온 알림 링크, 두 호스트의 같은 폴더, 보는 중에 끊긴 호스트, hello도 실패한 4401, 목록에서 빠진 호스트)은 Task 10b·10c의 테스트가 맡는다.

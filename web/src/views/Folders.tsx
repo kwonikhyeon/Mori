@@ -7,7 +7,7 @@ import { groupByFolder, type FolderGroup } from '../lib/queue'
 import { useHost } from '../lib/scope'
 import type { HostStore } from '../lib/store'
 import type { FolderView, TerminalView } from '../lib/types'
-import { Loading, TermRow, type ListProps } from './rows'
+import { ListFrame, Loading, TermRow, type ListProps } from './rows'
 import './lists.css'
 
 function sub(h: HostStore, t: TerminalView, f: FolderView | null): string {
@@ -55,29 +55,29 @@ function FolderSection({ g, p }: { g: FolderGroup; p: ListProps }) {
   )
 }
 
+function EmptyFolders() {
+  const h = useHost()
+  return (
+    <div class="empty">
+      <span class="empty-icon">
+        <Icon name="folder" size={26} />
+      </span>
+      <p class="empty-title">등록된 폴더가 없습니다</p>
+      <p class="empty-text">새 세션에서 폴더를 고르면 여기에 생깁니다.</p>
+      <a class="btn btn-primary" href={h.href({ name: 'new' })}>
+        <Icon name="plus" stroke={2} />새 세션
+      </a>
+    </div>
+  )
+}
+
 export function FolderList(p: ListProps) {
   const h = useHost()
   if (!h.ready.value) return <Loading />
   const groups = groupByFolder(h.terminals.value.values(), h.folders.value)
-  if (groups.length === 0) {
-    return (
-      <div class="empty">
-        <span class="empty-icon">
-          <Icon name="folder" size={26} />
-        </span>
-        <p class="empty-title">등록된 폴더가 없습니다</p>
-        <p class="empty-text">새 세션에서 폴더를 고르면 여기에 생깁니다.</p>
-        <a class="btn btn-primary" href={h.href({ name: 'new' })}>
-          <Icon name="plus" stroke={2} />새 세션
-        </a>
-      </div>
-    )
-  }
   return (
-    <div class={`fv fv-${p.variant}`}>
-      {groups.map((g) => (
-        <FolderSection key={g.folder?.id ?? ''} g={g} p={p} />
-      ))}
-    </div>
+    <ListFrame class={`fv fv-${p.variant}`}>
+      {groups.length === 0 ? <EmptyFolders /> : groups.map((g) => <FolderSection key={g.folder?.id ?? ''} g={g} p={p} />)}
+    </ListFrame>
   )
 }

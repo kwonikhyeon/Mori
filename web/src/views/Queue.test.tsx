@@ -149,4 +149,26 @@ describe('FolderList', () => {
     const rest = screen.getByRole('region', { name: '기타' })
     expect(within(rest).getByRole('link').textContent).toContain('desk · ~/x')
   })
+
+  it("greys a host's folders that may be stale", () => {
+    const s = withHost()
+    s.ready.value = true
+    s.unreachable.value = true
+    render(inHost(s, <FolderList variant="pc" />))
+    const fv = document.querySelector('.fv')!
+    expect(fv.getAttribute('aria-disabled')).toBe('true')
+    expect(fv.classList.contains('is-stale')).toBe(true)
+  })
+
+  it("keeps a stale host's folders from opening", () => {
+    const s = withHost()
+    s.folders.value = [folder()]
+    s.terminals.value = new Map([['t1', term()]])
+    s.ready.value = true
+    s.unreachable.value = true
+    render(inHost(s, <FolderList variant="pc" />))
+    const mori = screen.getByRole('region', { name: 'Mori' })
+    expect(fireEvent.click(within(mori).getByRole('link', { name: 'Mori Git 보기' }))).toBe(false)
+    expect(fireEvent.click(within(within(mori).getByRole('list')).getByRole('link'))).toBe(false)
+  })
 })

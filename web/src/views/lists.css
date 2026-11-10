@@ -18,13 +18,16 @@
 }
 
 /* What the hub last saw of a host it cannot reach now. */
-.qv.is-stale {
+.qv.is-stale,
+.fv.is-stale {
   opacity: .55;
   filter: grayscale(1);
 }
 
 .qv.is-stale a,
-.qv.is-stale button {
+.qv.is-stale button,
+.fv.is-stale a,
+.fv.is-stale button {
   pointer-events: none;
 }
 

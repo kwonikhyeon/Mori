@@ -25,6 +25,28 @@ export function termHref(h: HostScope, t: TerminalView, p: ListProps): string {
   return h.href({ name: 'terminal', addr: t.address, git: !!p.git })
 }
 
+// What the hub last saw of a host it cannot reach now: there to read, not to
+// use (decision 164); its banner tries again.
+const block = (e: Event) => {
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+/** A list of the host shown, greyed and shut while the hub cannot reach it. */
+export function ListFrame({ class: cls, children }: { class: string; children: ComponentChildren }) {
+  const stale = useHost().problem.value === 'unreachable'
+  return (
+    <div
+      class={cls + (stale ? ' is-stale' : '')}
+      role={stale ? 'group' : undefined}
+      aria-disabled={stale ? 'true' : undefined}
+      onClickCapture={stale ? block : undefined}
+    >
+      {children}
+    </div>
+  )
+}
+
 export function Loading() {
   return (
     <p class="qnote" role="status">

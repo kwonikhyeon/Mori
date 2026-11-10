@@ -11,6 +11,7 @@ let calls: Call[]
 let reply: (c: Call) => Response | undefined
 const toastTexts = () => toasts.value.map((t) => [t.text, t.kind])
 const field = (name: string) => screen.getByRole('textbox', { name }) as HTMLInputElement
+const nameHint = () => document.getElementById(field('이름').getAttribute('aria-describedby')!)!.textContent
 const LAB = linkedHost({ id: 'h_lab00001', name: 'lab', url: 'https://lab.example.ts.net', relay: false, relay_error: 'push service said 410' })
 const UNLINKED = linkedHost({ linked: false, version: '', relay: false })
 
@@ -131,6 +132,22 @@ describe('LinkHostCard', () => {
     fireEvent.input(field('코드'), { target: { value: 'ABCD-EFGH' } })
     fireEvent.click(screen.getByRole('button', { name: '연결' }))
     await vi.waitFor(() => expect(toastTexts()).toEqual([['다시 이었습니다: desk', 'info']]))
+  })
+
+  // The hub keeps the name of a host it had unless another is given (spec §6.9).
+  it('says a host linked before keeps its name', () => {
+    hosts.value = [UNLINKED, LAB]
+    render(<LinkHostCard />)
+    fireEvent.input(field('페어링 링크 또는 주소'), { target: { value: 'https://Desk.example.ts.net:443/pair#code=ABCD-EFGH' } })
+    expect(nameHint()).toBe('비우면 지금 이름을 그대로 씁니다: desk')
+  })
+
+  it("says a new host gives its own name", () => {
+    hosts.value = [UNLINKED, LAB]
+    render(<LinkHostCard />)
+    expect(nameHint()).toBe('비우면 그 호스트의 이름을 씁니다.')
+    fireEvent.input(field('페어링 링크 또는 주소'), { target: { value: 'https://macmini.example.ts.net/pair#code=ABCD-EFGH' } })
+    expect(nameHint()).toBe('비우면 그 호스트의 이름을 씁니다.')
   })
 
   it('shows why a link failed', async () => {

@@ -8,7 +8,7 @@ import { Icon } from '../components/Icon'
 import { api } from '../lib/api'
 import { versionText } from '../lib/format'
 import { hello } from '../lib/hello'
-import { isHere } from '../lib/hosts'
+import { isHere, originOf } from '../lib/hosts'
 import { formatCode } from '../lib/pairing'
 import { hub, others, reloadHosts, scopeOf, type HostScope } from '../lib/scope'
 import { hosts } from '../lib/store'
@@ -315,6 +315,10 @@ export function LinkHostCard() {
     codeRef.current?.focus()
   }, [relink])
 
+  // The hub keeps the name of a host it had unless another is given (spec §6.9).
+  const at = originOf(url)
+  const before = at ? hosts.value.find((h) => originOf(h.url) === at) : undefined
+
   const submit = async (e: Event) => {
     e.preventDefault()
     const u = url.trim()
@@ -400,7 +404,7 @@ export function LinkHostCard() {
             onInput={(e) => setName(e.currentTarget.value)}
           />
           <span id={id + '-name-hint'} class="field-hint">
-            비우면 그 호스트의 이름을 씁니다.
+            {before ? `비우면 지금 이름을 그대로 씁니다: ${before.name}` : '비우면 그 호스트의 이름을 씁니다.'}
           </span>
         </div>
         {error && (

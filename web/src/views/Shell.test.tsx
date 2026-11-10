@@ -73,6 +73,7 @@ function settingsServer() {
       if (path === '/api/devices') return Response.json([{ id: 'me', name: 'Mac · Chrome', user_agent: '', created_ms: 1, last_seen_ms: 1, current: true }])
       if (path === '/api/push/subscriptions') return Response.json([])
       if (path === '/api/push/key') return Response.json({ key: 'K' })
+      if (path === '/api/pair-codes') return Response.json({ code: 'ABCD-EFGH', url: '/pair#code=ABCD-EFGH', expires_ms: Date.now() + 300_000 }, { status: 201 })
       if (path === '/api/push/settings' || path === '/h/h_desk0001/api/push/settings') {
         return Response.json(init.method === 'PUT' ? JSON.parse(String(init.body)) : { children: false })
       }
@@ -250,6 +251,17 @@ describe('PC', () => {
       '프리셋 0',
       '정보',
     ])
+  })
+
+  it("keeps a new device's link apart from the form that links a host", async () => {
+    settingsServer()
+    at(1440, { name: 'settings' })
+    render(<Shell />)
+    fireEvent.click(await screen.findByRole('button', { name: '코드 만들기' }))
+    const row = (await screen.findByRole('textbox', { name: '링크' })).parentElement!
+    const form = screen.getByRole('region', { name: '호스트 연결' }).querySelector('form')!
+    // A class the two share lays one out as the other: the link and 복사 stacked.
+    expect([...row.classList].filter((c) => form.classList.contains(c))).toEqual([])
   })
 
   it("opens a linked host's own settings", async () => {

@@ -541,13 +541,13 @@ label.st-row:has(input:disabled) {
   padding-bottom: 10px;
 }
 
-.st-link {
+.st-hostlink {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.st-link .btn-primary {
+.st-hostlink .btn-primary {
   align-self: flex-start;
 }
 

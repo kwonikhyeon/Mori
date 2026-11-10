@@ -346,7 +346,7 @@ export function LinkHostCard() {
       <p class="st-text">
         그 호스트에서 <code>mori pair</code>로 받은 링크를 붙여 넣거나, 주소와 코드를 넣으세요.
       </p>
-      <form class="st-link" noValidate onSubmit={submit}>
+      <form class="st-hostlink" noValidate onSubmit={submit}>
         <div class="field">
           <label class="field-label" for={id + '-url'}>
             페어링 링크 또는 주소

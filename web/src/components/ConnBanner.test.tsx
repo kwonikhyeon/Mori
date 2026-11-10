@@ -13,11 +13,24 @@ describe('ConnBanner', () => {
     const seen: string[] = []
     vi.stubGlobal('fetch', vi.fn(async (url: string) => (seen.push(url), Response.json({}))))
     const s = withHost()
+    s.apply({ type: 'snapshot', core: { connected: true }, folders: [], terminals: [] })
     s.unreachable.value = true
     render(inHost(s, <ConnBanner />))
     expect(screen.getByRole('status').textContent).toContain('desk에 닿지 못했습니다')
     expect(screen.getByRole('status').textContent).toContain('마지막으로 본 목록입니다')
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
     await vi.waitFor(() => expect(seen).toContain('/h/h_desk0001/api/overview'))
+  })
+
+  // The page opened while the hub could not reach the host: no list was ever shown.
+  it('does not speak of a last list it never had', () => {
+    const s = withHost()
+    s.unreachable.value = true
+    render(inHost(s, <ConnBanner />))
+    const said = screen.getByRole('status').textContent
+    expect(said).toContain('desk에 닿지 못했습니다')
+    expect(said).toContain('아직 받은 목록이 없습니다')
+    expect(said).not.toContain('마지막으로 본 목록입니다')
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy()
   })
 })

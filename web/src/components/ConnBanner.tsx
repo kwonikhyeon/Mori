@@ -17,7 +17,8 @@ export function ConnBanner({ class: cls = '' }: { class?: string }) {
         <div class="banner banner-error banner-act">
           <Icon name="warning" size={16} class="banner-icon" />
           <span class="banner-text">
-            <b>{h.name.value}에 닿지 못했습니다</b> · <span>마지막으로 본 목록입니다</span>
+            <b>{h.name.value}에 닿지 못했습니다</b> ·{' '}
+            <span>{h.ready.value ? '마지막으로 본 목록입니다' : '아직 받은 목록이 없습니다'}</span>
           </span>
           <button type="button" class="btn btn-sm" onClick={() => h.retry()}>
             다시 시도

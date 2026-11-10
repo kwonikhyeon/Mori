@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -78,6 +79,21 @@ func TestPublicURL(t *testing.T) {
 	}
 	name = "macmini.example.ts.net" // Tailscale came up after the server
 	if got := pub(); got != "https://macmini.example.ts.net" {
+		t.Fatal(got)
+	}
+}
+
+func TestServerNames(t *testing.T) {
+	dns := func(context.Context) (string, error) { return "macmini.example.ts.net", nil }
+	pub := func() string { return "https://mori.example.com" }
+	if got := serverNames(pub, true, dns)(); !slices.Equal(got, []string{"https://mori.example.com", "macmini.example.ts.net"}) {
+		t.Fatal(got) // the flag's name, and Tailscale's still
+	}
+	if got := serverNames(pub, false, dns)(); !slices.Equal(got, []string{"https://mori.example.com"}) {
+		t.Fatal(got) // without the flag the public URL is Tailscale's already
+	}
+	down := func(context.Context) (string, error) { return "", errors.New("down") }
+	if got := serverNames(pub, true, down)(); !slices.Equal(got, []string{"https://mori.example.com"}) {
 		t.Fatal(got)
 	}
 }

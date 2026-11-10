@@ -2,7 +2,7 @@
 // this device is paired, then open the event stream or show pairing. A
 // 4401 on the stream or a 401 from any call goes back to pairing.
 import { effect, signal } from '@preact/signals'
-import { api, onUnauthorized } from './api'
+import { api, ApiError, onUnauthorized } from './api'
 import { EventStream } from './events'
 import { hello, hostLabel } from './hello'
 import { parseHash, route } from './router'
@@ -14,9 +14,12 @@ import { onWake } from './wake'
 
 export { hello, hostLabel }
 
-export type Phase = 'loading' | 'pair' | 'app'
+export type Phase = 'loading' | 'pair' | 'app' | 'refused'
 
 export const phase = signal<Phase>('loading')
+
+/** Why the server would not answer at this page's address (spec §3 #193). */
+export const refusal = signal<ApiError | null>(null)
 
 let stream: EventStream | null = null
 let stops: (() => void)[] = []
@@ -24,7 +27,8 @@ let stops: (() => void)[] = []
 async function ask(): Promise<Hello | null> {
   try {
     return await api.hello()
-  } catch {
+  } catch (e) {
+    if (e instanceof ApiError && e.kind === 'bad_host') refusal.value = e
     return null
   }
 }
@@ -32,6 +36,11 @@ async function ask(): Promise<Hello | null> {
 export async function boot(): Promise<void> {
   const h = await ask()
   hello.value = h
+  if (refusal.value) {
+    // Nothing answers at this name: a stream would only fail on and on.
+    phase.value = 'refused'
+    return
+  }
   if (h && !h.paired) {
     phase.value = 'pair'
     return

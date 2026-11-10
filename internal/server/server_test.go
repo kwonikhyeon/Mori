@@ -10,7 +10,9 @@ import (
 func TestHelloIsPublicAndHasSecurityHeaders(t *testing.T) {
 	e := newTestEnv(t, func(d *Deps) { d.Version, d.HostName = "v-test", "macmini" })
 	rec := httptest.NewRecorder()
-	e.s.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/api/hello", nil))
+	req := httptest.NewRequest("GET", "/api/hello", nil)
+	req.Host = "127.0.0.1:7761"
+	e.s.Handler().ServeHTTP(rec, req)
 	if rec.Code != 200 {
 		t.Fatalf("status %d", rec.Code)
 	}
@@ -67,7 +69,7 @@ func TestStatusForKinds(t *testing.T) {
 		"not_found": 404, "invalid_params": 400, "blocked": 409, "finished": 409, "live": 409,
 		"unavailable": 503, "core_unavailable": 503, "unauthorized": 401, "forbidden_origin": 403,
 		"rate_limited": 429, "git_failed": 422, "push_failed": 502, "whatever": 500,
-		"host_unlinked": 409, "host_unreachable": 502,
+		"host_unlinked": 409, "host_unreachable": 502, "bad_host": 421,
 	} {
 		if got := statusFor(kind); got != want {
 			t.Errorf("%s: %d want %d", kind, got, want)

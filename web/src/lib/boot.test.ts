@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../../test/fakeWs'
 import { linkedHost, term } from '../../test/fixtures'
 import { request } from './api'
-import { boot, hello, hostLabel, paired, phase, shutdown } from './boot'
+import { boot, hello, hostLabel, paired, phase, refusal, shutdown } from './boot'
 import { route } from './router'
 import { host, resetStore, terminals } from './store'
 
@@ -47,6 +47,7 @@ afterEach(() => {
   resetStore()
   phase.value = 'loading'
   hello.value = null
+  refusal.value = null
   vi.unstubAllGlobals()
 })
 
@@ -65,6 +66,15 @@ describe('boot', () => {
     routes['GET /api/hello'] = () => json(200, { ...HELLO, paired: false })
     await boot()
     expect(phase.value).toBe('pair')
+    expect(FakeWebSocket.all).toHaveLength(0)
+  })
+
+  it('stops at an address the server does not answer to', async () => {
+    const refused = { kind: 'bad_host', message: '이 주소로는 Mori에 들어올 수 없습니다', hint: 'Tailscale 이름으로 여세요' }
+    routes['GET /api/hello'] = () => json(421, { error: refused })
+    await boot()
+    expect(phase.value).toBe('refused')
+    expect(refusal.value).toMatchObject({ status: 421, ...refused })
     expect(FakeWebSocket.all).toHaveLength(0)
   })
 

@@ -125,6 +125,7 @@ func runServe(args []string) error {
 		Folders:   fr,
 		Git:       git,
 		PublicURL: pub,
+		Names:     serverNames(pub, *publicFlag != "", tailscale.DNSName),
 		UI:        webui.Handler(),
 		Logger:    logger,
 		Presence:  pres,
@@ -241,6 +242,23 @@ func publicURL(flagValue, listen string, dnsName func(context.Context) (string, 
 			return "https://" + name
 		}
 		return "http://" + listen
+	}
+}
+
+// serverNames are the names a device may reach this server by: its public
+// URL's, and its Tailscale name too when --public-url named another, since
+// tailscale serve may still forward to it (spec §3 #193).
+func serverNames(pub func() string, flagged bool, dnsName func(context.Context) (string, error)) func() []string {
+	return func() []string {
+		names := []string{pub()}
+		if flagged {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			if name, err := dnsName(ctx); err == nil {
+				names = append(names, name)
+			}
+		}
+		return names
 	}
 }
 

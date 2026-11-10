@@ -7,6 +7,7 @@ import (
 	"net/http/httputil"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/kwonikhyeon/mori/internal/auth"
 	"github.com/kwonikhyeon/mori/internal/core"
@@ -29,6 +30,12 @@ type Deps struct {
 	PublicURL func() string // where devices reach this server, for pairing links
 	UI        http.Handler
 	Logger    *slog.Logger
+
+	// Names are the names devices reach this server by, as URLs or bare
+	// names. A request under /api/, /ws/ or /h/ whose Host is another
+	// name, and not an IP address or localhost, gets 421 (spec §3 #193).
+	// It is asked at most every 10 seconds; nil means PublicURL's.
+	Names func() []string
 
 	// Folders tells which folder and worktree a terminal belongs to and
 	// keeps the worktrees of each folder. New makes one over Store and Git
@@ -58,6 +65,8 @@ type Server struct {
 	proxy   *httputil.ReverseProxy // nil without Deps.Links
 	folders signal                 // fired by FoldersChanged
 	viewers atomic.Int64           // numbers attach sockets for Presence
+	hosts   *hostCheck
+	slow    time.Duration // a request this slow is logged; tests lower it
 }
 
 func New(d Deps) *Server {
@@ -79,7 +88,11 @@ func New(d Deps) *Server {
 	if d.Presence == nil {
 		d.Presence = presence.New()
 	}
-	s := &Server{d: d, log: d.Logger, mux: http.NewServeMux(), hub: newHub()}
+	if d.Names == nil {
+		d.Names = func() []string { return []string{d.PublicURL()} }
+	}
+	s := &Server{d: d, log: d.Logger, mux: http.NewServeMux(), hub: newHub(),
+		hosts: &hostCheck{names: d.Names}, slow: slowRequest}
 	if d.Links != nil {
 		s.proxy = s.newProxy()
 	}
@@ -90,7 +103,8 @@ func New(d Deps) *Server {
 }
 
 // Handler is the root handler with security headers on every response.
-func (s *Server) Handler() http.Handler { return securityHeaders(s.mux) }
+// It logs the slow requests.
+func (s *Server) Handler() http.Handler { return s.timeRequests(securityHeaders(s.mux)) }
 
 // routes puts every API and WebSocket behind requireDevice, but for the
 // relay endpoint, whose secret path is its credential; the web UI itself is

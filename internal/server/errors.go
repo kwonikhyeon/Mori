@@ -45,6 +45,8 @@ func statusFor(kind string) int {
 		return http.StatusUnauthorized
 	case "forbidden_origin":
 		return http.StatusForbidden
+	case "bad_host":
+		return http.StatusMisdirectedRequest
 	case "rate_limited":
 		return http.StatusTooManyRequests
 	case "git_failed":

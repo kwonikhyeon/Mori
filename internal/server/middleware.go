@@ -30,13 +30,18 @@ func isWS(path string) bool {
 	return strings.HasPrefix(path, "/ws/")
 }
 
-// requireDevice guards /api/ and /ws/. Requests that change state and every
-// WebSocket must come from this server's own origin (403 otherwise). API
-// requests need a paired device (401), except the public ones. A WebSocket
-// goes on without one, and its handler closes it with 4401, which a browser
-// can read where it cannot read a refused upgrade.
+// requireDevice guards /api/, /ws/ and /h/. Their Host must be a name of
+// this server (421 otherwise). Requests that change state and every
+// WebSocket must come from this server's own origin (403). API requests
+// need a paired device (401), except the public ones. A WebSocket goes on
+// without one, and its handler closes it with 4401, which a browser can
+// read where it cannot read a refused upgrade.
 func (s *Server) requireDevice(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.hosts.allows(r.Host) {
+			writeError(w, errBadHost)
+			return
+		}
 		ws := isWS(r.URL.Path)
 		if (ws || changesState(r.Method)) && !auth.SameOrigin(r) {
 			writeError(w, errorf(http.StatusForbidden, "forbidden_origin", "다른 출처에서 온 요청은 받지 않습니다"))

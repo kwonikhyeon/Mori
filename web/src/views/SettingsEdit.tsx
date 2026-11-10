@@ -8,6 +8,7 @@ import { Icon } from '../components/Icon'
 import { api } from '../lib/api'
 import { formatArgv, parseArgv } from '../lib/argv'
 import { shortPath } from '../lib/format'
+import { isHere } from '../lib/hosts'
 import { apply, folders, hosts, presets } from '../lib/store'
 import { errorText, toast, toastError } from '../lib/toast'
 import type { FolderView, Preset } from '../lib/types'
@@ -240,15 +241,6 @@ function EditFoot({ add, error, saving, onAdd, onCancel }: EditFootProps) {
       </div>
     </>
   )
-}
-
-/** The link of this page itself. */
-function isHere(url: string): boolean {
-  try {
-    return new URL(url).origin === location.origin
-  } catch {
-    return false
-  }
 }
 
 /* ---------- 다른 호스트 ---------- */

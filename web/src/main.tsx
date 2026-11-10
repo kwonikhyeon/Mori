@@ -5,11 +5,12 @@ import './styles/ui.css'
 import { effect } from '@preact/signals'
 import { render } from 'preact'
 import { App } from './app'
-import { needs, showNeeds } from './lib/badge'
+import { showNeeds } from './lib/badge'
 import { boot } from './lib/boot'
 import { startClock } from './lib/clock'
 import { trackWidth } from './lib/media'
 import { initRouter } from './lib/router'
+import { totalNeeds } from './lib/scope'
 import { initTheme } from './lib/theme'
 import { trackViewport } from './lib/viewport'
 import { startWake } from './lib/wake'
@@ -20,7 +21,7 @@ trackWidth()
 initRouter()
 startClock()
 startWake()
-effect(() => showNeeds(needs.value))
+effect(() => showNeeds(totalNeeds.value))
 render(<App />, document.getElementById('app')!)
 void boot()
 

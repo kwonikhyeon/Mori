@@ -8,6 +8,7 @@ import { apply, conn, resetStore, terminals } from './store'
 const URL = 'ws://macmini.example.ts.net/ws/events'
 
 let unauthorized: Mock<() => void>
+let dropped: Mock<(code: number) => void>
 let stream: EventStream
 
 function snapshot(...addrs: string[]) {
@@ -19,12 +20,14 @@ beforeEach(() => {
   FakeWebSocket.reset()
   resetStore()
   unauthorized = vi.fn<() => void>()
+  dropped = vi.fn<(code: number) => void>()
   stream = new EventStream({
     url: URL,
     socket: FakeWebSocket as unknown as SocketCtor,
     apply,
     setConn: (c) => { conn.value = c },
     onUnauthorized: unauthorized,
+    onDrop: dropped,
     backoff: new Backoff(500, 10_000, 0.2, () => 0.5),
   })
   stream.start()
@@ -153,6 +156,23 @@ describe('EventStream', () => {
     stream.stop()
     expect(ws.closedWith).not.toBeNull()
     vi.advanceTimersByTime(60_000)
+    expect(FakeWebSocket.all).toHaveLength(1)
+  })
+
+  it('tells the close code of every drop it retries', async () => {
+    FakeWebSocket.last().drop(4502)
+    await vi.advanceTimersByTimeAsync(500)
+    FakeWebSocket.last().drop(4404)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(FakeWebSocket.all).toHaveLength(3)
+    FakeWebSocket.last().drop(4401)
+    expect(dropped.mock.calls).toEqual([[4502], [4404]])
+  })
+
+  it("stays stopped when the drop's handler stops it", async () => {
+    dropped.mockImplementation(() => stream.stop())
+    FakeWebSocket.last().drop(1006)
+    await vi.advanceTimersByTimeAsync(10_000)
     expect(FakeWebSocket.all).toHaveLength(1)
   })
 })

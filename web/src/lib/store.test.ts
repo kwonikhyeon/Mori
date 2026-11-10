@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { folder, linkedHost, status, term } from '../../test/fixtures'
-import { apply, applyOverview, conn, core, folders, host, presets, ready, resetStore, terminals } from './store'
+import { apply, applyOverview, conn, core, folders, host, hosts, hostsReady, makeStore, presets, ready, resetStore, terminals } from './store'
 
 beforeEach(() => resetStore())
 
@@ -79,5 +79,20 @@ describe('resetStore', () => {
     expect(terminals.value.size).toBe(0)
     expect(ready.value).toBe(false)
     expect(conn.value).toBe('connecting')
+  })
+})
+
+describe('makeStore', () => {
+  it('takes the host list from the hub only', () => {
+    const o = { host: { name: 'desk', version: '0.11.0' }, core: { connected: true }, folders: [], terminals: [], presets: [], hosts: [linkedHost()] }
+    makeStore().applyOverview(o)
+    expect(hosts.value).toEqual([])
+    expect(hostsReady.value).toBe(false)
+    applyOverview(o)
+    expect(hosts.value.map((h) => h.id)).toEqual(['h_desk0001'])
+    expect(hostsReady.value).toBe(true)
+    resetStore()
+    expect(hosts.value).toEqual([])
+    expect(hostsReady.value).toBe(false)
   })
 })

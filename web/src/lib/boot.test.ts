@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../../test/fakeWs'
-import { term } from '../../test/fixtures'
+import { linkedHost, term } from '../../test/fixtures'
 import { request } from './api'
 import { boot, hello, hostLabel, paired, phase, shutdown } from './boot'
 import { route } from './router'
@@ -104,6 +104,16 @@ describe('boot', () => {
     await request('GET', '/api/devices').catch(() => {})
     expect(phase.value).toBe('pair')
     expect(FakeWebSocket.last().closedWith).not.toBeNull()
+  })
+
+  it('opens a stream for each linked host', async () => {
+    routes['GET /api/overview'] = () => json(200, { ...OVERVIEW, hosts: [linkedHost()] })
+    await boot()
+    FakeWebSocket.last().open()
+    FakeWebSocket.last().json(snapshot())
+    await vi.waitFor(() =>
+      expect(FakeWebSocket.all.map((w) => new URL(w.url).pathname)).toEqual(['/ws/events', '/h/h_desk0001/ws/events']),
+    )
   })
 
   it('leaves /pair for the app once the device is paired', async () => {

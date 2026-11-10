@@ -11,6 +11,8 @@ export interface EventStreamOptions {
   apply: (msg: EventMessage) => void
   setConn: (c: Conn) => void
   onUnauthorized: () => void
+  /** Hears the close code of every drop it tries again after; stopping the stream here keeps it stopped. */
+  onDrop?: (code: number) => void
   url?: string
   socket?: SocketCtor
   backoff?: Backoff
@@ -125,6 +127,8 @@ export class EventStream {
       this.o.onUnauthorized()
       return
     }
+    this.o.onDrop?.(code)
+    if (!this.running) return
     if (code === GOING_AWAY) {
       this.set('restarting')
       this.later(this.o.restartGrace ?? 30_000)

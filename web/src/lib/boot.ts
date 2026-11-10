@@ -1,21 +1,21 @@
 // How the page starts (spec §3 #121, #130, #131): ask the server whether
 // this device is paired, then open the event stream or show pairing. A
 // 4401 on the stream or a 401 from any call goes back to pairing.
-import { computed, effect, signal } from '@preact/signals'
+import { effect, signal } from '@preact/signals'
 import { api, onUnauthorized } from './api'
 import { EventStream } from './events'
+import { hello, hostLabel } from './hello'
 import { parseHash, route } from './router'
-import { apply, applyOverview, conn, host, resetStore } from './store'
+import { startHosts } from './scope'
+import { apply, applyOverview, conn, resetStore } from './store'
 import type { Hello } from './types'
 import { onWake } from './wake'
+
+export { hello, hostLabel }
 
 export type Phase = 'loading' | 'pair' | 'app'
 
 export const phase = signal<Phase>('loading')
-/** What GET /api/hello said; null when it could not be asked. */
-export const hello = signal<Hello | null>(null)
-/** This host's name: the overview's once it came, hello's before. */
-export const hostLabel = computed(() => host.value?.name ?? hello.value?.host ?? '')
 
 let stream: EventStream | null = null
 let stops: (() => void)[] = []
@@ -74,6 +74,8 @@ function start(): void {
       if (conn.value === 'open') void loadOverview()
     }),
   )
+  // A stream of its own for each host linked to this hub (spec §3 #170).
+  stops.push(startHosts())
   s.start()
 }
 

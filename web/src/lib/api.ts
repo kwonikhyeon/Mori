@@ -27,22 +27,59 @@ export function onUnauthorized(fn: (() => void) | null): void {
   unauthorized = fn
 }
 
+// How long a call may go unanswered (spec §3 #179). A phone on a weak
+// network can wait minutes for an answer that is not coming, with the button
+// still busy.
+export const READ_LIMIT = 20_000
+export const WRITE_LIMIT = 75_000 // an interrupt may wait 60 s (spec §3 #41)
+export const UPLOAD_LIMIT = 300_000
+
+let writes = 0
+
+/** How many calls that change something are on their way; a reload waits for them (spec §3 #182). */
+export function writesInFlight(): number {
+  return writes
+}
+
 export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const init: RequestInit = { method, credentials: 'same-origin' }
+  const ctl = new AbortController()
+  const read = method === 'GET'
+  const limit = body instanceof FormData ? UPLOAD_LIMIT : read ? READ_LIMIT : WRITE_LIMIT
+  const timer = setTimeout(() => ctl.abort(), limit)
+  if (!read) writes++
+  try {
+    return await call<T>(method, path, body, ctl.signal)
+  } finally {
+    clearTimeout(timer)
+    if (!read) writes--
+  }
+}
+
+async function call<T>(method: string, path: string, body: unknown, signal: AbortSignal): Promise<T> {
+  const init: RequestInit = { method, credentials: 'same-origin', signal }
   if (body instanceof FormData) {
     init.body = body
   } else if (body !== undefined) {
     init.headers = { 'Content-Type': 'application/json' }
     init.body = JSON.stringify(body)
   }
+  const failed = () =>
+    signal.aborted
+      ? new ApiError(0, 'timeout', '서버가 제때 답하지 않았습니다')
+      : new ApiError(0, 'network', '서버에 연결할 수 없습니다')
   let res: Response
   try {
     res = await fetch(path, init)
   } catch {
-    throw new ApiError(0, 'network', '서버에 연결할 수 없습니다')
+    throw failed()
   }
   if (res.status === 204) return undefined as T
-  const text = await res.text()
+  let text: string
+  try {
+    text = await res.text()
+  } catch {
+    throw failed()
+  }
   let data: unknown
   try {
     data = text ? JSON.parse(text) : undefined

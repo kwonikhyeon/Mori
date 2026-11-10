@@ -54,6 +54,7 @@ const items = (menu: HTMLElement) => [...menu.querySelectorAll('[role^="menuitem
 const sent = (path: string, method = 'POST') => calls.filter((c) => c.url === path && c.method === method)
 
 beforeEach(() => {
+  localStorage.clear()
   FakeWebSocket.reset()
   FakeScreen.reset()
   vi.stubGlobal('WebSocket', FakeWebSocket)
@@ -124,6 +125,32 @@ describe('Terminal on a PC', () => {
     fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
     await vi.waitFor(() => expect(box.value).toBe(''))
     expect(sent('/api/terminals/t1/send').map((c) => c.body)).toEqual([{ text: 'fix the test\nthen run it' }])
+  })
+
+  it('sends the syllable still being composed once the IME has put it in', async () => {
+    await mount()
+    const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+    fireEvent.input(box, { target: { value: '테스트 돌려' } })
+    fireEvent.keyDown(box, { key: 'Enter', metaKey: true, isComposing: true })
+    fireEvent.input(box, { target: { value: '테스트 돌려줘' } })
+    expect(calls).toEqual([])
+    fireEvent.compositionEnd(box)
+    await vi.waitFor(() => expect(box.value).toBe(''))
+    expect(sent('/api/terminals/t1/send').map((c) => c.body)).toEqual([{ text: '테스트 돌려줘' }])
+  })
+
+  it('keeps what was typed until it is sent, on this device', async () => {
+    const first = await mount()
+    fireEvent.input(screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }), { target: { value: '반쯤 쓴 글' } })
+    first.unmount()
+    await mount()
+    const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+    expect(box.value).toBe('반쯤 쓴 글')
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+    await vi.waitFor(() => expect(box.value).toBe(''))
+    cleanup()
+    await mount()
+    expect((screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement).value).toBe('')
   })
 
   it("shows the screen's end once several lines are sent or the program is interrupted", async () => {

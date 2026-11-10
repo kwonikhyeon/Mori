@@ -278,6 +278,38 @@ describe('AttachSession', () => {
     expect(FakeWebSocket.all).toHaveLength(2)
   })
 
+  it('asks an attached socket whether it is alive when nudged, and keeps one that answers', () => {
+    const { s, states } = session()
+    const ws = attached()
+    s.nudge()
+    s.nudge() // one ping out at a time
+    expect(ws.messages().filter((m) => m.type === 'ping')).toHaveLength(1)
+    ws.json({ type: 'pong' })
+    vi.advanceTimersByTime(10_000)
+    s.nudge()
+    ws.receive(new Uint8Array([0x61])) // output answers as well
+    vi.advanceTimersByTime(10_000)
+    expect(FakeWebSocket.all).toHaveLength(1)
+    expect(ws.closedWith).toBeNull()
+    expect(ws.messages().filter((m) => m.type === 'ping')).toHaveLength(2)
+    expect(states).toEqual(['open'])
+  })
+
+  it('attaches again at once when the nudged socket does not answer', () => {
+    const { s, states } = session()
+    const ws = attached()
+    s.nudge()
+    vi.advanceTimersByTime(3_999)
+    expect(FakeWebSocket.all).toHaveLength(1)
+    vi.advanceTimersByTime(1)
+    expect(ws.closedWith).not.toBeNull()
+    expect(FakeWebSocket.all).toHaveLength(2)
+    expect(FakeWebSocket.last().query().get('resumed')).toBe('1')
+    expect(states).toEqual(['open', 'reconnecting'])
+    attached()
+    expect(s.state).toBe('open')
+  })
+
   it('stops for good', () => {
     const { s } = session()
     const ws = attached()

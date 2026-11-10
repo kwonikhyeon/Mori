@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"maps"
 	"net/http"
 	"slices"
@@ -146,14 +147,17 @@ func (f *eventFeed) foldersChanged() []any {
 }
 
 // handleEventsWS streams changes to the browser (spec §7.2): a snapshot,
-// then each change. The browser sends nothing on it.
+// then each change. The browser sends only pings, each answered with a pong.
 func (s *Server) handleEventsWS(w http.ResponseWriter, r *http.Request) {
 	c, done, ok := s.acceptWS(w, r)
 	if !ok {
 		return
 	}
 	defer done()
-	ctx := c.CloseRead(r.Context())
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	pings := make(chan struct{}, 1)
+	go func() { defer cancel(); readPings(ctx, c, pings) }()
 	folders, unsubscribe := s.folders.subscribe() // before the snapshot, so no change slips between
 	defer unsubscribe()
 	wt := s.d.Core.Watch(watchBuffer)
@@ -187,12 +191,40 @@ func (s *Server) handleEventsWS(w http.ResponseWriter, r *http.Request) {
 			msgs = f.foldersChanged()
 		case <-tick.C:
 			msgs = append(msgs, map[string]string{"type": "ping"})
+		case <-pings:
+			msgs = append(msgs, map[string]string{"type": "pong"})
 		}
 		for _, m := range msgs {
 			if err := writeWS(ctx, c, m); err != nil {
 				c.CloseNow()
 				return
 			}
+		}
+	}
+}
+
+// readPings reads what the browser sends on the events socket. A phone back
+// from sleep may hold a socket that still says it is open while nothing
+// reaches it, so the browser asks with {"type":"ping"} and waits for the
+// pong (spec §3 #178). Anything else closes the socket with 1008, as
+// CloseRead did. It also keeps the socket read, which keepAlive and Close
+// need. It returns when the socket ends.
+func readPings(ctx context.Context, c *websocket.Conn, pings chan<- struct{}) {
+	for {
+		typ, b, err := c.Read(ctx)
+		if err != nil {
+			return
+		}
+		var m struct {
+			Type string `json:"type"`
+		}
+		if typ != websocket.MessageText || json.Unmarshal(b, &m) != nil || m.Type != "ping" {
+			c.Close(websocket.StatusPolicyViolation, "이벤트 소켓에는 ping만 보냅니다")
+			return
+		}
+		select {
+		case pings <- struct{}{}:
+		default: // a pong is on its way already
 		}
 	}
 }

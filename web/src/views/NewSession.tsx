@@ -6,6 +6,7 @@ import { Fragment, type ComponentChildren } from 'preact'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Icon } from '../components/Icon'
 import { homeWorktree, shortPath, wtLabel } from '../lib/format'
+import { useChordSubmit } from '../lib/ime'
 import { isApple } from '../lib/platform'
 import { sessionsByWorktree } from '../lib/queue'
 import { useHost } from '../lib/scope'
@@ -172,6 +173,7 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
   }
 
   const apple = isApple()
+  const chord = useChordSubmit((f) => f.form?.requestSubmit())
   const hostName = h.name.value
   const head =
     variant === 'phone' ? (
@@ -317,11 +319,8 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
                     aria-describedby={id + '-th'}
                     aria-keyshortcuts={apple ? 'Meta+Enter' : 'Control+Enter'}
                     onInput={(e) => setTask(e.currentTarget.value)}
-                    onKeyDown={(e) => {
-                      if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.isComposing) return
-                      e.preventDefault()
-                      e.currentTarget.form?.requestSubmit()
-                    }}
+                    onKeyDown={chord.onKeyDown}
+                    onCompositionEnd={chord.onCompositionEnd}
                   />
                   <p class="field-hint" id={id + '-th'}>
                     세션을 만들자마자 프로그램에 보냅니다.

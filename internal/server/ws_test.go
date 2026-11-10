@@ -244,6 +244,27 @@ func TestEventsWithCoreDown(t *testing.T) {
 	}
 }
 
+func TestEventsAnswerPingsOnly(t *testing.T) {
+	e := newTestEnv(t)
+	e.pair()
+	ev := e.client("/ws/events")
+	ev.untilMsg("snapshot", isType("snapshot"))
+	for range 2 {
+		ev.send(map[string]any{"type": "ping"})
+		ev.untilMsg("pong", isType("pong"))
+	}
+	ev.send(map[string]any{"type": "resize", "cols": 80, "rows": 24})
+	if code := ev.closed(); code != websocket.StatusPolicyViolation {
+		t.Fatal(code)
+	}
+	bin := e.client("/ws/events")
+	bin.untilMsg("snapshot", isType("snapshot"))
+	bin.input("ping")
+	if code := bin.closed(); code != websocket.StatusPolicyViolation {
+		t.Fatal(code)
+	}
+}
+
 func TestEventFeed(t *testing.T) {
 	e := newTestEnv(t)
 	one := e.addFolder(filepath.FromSlash("/w/one"))
@@ -349,6 +370,8 @@ func TestAttachRoundTripSizeAndClose(t *testing.T) {
 	a.send(map[string]any{"type": "focus", "focused": true})
 	e.eventually(func() bool { return e.s.d.Presence.Focused(tv.Address) })
 	a.send(map[string]any{"type": "display", "fg": "#ddeeff", "bg": "#112233", "cell": []int{8, 16}})
+	a.send(map[string]any{"type": "ping"})
+	a.untilMsg("pong", isType("pong"))
 	a.send(map[string]any{"type": "nonsense"})
 	a.write(websocket.MessageText, []byte("{not json"))
 	a.input("echo still-$((5+5))\r") // what the browser got wrong did not end the session

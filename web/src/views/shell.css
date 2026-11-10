@@ -233,9 +233,32 @@ a.tab[aria-current="page"] {
 }
 
 .tab-icon {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+/* A new build of the hub waits (spec §3 #182). */
+.nav-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
+  pointer-events: none;
+}
+
+.tab-icon .nav-dot {
+  top: -1px;
+  right: -3px;
+}
+
+.pc-head-end .btn-icon {
+  position: relative;
 }
 
 .tab-badge {

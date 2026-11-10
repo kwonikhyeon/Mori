@@ -15,6 +15,7 @@ import { HostContext, hub, scopeOf, useHost, type HostScope } from '../lib/scope
 import { hostsReady } from '../lib/store'
 import { setTheme, theme, THEME_LABEL, type ThemePref } from '../lib/theme'
 import { toast } from '../lib/toast'
+import { newBuild } from '../lib/update'
 import { CommitPanel } from './Commit'
 import { FolderList } from './Folders'
 import { GitPanel, GitScreen, gitFrom } from './Git'
@@ -249,6 +250,7 @@ function PcShell() {
 function PcHeader() {
   const h = useHost()
   const r = route.value
+  const fresh = newBuild.value !== null
   return (
     <header class="pc-head">
       <a class="wordmark" href={h.href({ name: 'queue' })}>
@@ -263,8 +265,9 @@ function PcHeader() {
           <Icon name="plus" stroke={2} />새 세션
         </a>
         <ThemeButton />
-        <a class="btn btn-icon" href={h.href({ name: 'settings' })} aria-label="설정" title="설정" aria-current={r.name === 'settings' ? 'page' : undefined}>
+        <a class="btn btn-icon" href={h.href({ name: 'settings' })} aria-label={fresh ? '설정, 새 버전이 있습니다' : '설정'} title={fresh ? '설정 · 새 버전이 있습니다' : '설정'} aria-current={r.name === 'settings' ? 'page' : undefined}>
           <Icon name="sliders" size={18} />
+          {fresh && <span class="nav-dot" aria-hidden="true" />}
         </a>
       </div>
     </header>
@@ -408,6 +411,7 @@ function PhoneTab({ tab, title, sub, fab = false, children }: PhoneTabProps) {
 function TabBar({ current }: { current: Tab }) {
   const h = useHost()
   const n = h.needs.value
+  const fresh = newBuild.value !== null
   const tab = (t: Tab, to: string, icon: IconName, label: string, extra?: ComponentChildren) => (
     <a class="tab" href={to} aria-current={current === t ? 'page' : undefined}>
       <span class="tab-icon">
@@ -416,6 +420,7 @@ function TabBar({ current }: { current: Tab }) {
       </span>
       {label}
       {t === 'queue' && n > 0 && <span class="sr-only">, 볼 것 {n}개</span>}
+      {t === 'settings' && fresh && <span class="sr-only">, 새 버전이 있습니다</span>}
     </a>
   )
   return (
@@ -426,7 +431,7 @@ function TabBar({ current }: { current: Tab }) {
         </span>
       ))}
       {tab('folders', h.href({ name: 'folders' }), 'folder', '폴더')}
-      {tab('settings', h.href({ name: 'settings' }), 'sliders', '설정')}
+      {tab('settings', h.href({ name: 'settings' }), 'sliders', '설정', fresh && <span class="nav-dot" aria-hidden="true" />)}
     </nav>
   )
 }

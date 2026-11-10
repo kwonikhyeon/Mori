@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { api, ApiError, apiFor, hostPrefix, hubUnpaired, onUnauthorized, request, termPath, wsURL, type HostApi } from './api'
+import {
+  api, ApiError, apiFor, hostPrefix, hubUnpaired, onUnauthorized, READ_LIMIT, request, termPath, UPLOAD_LIMIT, WRITE_LIMIT, wsURL,
+  type HostApi,
+} from './api'
 
 type Call = { url: string; init: RequestInit }
 
@@ -58,6 +61,47 @@ describe('request', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
     const err = await request('GET', '/api/overview').catch((e) => e)
     expect(err).toMatchObject({ status: 0, kind: 'network', message: '서버에 연결할 수 없습니다' })
+  })
+
+  it('gives up on a server that does not answer in time', async () => {
+    vi.useFakeTimers()
+    try {
+      // fetch rejects when its signal aborts, as the browser's does
+      vi.stubGlobal('fetch', vi.fn((url: string, init: RequestInit) => {
+        calls.push({ url, init })
+        return new Promise<Response>((_, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+        })
+      }))
+      const at = (method: string, body?: unknown) => request(method, '/api/x', body).catch((e) => e)
+      const read = at('GET')
+      const write = at('POST', { text: 'x' })
+      const upload = at('POST', new FormData())
+      await vi.advanceTimersByTimeAsync(READ_LIMIT - 1)
+      expect(calls.map((c) => c.init.signal?.aborted)).toEqual([false, false, false])
+      await vi.advanceTimersByTimeAsync(1)
+      expect(await read).toMatchObject({ status: 0, kind: 'timeout', message: '서버가 제때 답하지 않았습니다' })
+      await vi.advanceTimersByTimeAsync(WRITE_LIMIT - READ_LIMIT)
+      expect(await write).toMatchObject({ kind: 'timeout' })
+      expect(calls[2].init.signal?.aborted).toBe(false)
+      await vi.advanceTimersByTimeAsync(UPLOAD_LIMIT - WRITE_LIMIT)
+      expect(await upload).toMatchObject({ kind: 'timeout' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops the clock once the answer came', async () => {
+    vi.useFakeTimers()
+    try {
+      await request('GET', '/api/overview')
+      expect(vi.getTimerCount()).toBe(0)
+      reply = () => json(500, {})
+      await request('POST', '/api/logout').catch(() => {})
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('calls the unauthorized hook for an unpaired device only', async () => {

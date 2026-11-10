@@ -298,9 +298,11 @@ export type EventMessage =
   | { type: 'folders'; folders: FolderView[] }
   | ({ type: 'core' } & CoreStatus)
   | { type: 'ping' }
+  | { type: 'pong' }
 
 /** The JSON messages of /ws/attach from the server (spec §7.3). */
 export type AttachMessage =
   | { type: 'attached'; terminal: TerminalView; cols: number; rows: number }
   | { type: 'size'; cols: number; rows: number }
   | { type: 'closed'; reason: string; exit_code: number | null; signal: number | null }
+  | { type: 'pong' }

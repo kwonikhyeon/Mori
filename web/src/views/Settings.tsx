@@ -9,6 +9,7 @@ import { versionText } from '../lib/format'
 import { useHost } from '../lib/scope'
 import { setTheme, theme, THEME_LABEL, type ThemePref } from '../lib/theme'
 import type { CoreStatus } from '../lib/types'
+import { newBuild, reloadPage } from '../lib/update'
 import { DeviceCards } from './SettingsDevices'
 import { nameOf } from './HostSwitch'
 import { FoldersCard, PresetsCard } from './SettingsEdit'
@@ -25,8 +26,10 @@ export interface SettingsProps {
 export function Settings({ variant }: SettingsProps) {
   const h = useHost()
   const isHub = h.id === ''
+  const fresh = newBuild.value
   const col = (
     <div class="st-col">
+      {fresh && <UpdateCard version={fresh} />}
       {isHub ? (
         <>
           <PushCards />
@@ -59,6 +62,26 @@ export function Settings({ variant }: SettingsProps) {
       </header>
       <div class="st-scroll">{col}</div>
     </div>
+  )
+}
+
+/** The hub runs a newer build than this page (spec §3 #182). */
+function UpdateCard({ version }: { version: string }) {
+  const id = useId()
+  return (
+    <section class="st-card" aria-labelledby={id}>
+      <div class="st-card-head">
+        <h2 id={id} class="st-h2">
+          새 버전
+        </h2>
+        <button type="button" class="btn btn-primary btn-sm" onClick={reloadPage}>
+          새로고침
+        </button>
+      </div>
+      <p class="st-hint">
+        허브가 {versionText(version)} 버전으로 바뀌었습니다. 쓰던 글은 새로 고쳐도 남습니다.
+      </p>
+    </section>
   )
 }
 

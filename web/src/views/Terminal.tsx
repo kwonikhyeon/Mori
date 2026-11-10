@@ -11,8 +11,10 @@ import { Menu, type MenuItem } from '../components/Menu'
 import { ApiError } from '../lib/api'
 import type { Closed, Size } from '../lib/attach'
 import { now } from '../lib/clock'
+import { draftKey, loadDraft, saveDraft } from '../lib/drafts'
 import { fitSize } from '../lib/fit'
 import { appName, askText, chip, endText, place, type EndFacts } from '../lib/format'
+import { useChordSubmit } from '../lib/ime'
 import { QUICK_KEYS } from '../lib/keys'
 import { isApple } from '../lib/platform'
 import { navigate, parseHash } from '../lib/router'
@@ -333,7 +335,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const askBar = blocked && t && <AskBar t={t} phone={phone} id={id} onKey={answer} />
   const observeBar = observing && active && <ObserveBar onOff={() => observe(false)} />
   const endBar = finished && <EndBar t={t} ended={ended} onRemove={() => void remove()} />
-  const composer = canType && <Composer addr={addr} phone={phone} id={id} onSent={toEnd} />
+  const composer = canType && <Composer key={draftKey(h.id, addr)} addr={addr} phone={phone} id={id} onSent={toEnd} />
 
   if (!phone) {
     return (
@@ -583,21 +585,29 @@ function QuickKeys({ link, open }: { link: TermLink | null; open: boolean }) {
   )
 }
 
-/** Several lines sent at once with POST send (spec §3 #124). */
+/**
+ * Several lines sent at once with POST send (spec §3 #124). What is typed
+ * stays as this device's draft until it is sent (spec §3 #181).
+ */
 function Composer({ addr, phone, id, onSent }: { addr: string; phone: boolean; id: string; onSent: () => void }) {
   const h = useHost()
-  const [text, setText] = useState('')
+  const draft = draftKey(h.id, addr)
+  const [text, setText] = useState(() => loadDraft(draft))
   const [busy, setBusy] = useState(false)
   const [held, setHeld] = useState(false)
   const field = id + '-send'
   const apple = isApple()
-  const submit = async () => {
-    if (busy || text.trim() === '') return
+  const edit = (v: string) => {
+    setText(v)
+    saveDraft(draft, v)
+  }
+  const submit = async (value: string) => {
+    if (busy || value.trim() === '') return
     setBusy(true)
     setHeld(false)
     try {
-      await h.api.terminals.send(addr, text)
-      setText('')
+      await h.api.terminals.send(addr, value)
+      edit('')
       onSent()
     } catch (e) {
       if (e instanceof ApiError && e.kind === 'blocked') setHeld(true)
@@ -606,6 +616,7 @@ function Composer({ addr, phone, id, onSent }: { addr: string; phone: boolean; i
       setBusy(false)
     }
   }
+  const chord = useChordSubmit((f) => void submit(f.value))
   return (
     <div class="term-compose">
       {held && (
@@ -617,7 +628,7 @@ function Composer({ addr, phone, id, onSent }: { addr: string; phone: boolean; i
         class="term-send"
         onSubmit={(e) => {
           e.preventDefault()
-          void submit()
+          void submit(text)
         }}
       >
         <label class="sr-only" for={field}>
@@ -626,20 +637,18 @@ function Composer({ addr, phone, id, onSent }: { addr: string; phone: boolean; i
         <textarea
           id={field}
           class="input term-send-input"
+          data-draft=""
           rows={phone ? 1 : 2}
           value={text}
           readOnly={busy}
           placeholder={phone ? '여러 줄로 보내기' : `여러 줄로 보내기 · ${apple ? '⌘Enter' : 'Ctrl+Enter'}`}
           aria-keyshortcuts={apple ? 'Meta+Enter' : 'Control+Enter'}
           onInput={(e) => {
-            setText(e.currentTarget.value)
+            edit(e.currentTarget.value)
             setHeld(false)
           }}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.isComposing) return
-            e.preventDefault()
-            void submit()
-          }}
+          onKeyDown={chord.onKeyDown}
+          onCompositionEnd={chord.onCompositionEnd}
         />
         <button type="submit" class="btn btn-primary term-send-btn" aria-label={phone ? '보내기' : undefined} disabled={busy || text.trim() === ''}>
           <Icon name="send" size={phone ? 20 : 16} stroke={2} />

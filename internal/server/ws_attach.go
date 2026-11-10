@@ -272,6 +272,10 @@ func (a *attachment) input(ctx context.Context, st *hc.Stream, addr string) {
 			if !a.q.observe {
 				st.Facts(m.Display)
 			}
+		case "ping": // is the socket alive? (spec §3 #178)
+			if writeWS(ctx, a.c, map[string]string{"type": "pong"}) != nil {
+				return
+			}
 		}
 	}
 }

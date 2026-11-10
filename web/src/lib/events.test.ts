@@ -150,6 +150,38 @@ describe('EventStream', () => {
     expect(FakeWebSocket.all).toHaveLength(2)
   })
 
+  it('asks an open socket whether it is alive when nudged, and keeps one that answers', () => {
+    const ws = FakeWebSocket.last()
+    ws.open()
+    snapshot('t1')
+    stream.nudge()
+    stream.nudge() // one ping out at a time
+    expect(ws.messages()).toEqual([{ type: 'ping' }])
+    ws.json({ type: 'pong' })
+    vi.advanceTimersByTime(10_000)
+    expect(FakeWebSocket.all).toHaveLength(1)
+    expect(ws.closedWith).toBeNull()
+    expect(conn.value).toBe('open')
+    expect([...terminals.value.keys()]).toEqual(['t1'])
+  })
+
+  it('makes a new socket at once when the nudged one does not answer', () => {
+    const ws = FakeWebSocket.last()
+    ws.open()
+    snapshot('t1')
+    stream.nudge()
+    vi.advanceTimersByTime(3_999)
+    expect(FakeWebSocket.all).toHaveLength(1)
+    vi.advanceTimersByTime(1)
+    expect(ws.closedWith).not.toBeNull()
+    expect(dropped.mock.calls).toEqual([[1006]])
+    expect(FakeWebSocket.all).toHaveLength(2)
+    FakeWebSocket.last().open()
+    snapshot('t2')
+    expect(conn.value).toBe('open')
+    expect([...terminals.value.keys()]).toEqual(['t2'])
+  })
+
   it('stays down after stop', () => {
     const ws = FakeWebSocket.last()
     ws.open()

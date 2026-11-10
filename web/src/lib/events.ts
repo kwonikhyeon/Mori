@@ -22,8 +22,11 @@ export interface EventStreamOptions {
   restartGrace?: number
   /** Silence that counts as a dead socket; the server pings every 30 s. */
   silence?: number
+  /** How long a nudged socket has to answer its ping. */
+  probe?: number
 }
 
+const OPEN = 1
 const GOING_AWAY = 1001 // the server stops
 const OVERFLOW = 1013 // the server dropped us for falling behind
 const UNPAIRED = 4401
@@ -35,6 +38,7 @@ export class EventStream {
   private retry: Timer | undefined
   private banner: Timer | undefined
   private watchdog: Timer | undefined
+  private probing: Timer | undefined
   private state: Conn = 'connecting'
   private running = false
   private readonly backoff: Backoff
@@ -60,11 +64,34 @@ export class EventStream {
     this.detach()?.close()
   }
 
-  /** Tries now instead of waiting out the backoff: the page or the network came back. */
+  /**
+   * The page or the network came back. Waiting out the backoff, it tries
+   * now. With a socket open, it asks the server: a phone back from sleep can
+   * hold a socket that says it is open while nothing reaches it, and one
+   * that does not answer soon is dropped and made again (spec §3 #178).
+   */
   nudge(): void {
-    if (!this.running || this.ws) return
-    clearTimeout(this.retry)
-    this.connect()
+    if (!this.running) return
+    const ws = this.ws
+    if (!ws) {
+      clearTimeout(this.retry)
+      this.connect()
+      return
+    }
+    if (ws.readyState !== OPEN || this.probing !== undefined) return
+    this.probing = setTimeout(() => {
+      this.probing = undefined
+      this.detach()?.close()
+      this.dropped(1006)
+      if (this.retry === undefined) return
+      clearTimeout(this.retry)
+      this.connect()
+    }, this.o.probe ?? 4_000)
+    try {
+      ws.send('{"type":"ping"}')
+    } catch {
+      // the probe runs out
+    }
   }
 
   private connect(): void {
@@ -74,6 +101,8 @@ export class EventStream {
     ws.onclose = (e) => {
       this.ws = null
       clearTimeout(this.watchdog)
+      clearTimeout(this.probing)
+      this.probing = undefined
       this.dropped(e.code)
     }
     this.ws = ws
@@ -84,6 +113,8 @@ export class EventStream {
   private detach(): WebSocket | null {
     const ws = this.ws
     clearTimeout(this.watchdog)
+    clearTimeout(this.probing)
+    this.probing = undefined
     this.ws = null
     if (ws) {
       ws.onmessage = null
@@ -102,6 +133,8 @@ export class EventStream {
 
   private onMessage(e: MessageEvent): void {
     this.arm()
+    clearTimeout(this.probing)
+    this.probing = undefined
     if (typeof e.data !== 'string') return
     let msg: EventMessage
     try {
@@ -109,7 +142,7 @@ export class EventStream {
     } catch {
       return
     }
-    if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string' || msg.type === 'ping') return
+    if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string' || msg.type === 'ping' || msg.type === 'pong') return
     this.o.apply(msg)
     if (msg.type === 'snapshot') {
       this.backoff.reset()

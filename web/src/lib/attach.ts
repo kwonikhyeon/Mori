@@ -54,6 +54,8 @@ export interface AttachOptions {
   socket?: SocketCtor
   backoff?: Backoff
   onUnauthorized?: () => void
+  /** How long a nudged socket has to answer its ping. */
+  probe?: number
 }
 
 type Handlers = { [K in keyof AttachEvents]: Set<(v: AttachEvents[K]) => void> }
@@ -73,6 +75,7 @@ export class AttachSession {
 
   private ws: WebSocket | null = null
   private retry: ReturnType<typeof setTimeout> | undefined
+  private probing: ReturnType<typeof setTimeout> | undefined
   private attachedOnce = false
   private stopped = false
   private want: Size | null
@@ -112,20 +115,31 @@ export class AttachSession {
     this.stopped = true
     clearTimeout(this.retry)
     this.retry = undefined
-    const ws = this.ws
-    this.ws = null
-    if (ws) {
-      ws.onmessage = null
-      ws.onclose = null
-      ws.close()
-    }
+    this.detach()?.close()
   }
 
-  /** Tries now instead of waiting out the backoff. */
+  /**
+   * The page, the network, the core or the terminal came back. Waiting out
+   * the backoff, it tries now. Attached, it asks the server, and attaches
+   * again when no answer comes soon: a phone back from sleep can hold a
+   * socket that says it is open while nothing reaches it (spec §3 #178).
+   */
   nudge(): void {
-    if (this.stopped || this.ws || this.retry === undefined) return
-    clearTimeout(this.retry)
-    this.connect()
+    if (this.stopped) return
+    if (!this.ws) {
+      if (this.retry === undefined) return
+      clearTimeout(this.retry)
+      this.connect()
+      return
+    }
+    if (!this.writable() || this.probing !== undefined) return
+    this.probing = setTimeout(() => {
+      this.probing = undefined
+      this.detach()?.close()
+      this.setState('reconnecting')
+      this.connect()
+    }, this.o.probe ?? 4_000)
+    this.json({ type: 'ping' })
   }
 
   /** The event stream heard the core; a session waiting for it goes back now. */
@@ -178,6 +192,19 @@ export class AttachSession {
     return this.state === 'open' && this.ws?.readyState === OPEN
   }
 
+  /** Takes the socket out of the session; what it does next is not heard. */
+  private detach(): WebSocket | null {
+    const ws = this.ws
+    clearTimeout(this.probing)
+    this.probing = undefined
+    this.ws = null
+    if (ws) {
+      ws.onmessage = null
+      ws.onclose = null
+    }
+    return ws
+  }
+
   private json(v: object): void {
     this.ws!.send(JSON.stringify(v))
   }
@@ -198,13 +225,15 @@ export class AttachSession {
     ws.binaryType = 'arraybuffer'
     ws.onmessage = (e) => this.onMessage(e)
     ws.onclose = (e) => {
-      this.ws = null
+      this.detach()
       this.onClose(e)
     }
     this.ws = ws
   }
 
   private onMessage(e: MessageEvent): void {
+    clearTimeout(this.probing)
+    this.probing = undefined
     if (typeof e.data !== 'string') {
       this.emit('data', new Uint8Array(e.data as ArrayBuffer))
       return

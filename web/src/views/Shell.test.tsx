@@ -12,6 +12,7 @@ import { conn, core, folders, hostsReady, ready, resetStore, terminals } from '.
 import { theme } from '../lib/theme'
 import { toasts } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
+import { newBuild, resetUpdates, startUpdates } from '../lib/update'
 import { gitFrom } from './Git'
 import { phoneBack, Shell } from './Shell'
 import { forgetCommits } from './useLog'
@@ -106,6 +107,7 @@ afterEach(() => {
   forgetCommits()
   hostsReady.value = false
   toasts.value = []
+  resetUpdates()
   vi.unstubAllGlobals()
 })
 
@@ -295,6 +297,28 @@ describe('PC', () => {
     expect(theme.value).toBe('system')
   })
 
+  it('marks 설정 while the hub runs a new build, and its card reloads the page', async () => {
+    settingsServer()
+    const reload = vi.fn()
+    const stop = startUpdates({ reload })
+    at(1440, { name: 'settings' })
+    render(<Shell />)
+    expect(screen.getByRole('link', { name: '설정' }).querySelector('.nav-dot')).toBeNull()
+    expect(screen.queryByRole('heading', { name: '새 버전' })).toBeNull()
+    act(() => {
+      newBuild.value = 'bbb2222'
+    })
+    expect(screen.getByRole('link', { name: '설정, 새 버전이 있습니다' }).querySelector('.nav-dot')).toBeTruthy()
+    const main = screen.getByRole('main')
+    expect(within(main).getAllByRole('heading', { level: 2 })[0].textContent).toBe('새 버전')
+    expect(main.querySelector('.st-card')!.textContent).toContain('허브가 bbb2222 버전으로 바뀌었습니다.')
+    expect(reload).not.toHaveBeenCalled() // a screen with forms waits for the button
+    fireEvent.click(within(main).getByRole('button', { name: '새로고침' }))
+    expect(reload).toHaveBeenCalledTimes(1)
+    stop()
+    await screen.findByRole('heading', { name: '기기 1' })
+  })
+
   it("waits for the host list before a host's link", async () => {
     at(1440, { name: 'terminal', addr: 't1', git: false, host: 'h_desk0001' })
     render(<Shell />)
@@ -385,6 +409,14 @@ describe('phone', () => {
     expect(screen.queryByRole('button', { name: /^호스트/ })).toBeNull()
     expect(await screen.findByRole('heading', { name: '기기 1' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '화면' })).toBeTruthy()
+  })
+
+  it('marks the settings tab while the hub runs a new build', () => {
+    newBuild.value = 'bbb2222'
+    at(390, { name: 'queue' })
+    render(<Shell />)
+    const tab = within(screen.getByRole('navigation', { name: '주 메뉴' })).getByRole('link', { name: '설정, 새 버전이 있습니다' })
+    expect(tab.querySelector('.nav-dot')).toBeTruthy()
   })
 
   it("speaks of the last list above an unreachable host's queue", () => {

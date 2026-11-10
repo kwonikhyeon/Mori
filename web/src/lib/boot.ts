@@ -9,6 +9,7 @@ import { parseHash, route } from './router'
 import { startHosts } from './scope'
 import { apply, applyOverview, conn, resetStore } from './store'
 import type { Hello } from './types'
+import { startUpdates } from './update'
 import { onWake } from './wake'
 
 export { hello, hostLabel }
@@ -76,6 +77,8 @@ function start(): void {
   )
   // A stream of its own for each host linked to this hub (spec §3 #170).
   stops.push(startHosts())
+  // A new build of the hub reloads the page when that loses nothing (spec §3 #182).
+  stops.push(startUpdates())
   s.start()
 }
 

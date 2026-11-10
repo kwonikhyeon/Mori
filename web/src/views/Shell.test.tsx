@@ -324,6 +324,17 @@ describe('PC', () => {
     expect(screen.getByRole('heading', { name: 'desk 연결이 끊겼습니다' })).toBeTruthy()
     expect(FakeWebSocket.all.filter((w) => w.url.includes('/ws/attach'))).toHaveLength(0)
   })
+
+  // The sidebar's list is there beside every screen.
+  it("speaks of the sidebar's last list while a host is out of reach", () => {
+    settingsServer()
+    const s = withHost()
+    s.ready.value = true
+    s.unreachable.value = true
+    at(1440, { name: 'settings', host: 'h_desk0001' })
+    render(<Shell />)
+    expect(document.querySelector('.pc-banner')!.textContent).toContain('마지막으로 본 목록입니다')
+  })
 })
 
 describe('phone', () => {
@@ -374,6 +385,27 @@ describe('phone', () => {
     expect(screen.queryByRole('button', { name: /^호스트/ })).toBeNull()
     expect(await screen.findByRole('heading', { name: '기기 1' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '화면' })).toBeTruthy()
+  })
+
+  it("speaks of the last list above an unreachable host's queue", () => {
+    const s = withHost()
+    s.ready.value = true
+    s.unreachable.value = true
+    at(390, { name: 'queue', host: 'h_desk0001' })
+    render(<Shell />)
+    expect(document.querySelector('.ph-banner')!.textContent).toContain('마지막으로 본 목록입니다')
+  })
+
+  it("speaks of no list above an unreachable host's settings", () => {
+    settingsServer()
+    const s = withHost()
+    s.ready.value = true
+    s.unreachable.value = true
+    at(390, { name: 'settings', host: 'h_desk0001' })
+    render(<Shell />)
+    const said = document.querySelector('.ph-banner')!.textContent
+    expect(said).toContain('다시 연결하는 중입니다')
+    expect(said).not.toContain('목록')
   })
 
   it('gives a session the whole screen', () => {

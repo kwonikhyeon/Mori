@@ -203,7 +203,7 @@ function PcShell() {
   return (
     <div class="pc">
       <PcHeader />
-      <ConnBanner class="pc-banner" />
+      <ConnBanner class="pc-banner" list />
       <div class="pc-body">
         <nav id="pc-side" class="pc-side" aria-label="세션 대기열" style={{ width: `${L.sidebar}px` }}>
           <Segmented
@@ -397,7 +397,7 @@ function PhoneTab({ tab, title, sub, fab = false, children }: PhoneTabProps) {
           </a>
         )}
       </header>
-      <ConnBanner class="ph-banner" />
+      <ConnBanner class="ph-banner" list={tab !== 'settings'} />
       <div class="ph-scroll">{children}</div>
       <TabBar current={tab} />
       {!sub && <HostSheet />}

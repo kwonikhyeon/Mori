@@ -373,11 +373,14 @@ a.term-note-link:hover {
 }
 
 /* ---------- quick keys (phone) ---------- */
+/* All nine keys show on a phone: they share the row evenly, and a word key
+   is never narrower than its word. A screen of 320px or more never needs to
+   scroll the row; a narrower one may. */
 .term-keys {
   position: relative;
   display: flex;
   flex: none;
-  gap: 6px;
+  gap: 4px;
   margin: 0 -12px;
   padding: 0 12px;
   overflow-x: auto;
@@ -389,10 +392,12 @@ a.term-note-link:hover {
 }
 
 .term-key {
-  flex: none;
-  min-width: 48px;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
   height: 44px;
-  padding: 0 10px;
+  padding: 0 4px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-2);
@@ -401,7 +406,12 @@ a.term-note-link:hover {
   font-size: 13px;
 }
 
+/* The bundled Latin subsets have ↑ and ↓ but not ← and →: all four come
+   from the system's font, so they look alike. An arrow may grow narrower
+   than its padding needs, which leaves the narrowest phone its room. */
 .term-key.is-arrow {
+  min-width: 0;
+  font-family: system-ui, sans-serif;
   font-size: 15px;
 }
 

@@ -283,6 +283,11 @@ a.btn-danger:hover {
   background: var(--dot-error);
 }
 
+/* Where the focus stays when 다시 시도 goes with the problem it tried. */
+.banner-slot:focus {
+  outline: none;
+}
+
 /* What is wrong with the server or the core. */
 .banner {
   display: flex;

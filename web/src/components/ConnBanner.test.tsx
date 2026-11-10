@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { inHost, withHost } from '../../test/scopes'
 import { ConnBanner } from './ConnBanner'
@@ -44,5 +44,38 @@ describe('ConnBanner', () => {
     expect(said).toContain('desk에 닿지 못했습니다')
     expect(said).toContain('다시 연결하는 중입니다')
     expect(said).not.toContain('목록')
+  })
+
+  // 다시 시도 worked: the button goes, and the focus must not fall to the page.
+  it('keeps the focus where 다시 시도 was when the host comes back', () => {
+    const s = withHost()
+    s.unreachable.value = true
+    render(inHost(s, <ConnBanner list />))
+    screen.getByRole('button', { name: '다시 시도' }).focus()
+    act(() => {
+      s.unreachable.value = false
+    })
+    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('status'))
+  })
+
+  it('leaves the focus alone when the host comes back by itself', () => {
+    const s = withHost()
+    s.unreachable.value = true
+    render(
+      inHost(
+        s,
+        <>
+          <input aria-label="입력" />
+          <ConnBanner list />
+        </>,
+      ),
+    )
+    const input = screen.getByRole('textbox', { name: '입력' })
+    input.focus()
+    act(() => {
+      s.unreachable.value = false
+    })
+    expect(document.activeElement).toBe(input)
   })
 })

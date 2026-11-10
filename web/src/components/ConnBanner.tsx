@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'preact/hooks'
 import { connBanner } from '../lib/health'
 import { useHost } from '../lib/scope'
 import { Icon } from './Icon'
@@ -15,11 +16,20 @@ interface Props {
  */
 export function ConnBanner({ class: cls = '', list = false }: Props) {
   const h = useHost()
+  const box = useRef<HTMLDivElement>(null)
+  const btn = useRef<HTMLButtonElement>(null)
+  // Whether 다시 시도 has the focus as this render begins: when the host is
+  // back, the button goes and the focus stays here, not on the page.
+  const had = useRef(false)
+  had.current = btn.current !== null && document.activeElement === btn.current
   const problem = h.problem.value
+  useLayoutEffect(() => {
+    if (had.current && !btn.current) box.current?.focus()
+  }, [problem])
   const b = problem ? null : connBanner(h.conn.value, h.core.value)
   const why = !list ? '다시 연결하는 중입니다' : h.ready.value ? '마지막으로 본 목록입니다' : '아직 받은 목록이 없습니다'
   return (
-    <div class={cls} role="status" aria-live="polite">
+    <div ref={box} class={`banner-slot ${cls}`} role="status" aria-live="polite" tabIndex={-1}>
       {problem === 'unreachable' && (
         <div class="banner banner-error banner-act">
           <Icon name="warning" size={16} class="banner-icon" />
@@ -27,7 +37,7 @@ export function ConnBanner({ class: cls = '', list = false }: Props) {
             <b>{h.name.value}에 닿지 못했습니다</b> ·{' '}
             <span>{why}</span>
           </span>
-          <button type="button" class="btn btn-sm" onClick={() => h.retry()}>
+          <button ref={btn} type="button" class="btn btn-sm" onClick={() => h.retry()}>
             다시 시도
           </button>
         </div>

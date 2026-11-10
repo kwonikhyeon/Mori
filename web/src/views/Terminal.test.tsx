@@ -7,6 +7,7 @@ import { inHost, withHost } from '../../test/scopes'
 import { now } from '../lib/clock'
 import { route } from '../lib/router'
 import { core, folders, ready, resetStore, terminals } from '../lib/store'
+import { resetTermFont } from '../lib/termfont'
 import { toasts } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
 import { openScreen } from '../lib/xterm'
@@ -15,7 +16,13 @@ import { Terminal, type TerminalProps } from './Terminal'
 // jsdom cannot lay out xterm's cells: the view draws on a FakeScreen.
 vi.mock('../lib/xterm', async () => {
   const { FakeScreen } = await import('../../test/fakeScreen')
-  return { openScreen: vi.fn(async () => new FakeScreen()) }
+  return {
+    openScreen: vi.fn(async (_el: HTMLElement, o: { fontSize: number }) => {
+      const s = new FakeScreen()
+      s.fontSize = o.fontSize
+      return s
+    }),
+  }
 })
 
 interface Call {
@@ -55,6 +62,7 @@ const sent = (path: string, method = 'POST') => calls.filter((c) => c.url === pa
 
 beforeEach(() => {
   localStorage.clear()
+  resetTermFont()
   FakeWebSocket.reset()
   FakeScreen.reset()
   vi.stubGlobal('WebSocket', FakeWebSocket)
@@ -298,6 +306,77 @@ describe('Terminal on a PC', () => {
     expect(screen.queryByRole('button', { name: '이 화면에 맞추기' })).toBeNull()
   })
 
+  it("offers the output's end while the screen is scrolled back, and says when output came", async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    const s = FakeScreen.last()
+    expect(screen.queryByRole('button', { name: '맨 아래로' })).toBeNull()
+    act(() => s.scrollTo(false))
+    const jump = screen.getByRole('button', { name: '맨 아래로' })
+    expect(jump.classList.contains('btn-primary')).toBe(false)
+    // output comes as bytes
+    await act(() => ws.receive(new TextEncoder().encode('more\r\n')))
+    expect(screen.queryByRole('button', { name: '맨 아래로' })).toBeNull()
+    const fresh = screen.getByRole('button', { name: '새 출력' })
+    expect(fresh.classList.contains('btn-primary')).toBe(true)
+    const [bottoms, focused] = [s.bottoms, s.focused]
+    fireEvent.click(fresh)
+    expect(s.bottoms).toBe(bottoms + 1)
+    // the keys go back to the terminal
+    expect(s.focused).toBe(focused + 1)
+    expect(screen.queryByRole('button', { name: '새 출력' })).toBeNull()
+    // scrolled back again, nothing new yet
+    act(() => s.scrollTo(false))
+    expect(screen.getByRole('button', { name: '맨 아래로' })).toBeTruthy()
+  })
+
+  it('types a key pressed outside the terminal into it, and leaves the keys of a field or a dialog', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    const s = FakeScreen.last()
+    const focused = s.focused
+    fireEvent.keyDown(document.body, { key: 'y' })
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+    expect(ws.input()).toEqual(['y', '\r'])
+    expect(s.focused).toBe(focused + 2)
+    // Escape closes what is open; a shortcut is the browser's
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    fireEvent.keyDown(document.body, { key: 'r', metaKey: true })
+    // A button keeps the keys that press it; a letter still types.
+    const stop = screen.getByRole('button', { name: '중단' })
+    stop.focus()
+    fireEvent.keyDown(stop, { key: 'Enter' })
+    fireEvent.keyDown(stop, { key: ' ' })
+    fireEvent.keyDown(stop, { key: 'n' })
+    expect(ws.input()).toEqual(['y', '\r', 'n'])
+    // A field keeps its keys.
+    const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' })
+    box.focus()
+    fireEvent.keyDown(box, { key: 'q' })
+    // So does a dialog.
+    fireEvent.click(screen.getByRole('button', { name: '종료' }))
+    fireEvent.keyDown(document.body, { key: 'k' })
+    expect(ws.input()).toEqual(['y', '\r', 'n'])
+  })
+
+  it('takes no stray keys while only watching', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    fireEvent.click(screen.getByRole('button', { name: '보기 전용' }))
+    const watch = FakeWebSocket.last()
+    await attach(watch)
+    fireEvent.keyDown(document.body, { key: 'y' })
+    expect(watch.input()).toEqual([])
+    expect(ws.input()).toEqual([])
+  })
+
+  it('draws with the letters picked in 설정 for a PC', async () => {
+    localStorage.setItem('mori.font', JSON.stringify({ pc: 15, phone: 11 }))
+    resetTermFont()
+    await mount()
+    expect(vi.mocked(openScreen).mock.lastCall![1].fontSize).toBe(15)
+  })
+
   it('attaches at the terminal\'s own size while it cannot measure the stage', async () => {
     const { ws } = await mount(term({ cols: 132, rows: 43 }))
     expect([ws.query().get('cols'), ws.query().get('rows')]).toEqual(['132', '43'])
@@ -411,7 +490,7 @@ describe('Terminal on a phone', () => {
     const { ws } = await phone()
     const keys = screen.getByRole('region', { name: '빠른 키' })
     const names = within(keys).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)
-    expect(names).toEqual(['Esc', 'Tab', 'Shift+Tab', '위 화살표', '아래 화살표', '왼쪽 화살표', '오른쪽 화살표', 'Enter', 'Ctrl+C'])
+    expect(names).toEqual(['Esc', 'Ctrl', 'Alt', 'Tab', 'Shift+Tab', '위 화살표', '아래 화살표', '왼쪽 화살표', '오른쪽 화살표', 'Enter', 'Ctrl+C'])
     const esc = within(keys).getByRole('button', { name: 'Esc' }) as HTMLButtonElement
     expect(esc.disabled).toBe(true)
     await attach(ws)
@@ -422,6 +501,81 @@ describe('Terminal on a phone', () => {
     fireEvent.click(within(keys).getByRole('button', { name: '위 화살표' }))
     fireEvent.click(within(keys).getByRole('button', { name: 'Ctrl+C' }))
     expect(ws.input()).toEqual(['\x1b', '\x1b[A', '\x1bOA', '\x03'])
+  })
+
+  it('holds Ctrl or Alt for the next key, and on when tapped twice', async () => {
+    const { ws } = await phone()
+    await attach(ws)
+    const keys = screen.getByRole('region', { name: '빠른 키' })
+    const ctrl = within(keys).getByRole('button', { name: 'Ctrl' })
+    expect(ctrl.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(ctrl)
+    expect(ctrl.getAttribute('aria-pressed')).toBe('true')
+    act(() => FakeScreen.last().type('c'))
+    expect(ctrl.getAttribute('aria-pressed')).toBe('false')
+    // tapped twice it stays on, until it is tapped again
+    fireEvent.click(ctrl)
+    fireEvent.click(ctrl)
+    const held = within(keys).getByRole('button', { name: 'Ctrl 고정' })
+    expect(held.hasAttribute('data-lock')).toBe(true)
+    act(() => FakeScreen.last().type('a'))
+    act(() => FakeScreen.last().type('e'))
+    expect(held.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(held)
+    expect(within(keys).getByRole('button', { name: 'Ctrl' }).getAttribute('aria-pressed')).toBe('false')
+    // Alt with a quick key
+    fireEvent.click(within(keys).getByRole('button', { name: 'Alt' }))
+    fireEvent.click(within(keys).getByRole('button', { name: '왼쪽 화살표' }))
+    act(() => FakeScreen.last().type('b'))
+    expect(ws.input()).toEqual(['\x03', '\x01', '\x05', '\x1b[1;3D', 'b'])
+  })
+
+  it('shows two lines of a long question until it is opened', async () => {
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(80)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(36)
+    const long = 'Bash(rm -rf node_modules && npm ci && npm test -- --run --reporter verbose)를 실행할까요?'
+    await phone(term({ status: status('blocked', { msg: long }) }))
+    const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
+    const more = within(ask).getByRole('button', { name: '전체 보기' })
+    const msg = within(ask).getByText(long)
+    expect(more.getAttribute('aria-expanded')).toBe('false')
+    expect(more.getAttribute('aria-controls')).toBe(msg.id)
+    fireEvent.click(more)
+    expect(more.textContent).toBe('접기')
+    expect(more.getAttribute('aria-expanded')).toBe('true')
+    expect(msg.classList.contains('is-open')).toBe(true)
+    fireEvent.click(more)
+    expect(msg.classList.contains('is-open')).toBe(false)
+  })
+
+  it('has nothing to open for a short question', async () => {
+    await phone(term({ status: status('blocked', { msg: '파일을 고칠까요?' }) }))
+    expect(screen.queryByRole('button', { name: '전체 보기' })).toBeNull()
+  })
+
+  it('changes the letters\' size from its menu, and the terminal follows the cells', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(840)
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(425)
+    const { ws } = await phone()
+    // (840 − 14) / 8 and 425 / 17 at 12 px
+    await attach(ws, 103, 25)
+    expect(FakeScreen.last().fontSize).toBe(12)
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: '글자 크기' }))
+    const sheet = screen.getByRole('dialog', { name: '글자 크기' })
+    const sizes = within(sheet).getByRole('group', { name: '터미널 글자 크기' })
+    expect(within(sizes).getByRole('button', { name: '12' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(within(sizes).getByRole('button', { name: '14' }))
+    await vi.waitFor(() => expect(ws.messages().filter((m) => m.type === 'resize')).toEqual([{ type: 'resize', cols: 88, rows: 21 }]))
+    expect(FakeScreen.last().fontSize).toBe(14)
+    expect(within(sizes).getByRole('button', { name: '14' }).getAttribute('aria-pressed')).toBe('true')
+    expect(JSON.parse(localStorage.getItem('mori.font')!)).toEqual({ phone: 14 })
+    // the same screen, not a new one
+    expect(FakeScreen.all).toHaveLength(1)
+    // back to the default: nothing is kept
+    fireEvent.click(within(sizes).getByRole('button', { name: '12' }))
+    await vi.waitFor(() => expect(FakeScreen.last().fontSize).toBe(12))
+    expect(JSON.parse(localStorage.getItem('mori.font')!)).toEqual({})
   })
 
   it('answers a blocked program from four big keys', async () => {
@@ -436,7 +590,7 @@ describe('Terminal on a phone', () => {
     await attach(ws)
     fireEvent.click(screen.getByRole('button', { name: '더 보기' }))
     const menu = screen.getByRole('menu')
-    expect(items(menu)).toEqual(['파일 올리기', '보기 전용', '이름 바꾸기', '중단', '종료'])
+    expect(items(menu)).toEqual(['파일 올리기', '보기 전용', '이름 바꾸기', '중단', '글자 크기', '종료'])
     fireEvent.click(within(menu).getByRole('menuitemcheckbox', { name: '보기 전용' }))
     expect(FakeWebSocket.last().query().get('observe')).toBe('1')
     expect(screen.getByText('보기 전용 — 입력과 크기 변경을 보내지 않습니다')).toBeTruthy()
@@ -457,7 +611,7 @@ describe('Terminal on a phone', () => {
     await phone(term({ state: 'finished', pid: null, exit_code: 1, reason: 'exited', finished_ms: 9 * HOUR }))
     expect(screen.getByText(/코드 1/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '더 보기' }))
-    expect(items(screen.getByRole('menu'))).toEqual(['이름 바꾸기', '목록에서 지우기'])
+    expect(items(screen.getByRole('menu'))).toEqual(['이름 바꾸기', '글자 크기', '목록에서 지우기'])
     fireEvent.click(screen.getAllByRole('button', { name: '목록에서 지우기' })[0])
     await vi.waitFor(() => expect(route.value).toEqual({ name: 'folders' }))
   })

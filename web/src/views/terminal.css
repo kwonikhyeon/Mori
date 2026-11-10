@@ -251,6 +251,20 @@ a.term-note-link:hover {
   box-shadow: var(--shadow-pop);
 }
 
+/* The screen scrolled back: its end is one press away (spec §3 #183). */
+.term-jump {
+  position: absolute;
+  right: 26px;
+  bottom: 14px;
+  z-index: 2;
+  box-shadow: var(--shadow-pop);
+}
+
+.term-phone .term-jump {
+  right: 14px;
+  bottom: 12px;
+}
+
 .term-drop {
   position: absolute;
   inset: 8px;
@@ -346,12 +360,50 @@ a.term-note-link:hover {
   font-weight: 700;
 }
 
+.term-ask-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.term-ask-top h2 {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Two lines of the question, the rest a press away (spec §3 #184). */
 .term-ask-head .term-ask-msg {
+  display: -webkit-box;
   overflow: hidden;
   color: var(--text-2);
   font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.term-ask-head .term-ask-msg.is-open {
+  position: relative;
+  display: block;
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  white-space: pre-line;
+}
+
+/* A 44 px target that leaves the title's line as it is. */
+.term-ask-more {
+  flex: none;
+  height: 44px;
+  margin: -12px -4px -12px 0;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .term-ask-grid {
@@ -373,14 +425,14 @@ a.term-note-link:hover {
 }
 
 /* ---------- quick keys (phone) ---------- */
-/* All nine keys show on a phone: they share the row evenly, and a word key
+/* All eleven keys show on a phone: they share the row evenly, and a word key
    is never narrower than its word. A screen of 320px or more never needs to
    scroll the row; a narrower one may. */
 .term-keys {
   position: relative;
   display: flex;
   flex: none;
-  gap: 4px;
+  gap: 3px;
   margin: 0 -12px;
   padding: 0 12px;
   overflow-x: auto;
@@ -397,13 +449,28 @@ a.term-note-link:hover {
   align-items: center;
   justify-content: center;
   height: 44px;
-  padding: 0 4px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-2);
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
+}
+
+/* Ctrl or Alt held for the next key, and held on (spec §3 #186). */
+.term-key.is-mod[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.term-key.is-mod[data-lock] {
+  background: var(--accent);
+  color: var(--on-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* The bundled Latin subsets have ↑ and ↓ but not ← and →: all four come
@@ -566,4 +633,21 @@ textarea.term-send-input {
 
 .term-dock:empty {
   display: none;
+}
+
+/* ---------- phone: the keyboard is up (spec §3 #187) ---------- */
+/* The screen keeps what room there is: the header keeps the title only,
+   the dock draws closer. The keyboard covers the bottom's safe area. */
+.kb .term-head {
+  min-height: 48px;
+}
+
+.kb .term-sub-row {
+  display: none;
+}
+
+.kb .term-dock {
+  gap: 8px;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }

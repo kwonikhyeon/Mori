@@ -11,6 +11,7 @@ import { setTheme, theme, THEME_LABEL, type ThemePref } from '../lib/theme'
 import type { CoreStatus } from '../lib/types'
 import { newBuild, reloadPage } from '../lib/update'
 import { DeviceCards } from './SettingsDevices'
+import { FONT_HINT, TermFontField } from './TermFont'
 import { nameOf } from './HostSwitch'
 import { FoldersCard, PresetsCard } from './SettingsEdit'
 import { HostNoticesCard, HostsCard, LinkHostCard, settingsSub } from './SettingsHosts'
@@ -38,7 +39,7 @@ export function Settings({ variant }: SettingsProps) {
       ) : (
         <HostNoticesCard />
       )}
-      <ThemeCard />
+      <ThemeCard variant={variant} />
       <FoldersCard />
       {isHub && (
         <>
@@ -85,7 +86,7 @@ function UpdateCard({ version }: { version: string }) {
   )
 }
 
-function ThemeCard() {
+function ThemeCard({ variant }: SettingsProps) {
   const id = useId()
   return (
     <section class="st-card" aria-labelledby={id}>
@@ -99,6 +100,10 @@ function ThemeCard() {
         <Segmented label="테마" items={THEMES.map((v) => ({ value: v, label: THEME_LABEL[v] }))} value={theme.value} onChange={setTheme} />
       </div>
       <p class="st-hint">이 기기에만 적용됩니다. 터미널은 늘 어둡게 보입니다.</p>
+      <TermFontField layout={variant} />
+      <p class="st-hint">
+        이 기기의 {variant === 'phone' ? '폰' : 'PC'} 화면에 쓰입니다. {FONT_HINT}
+      </p>
     </section>
   )
 }

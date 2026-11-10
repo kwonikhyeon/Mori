@@ -2,6 +2,7 @@
 import type { JSX } from 'preact'
 
 const SHAPES = {
+  'arrow-down': <path d="M12 5v14M6 13l6 6 6-6" />,
   back: <path d="M15 6l-6 6 6 6" />,
   bell: (
     <>
@@ -106,6 +107,7 @@ const SHAPES = {
       <circle cx="8" cy="8" r="1.5" />
     </>
   ),
+  'text-size': <path d="M3 19l5-13 5 13M5 14.5h6M14.5 19l3.5-8 3.5 8M15.6 16.5h4.8" />,
   terminal: (
     <>
       <path d="M5 7l5 5-5 5" />

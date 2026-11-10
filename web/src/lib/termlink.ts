@@ -9,7 +9,7 @@ import { api, type HostApi } from './api'
 import { AttachSession, type AttachState, type Closed, type Size } from './attach'
 import type { SocketCtor } from './events'
 import { watchFocus } from './focus'
-import { keyBytes, type QuickKey } from './keys'
+import { keyBytes, NO_MODS, tapMod, withMods, type Mod, type Mods, type QuickKey } from './keys'
 import { paintFilter } from './paint'
 import { hubStore, type HostStore } from './store'
 import { screenText } from './termview'
@@ -55,8 +55,11 @@ export class TermLink {
   /** The size that fits this screen. */
   readonly fit = signal<Size | null>(null)
   readonly observing = signal(false)
+  /** Ctrl and Alt held by the quick keys (spec §3 #186). */
+  readonly mods = signal<Mods>(NO_MODS)
 
   private session!: AttachSession
+  private tapped: Record<Mod, number> = { ctrl: -Infinity, alt: -Infinity }
   private offSession: (() => void)[] = []
   private readonly stops: (() => void)[] = []
   /** The newest socket attached, so the screen shows the stream's end. */
@@ -68,7 +71,7 @@ export class TermLink {
     this.fit.value = o.fit ?? null
     this.observing.value = !!o.observe
     const sc = o.screen
-    this.stops.push(sc.onData((s) => void this.session.send(s)))
+    this.stops.push(sc.onData((s) => void this.typed(s)))
     this.stops.push(sc.onBinary((s) => void this.session.send(bytes(s))))
     this.open()
     this.stops.push(
@@ -100,9 +103,19 @@ export class TermLink {
     return this.sent(this.session.send(s))
   }
 
-  /** A quick key, written the way the program reads it now. */
+  /** A quick key, written the way the program reads it now, with Ctrl and Alt as held. */
   key(k: QuickKey): boolean {
-    return this.sent(this.session.send(keyBytes(k, this.o.screen.appCursor())))
+    const m = this.mods.peek()
+    const ok = this.sent(this.session.send(keyBytes(k, this.o.screen.appCursor(), m.ctrl !== 'off', m.alt !== 'off')))
+    if (ok) this.spend()
+    return ok
+  }
+
+  /** Ctrl or Alt tapped: held for the next key, held on, or let go. */
+  tapMod(m: Mod, at = Date.now()): void {
+    const cur = this.mods.peek()
+    this.mods.value = { ...cur, [m]: tapMod(cur[m], at - this.tapped[m]) }
+    this.tapped[m] = at
   }
 
   /** The screen's box changed: the terminal follows when the fit did. */
@@ -134,6 +147,22 @@ export class TermLink {
     for (const stop of this.stops.splice(0)) stop()
   }
 
+  /** A key typed into the screen, with Ctrl and Alt as the quick keys hold them. */
+  private typed(s: string): boolean {
+    const m = this.mods.peek()
+    const one = s.length === 1 && (m.ctrl !== 'off' || m.alt !== 'off')
+    const ok = this.session.send(one ? withMods(s, m.ctrl !== 'off', m.alt !== 'off') : s)
+    if (ok && one) this.spend()
+    return ok
+  }
+
+  /** A key went: what was held for it lets go. */
+  private spend(): void {
+    const m = this.mods.peek()
+    if (m.ctrl !== 'once' && m.alt !== 'once') return
+    this.mods.value = { ctrl: m.ctrl === 'once' ? 'off' : m.ctrl, alt: m.alt === 'once' ? 'off' : m.alt }
+  }
+
   /** What went shows the screen's end, as xterm does for what is typed into it. */
   private sent(ok: boolean): boolean {
     if (ok) this.o.screen.scrollToBottom()
@@ -154,6 +183,7 @@ export class TermLink {
     })
     this.session = s
     this.live = false
+    this.mods.value = NO_MODS
     let paint = (d: Uint8Array) => d
     this.offSession = [
       s.on('data', (d) => sc.write(paint(d))),

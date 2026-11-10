@@ -1,7 +1,8 @@
 // The terminal screen (B-PC, B-Terminal; spec §3 #123–#127, #133). The
 // program's screen fills the middle; above it the title and the tools,
 // under it the keys a blocked program waits for, the quick keys on a
-// phone and a box that sends several lines at once.
+// phone and a box that sends several lines at once. A screen scrolled back
+// offers its end (#183); on a PC a key pressed outside it still types (#188).
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Chip } from '../components/Chip'
 import { Confirm } from '../components/Confirm'
@@ -15,10 +16,11 @@ import { draftKey, loadDraft, saveDraft } from '../lib/drafts'
 import { fitSize } from '../lib/fit'
 import { appName, askText, chip, endText, place, type EndFacts } from '../lib/format'
 import { useChordSubmit } from '../lib/ime'
-import { QUICK_KEYS } from '../lib/keys'
+import { isMod, NO_MODS, QUICK_KEYS, strayBytes } from '../lib/keys'
 import { isApple } from '../lib/platform'
 import { navigate, parseHash } from '../lib/router'
 import { others, useHost } from '../lib/scope'
+import { DEFAULT_FONT, fontFor, termFont, type Layout } from '../lib/termfont'
 import { TermLink } from '../lib/termlink'
 import { attachNote, BLOCKED_KEYS, quotePath, type AnswerKey, type AttachNote } from '../lib/termview'
 import { effectiveTheme, terminalTheme } from '../lib/theme'
@@ -29,6 +31,7 @@ import { openScreen, type Screen } from '../lib/xterm'
 import { gitFrom } from './Git'
 import { nameOf } from './HostSwitch'
 import { titleOf, type Variant } from './rows'
+import { TermFontSheet } from './TermFont'
 import './terminal.css'
 
 /** The box settles before the terminal follows it, as when a keyboard slides in. */
@@ -42,6 +45,9 @@ const BROKEN: AttachNote = { kind: 'error', title: '터미널을 열 수 없습�
 
 /** Keeps the focus where it is, in the terminal or the keyboard on a phone. */
 const keep = (e: Event) => e.preventDefault()
+
+/** Where a key typed with the focus there belongs to that place, not the terminal (spec §3 #188). */
+const OWN_KEYS = '.xterm, [role="menu"], dialog, input, textarea, select, [contenteditable]:not([contenteditable="false"])'
 
 export interface TerminalProps {
   addr: string
@@ -69,6 +75,12 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const [killing, setKilling] = useState(false)
   const [killBusy, setKillBusy] = useState(false)
   const [drop, setDrop] = useState(false)
+  const [fonting, setFonting] = useState(false)
+  // The screen is scrolled back from its end, and output came since.
+  const [away, setAway] = useState(false)
+  const [fresh, setFresh] = useState(false)
+  const layout: Layout = phone ? 'phone' : 'pc'
+  const fontPx = fontFor(layout)
 
   // The cells that fit the stage inside the scroll box's padding.
   const measure = (): Size | null => {
@@ -92,7 +104,8 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     const t0 = h.terminals.peek().get(addr)
     setBroken(false)
     openScreen(host.current!, {
-      fontSize: phone ? 12 : 13,
+      // a size picked later changes the open screen (below), not a new one
+      fontSize: termFont.peek()[layout] ?? DEFAULT_FONT[layout],
       theme: terminalTheme(effectiveTheme.peek()),
       cols: t0?.cols || 80,
       rows: t0?.rows || 24,
@@ -155,6 +168,39 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     }
   }, [link])
 
+  // A size picked in 설정 or the sheet redraws the open screen, and the
+  // terminal follows the cells that fit now (spec §3 #185).
+  useEffect(() => {
+    const s = screen.current
+    if (!link || !s) return
+    let dead = false
+    void s.setFontSize(fontPx).then((changed) => {
+      if (!changed || dead) return
+      // the cells are measured again once the screen has drawn with them
+      requestAnimationFrame(() => {
+        if (!dead) link.setFit(measure())
+      })
+    })
+    return () => {
+      dead = true
+    }
+  }, [link, fontPx])
+
+  // Whether the end of the output is on screen, and whether output came
+  // while it was not (spec §3 #183).
+  useEffect(() => {
+    const s = screen.current
+    if (!link || !s) return
+    const look = (wrote: boolean) => {
+      const end = s.atEnd()
+      setAway(!end)
+      if (end) setFresh(false)
+      else if (wrote) setFresh(true)
+    }
+    look(false)
+    return s.onView(look)
+  }, [link])
+
   const st = link?.state.value ?? 'connecting'
   const observing = link?.observing.value ?? false
   const size = link?.size.value ?? null
@@ -175,6 +221,28 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const sub = t ? `${appName(t, h.presets.value)} · ${place(t, h.folders.value)}` : ''
   // With other hosts about, the header says which one the session runs on.
   const hostTag = others.value.length > 0 ? nameOf(h) : ''
+
+  // On a PC a key pressed while the focus is on the page, or on one of the
+  // terminal's own buttons, types into the terminal and gives it the focus
+  // (spec §3 #188). A field, a menu or a dialog keeps its keys; a button
+  // keeps the keys that press it or move from it.
+  useEffect(() => {
+    if (phone || !link || !canType) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || document.querySelector('dialog[open]')) return
+      const a = document.activeElement
+      if (a && a !== document.body && a !== document.documentElement) {
+        if (a.closest(OWN_KEYS) || !a.closest('.term-pc')) return
+        if ([...e.key].length !== 1 || e.key === ' ') return
+      }
+      const bytes = strayBytes(e, screen.current?.appCursor() ?? false)
+      if (bytes === null || !link.send(bytes)) return
+      e.preventDefault()
+      screen.current?.focus()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [phone, link, canType])
 
   const fail = (what: string) => (e: unknown) => toastError(e, what)
   const answer = (k: AnswerKey) => {
@@ -297,6 +365,23 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
           <Icon name="monitor" size={15} />이 화면에 맞추기
         </button>
       )}
+      {away && (
+        <button
+          type="button"
+          class={'btn btn-sm term-jump' + (fresh ? ' btn-primary' : '')}
+          onPointerDown={keep}
+          onMouseDown={keep}
+          onClick={(e) => {
+            // a phone would open its keyboard
+            e.stopPropagation()
+            toEnd()
+            if (!phone && canType) screen.current?.focus()
+          }}
+        >
+          <Icon name="arrow-down" size={15} />
+          {fresh ? '새 출력' : '맨 아래로'}
+        </button>
+      )}
       {drop && (
         <div class="term-drop" aria-hidden="true">
           여기에 놓으면 올립니다
@@ -410,9 +495,11 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     if (t) items.push({ label: '이름 바꾸기', icon: 'pencil', onSelect: () => setRenaming(true) })
     items.push({ label: '중단', icon: 'stop', onSelect: interrupt })
     if (differs) items.push({ label: '이 화면에 맞추기', icon: 'monitor', onSelect: () => link?.fitNow() })
+    items.push({ label: '글자 크기', icon: 'text-size', onSelect: () => setFonting(true) })
     items.push({ label: '종료', icon: 'power', danger: true, onSelect: () => setKilling(true) })
   } else {
     if (t) items.push({ label: '이름 바꾸기', icon: 'pencil', onSelect: () => setRenaming(true) })
+    items.push({ label: '글자 크기', icon: 'text-size', onSelect: () => setFonting(true) })
     if (finished) items.push({ label: '목록에서 지우기', icon: 'trash', danger: true, onSelect: () => void remove() })
   }
 
@@ -459,6 +546,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       </div>
       {fileInput}
       {confirm}
+      <TermFontSheet open={fonting} layout="phone" onClose={() => setFonting(false)} />
     </div>
   )
 }
@@ -521,6 +609,7 @@ interface AskBarProps {
 function AskBar({ t, phone, id, onKey }: AskBarProps) {
   const head = id + '-ask'
   const msg = askText(t, 'blocked')
+  const more = useMore(msg)
   const keys = BLOCKED_KEYS[phone ? 'phone' : 'pc'].map((k) => (
     <button
       key={k.name}
@@ -534,14 +623,32 @@ function AskBar({ t, phone, id, onKey }: AskBarProps) {
     </button>
   ))
   if (phone) {
+    const text = id + '-ask-msg'
     return (
       <section class="term-ask" aria-labelledby={head}>
         <div class="term-ask-head">
-          <h2 id={head}>
-            <Icon name="warning" size={18} />
-            승인 대기 — 키로 응답
-          </h2>
-          <span class="term-ask-msg">{msg}</span>
+          <div class="term-ask-top">
+            <h2 id={head}>
+              <Icon name="warning" size={18} />
+              승인 대기 — 키로 응답
+            </h2>
+            {(more.long || more.open) && (
+              <button
+                type="button"
+                class="term-ask-more"
+                aria-expanded={more.open}
+                aria-controls={text}
+                onPointerDown={keep}
+                onMouseDown={keep}
+                onClick={() => more.setOpen(!more.open)}
+              >
+                {more.open ? '접기' : '전체 보기'}
+              </button>
+            )}
+          </div>
+          <p ref={more.ref} id={text} class={'term-ask-msg' + (more.open ? ' is-open' : '')}>
+            {msg}
+          </p>
         </div>
         <div class="term-ask-grid">{keys}</div>
       </section>
@@ -563,24 +670,73 @@ function AskBar({ t, phone, id, onKey }: AskBarProps) {
   )
 }
 
-/** The keys a phone keyboard does not have, typed down the stream. */
+/**
+ * A phone's message from a blocked program shows two lines until it is
+ * opened (spec §3 #184): long, when it has more than that.
+ */
+function useMore(msg: string) {
+  const ref = useRef<HTMLParagraphElement>(null)
+  const [open, setOpen] = useState(false)
+  const [long, setLong] = useState(false)
+  // a new question starts closed
+  useEffect(() => setOpen(false), [msg])
+  useEffect(() => {
+    const el = ref.current
+    if (!el || open) return
+    const check = () => setLong(el.scrollHeight > el.clientHeight + 1)
+    check()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [msg, open])
+  return { ref, open, long, setOpen }
+}
+
+/**
+ * The keys a phone keyboard does not have, typed down the stream. Ctrl and
+ * Alt hold for the next key, or stay on when tapped twice (spec §3 #186).
+ */
 function QuickKeys({ link, open }: { link: TermLink | null; open: boolean }) {
+  const mods = link?.mods.value ?? NO_MODS
   return (
     <section class="term-keys" aria-label="빠른 키">
-      {QUICK_KEYS.map((q) => (
-        <button
-          key={q.key}
-          type="button"
-          class={'term-key' + (ARROWS.has(q.key) ? ' is-arrow' : '')}
-          aria-label={q.label !== q.text ? q.label : undefined}
-          disabled={!open}
-          onPointerDown={keep}
-          onMouseDown={keep}
-          onClick={() => link?.key(q.key)}
-        >
-          {q.text}
-        </button>
-      ))}
+      {QUICK_KEYS.map((q) => {
+        const k = q.key
+        if (isMod(k)) {
+          const m = mods[k]
+          return (
+            <button
+              key={k}
+              type="button"
+              class="term-key is-mod"
+              aria-label={m === 'lock' ? `${q.label} 고정` : undefined}
+              aria-pressed={m !== 'off'}
+              data-lock={m === 'lock' ? '' : undefined}
+              disabled={!open}
+              onPointerDown={keep}
+              onMouseDown={keep}
+              onClick={() => link?.tapMod(k)}
+            >
+              {q.text}
+            </button>
+          )
+        }
+        return (
+          <button
+            key={k}
+            type="button"
+            class={'term-key' + (ARROWS.has(k) ? ' is-arrow' : '')}
+            aria-label={q.label !== q.text ? q.label : undefined}
+            disabled={!open}
+            onPointerDown={keep}
+            onMouseDown={keep}
+            onClick={() => link?.key(k)}
+          >
+            {q.text}
+          </button>
+        )
+      })}
     </section>
   )
 }

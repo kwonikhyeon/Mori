@@ -26,6 +26,15 @@ export interface Screen {
   focus(): void
   /** Shows the end of the output, where the cursor is. */
   scrollToBottom(): void
+  /** Whether the end of the output is on screen. */
+  atEnd(): boolean
+  /**
+   * Calls fn when the view may have moved: a scroll, a reset, or new output
+   * (wrote). Returns the function that stops it.
+   */
+  onView(fn: (wrote: boolean) => void): () => void
+  /** Draws with letters of px CSS pixels; resolves true once it changed. */
+  setFontSize(px: number): Promise<boolean>
   onData(fn: (s: string) => void): () => void
   onBinary(fn: (s: string) => void): () => void
   dispose(): void
@@ -111,6 +120,17 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     })
   }
   term.open(el)
+  let size = o.fontSize
+  let gone = false
+  const views = new Set<(wrote: boolean) => void>()
+  const tell = (wrote: boolean) => {
+    for (const fn of views) fn(wrote)
+  }
+  // A wheel, a finger (touchscroll.ts) and the scrollbar scroll through
+  // scrollLines, which tells onScroll as new lines do; a write tells once
+  // its bytes are parsed.
+  const offScroll = term.onScroll(() => tell(false))
+  const offWrite = term.onWriteParsed(() => tell(true))
   const cell = (): [number, number] => {
     const s = term.element?.querySelector('.xterm-screen')?.getBoundingClientRect()
     if (!s || !term.cols || !term.rows) return [0, 0]
@@ -118,13 +138,16 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
   }
   const untouch = touchScroll(el, term, { rowHeight: () => cell()[1] })
   // a zoom or another screen changes the rows' height in device pixels
-  const unfollow = followPixelRatio(() => void loadPowerline(FONT, o.fontSize))
+  const unfollow = followPixelRatio(() => void loadPowerline(FONT, size))
   const off = (d: { dispose(): void }) => () => d.dispose()
   return {
     get cols() { return term.cols },
     get rows() { return term.rows },
     write: (d) => term.write(d),
-    reset: () => term.reset(),
+    reset: () => {
+      term.reset()
+      tell(false)
+    },
     resize: (c, r) => {
       if (c !== term.cols || r !== term.rows) term.resize(c, r)
     },
@@ -137,10 +160,37 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
       term.options.disableStdin = !on
     },
     focus: () => term.focus(),
-    scrollToBottom: () => term.scrollToBottom(),
+    scrollToBottom: () => {
+      term.scrollToBottom()
+      tell(false)
+    },
+    atEnd: () => {
+      const b = term.buffer.active
+      return b.viewportY >= b.baseY
+    },
+    onView: (fn) => {
+      views.add(fn)
+      return () => {
+        views.delete(fn)
+      }
+    },
+    setFontSize: async (px) => {
+      if (px === size || gone) return false
+      size = px
+      await fontsReady(px)
+      // the Powerline face is made for the rows' height
+      await loadPowerline(FONT, px)
+      if (size !== px || gone) return false
+      term.options.fontSize = px
+      return true
+    },
     onData: (fn) => off(term.onData(fn)),
     onBinary: (fn) => off(term.onBinary(fn)),
     dispose: () => {
+      gone = true
+      views.clear()
+      offScroll.dispose()
+      offWrite.dispose()
       unfollow()
       untouch()
       term.dispose()

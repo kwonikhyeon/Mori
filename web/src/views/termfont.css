@@ -1,0 +1,11 @@
+/* The terminal's letter size, in 설정 and in the phone's sheet (spec §3 #185). */
+.term-font .seg {
+  max-width: 420px;
+}
+
+.term-font-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}

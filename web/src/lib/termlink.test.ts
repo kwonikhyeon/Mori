@@ -101,6 +101,42 @@ describe('TermLink', () => {
     expect([...(ws.sent.at(-1) as Uint8Array)]).toEqual([0x80])
   })
 
+  it('holds Ctrl or Alt for the next key, or until tapped off', () => {
+    const { l, screen, ws } = link()
+    attach(ws)
+    l.tapMod('ctrl', 1_000)
+    expect(l.mods.value).toEqual({ ctrl: 'once', alt: 'off' })
+    screen.type('c')
+    // once: the next key took it
+    expect(l.mods.value.ctrl).toBe('off')
+    screen.type('c')
+    l.tapMod('alt', 2_000)
+    l.key('enter')
+    l.tapMod('alt', 3_000)
+    l.tapMod('alt', 3_200)
+    expect(l.mods.value.alt).toBe('lock')
+    screen.type('b')
+    screen.type('f')
+    l.key('left')
+    // a syllable or a paste goes as it is, and keeps what is held
+    screen.type('안녕')
+    expect(l.mods.value.alt).toBe('lock')
+    l.tapMod('alt', 9_000)
+    screen.type('d')
+    expect(ws.input()).toEqual(['\x03', 'c', '\x1b\r', '\x1bb', '\x1bf', '\x1b[1;3D', '안녕', 'd'])
+    expect(l.mods.value).toEqual({ ctrl: 'off', alt: 'off' })
+  })
+
+  it('keeps a held key while nothing can be sent, and lets go when it attaches again', () => {
+    const { l, ws } = link()
+    l.tapMod('ctrl', 1_000)
+    expect(l.key('up')).toBe(false)
+    expect(l.mods.value.ctrl).toBe('once')
+    attach(ws)
+    l.setObserve(true)
+    expect(l.mods.value).toEqual({ ctrl: 'off', alt: 'off' })
+  })
+
   it("shows the screen's end for the keys and the text it sends, as typing does", () => {
     const { l, screen, ws } = link()
     // nothing goes before it is attached: the screen stays where it is

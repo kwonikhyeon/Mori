@@ -1,11 +1,13 @@
-// The one place that knows xterm.js. Views and tests see a Screen; the
-// view tests replace this module, since jsdom cannot lay out cells.
+// The one place that opens xterm.js; touchscroll.ts lends it a finger.
+// Views and tests see a Screen; the view tests replace this module, since
+// jsdom cannot lay out cells.
 
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal, type ITheme } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { isApple } from './platform'
+import { touchScroll } from './touchscroll'
 
 export interface Screen {
   readonly cols: number
@@ -101,6 +103,12 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     })
   }
   term.open(el)
+  const cell = (): [number, number] => {
+    const s = term.element?.querySelector('.xterm-screen')?.getBoundingClientRect()
+    if (!s || !term.cols || !term.rows) return [0, 0]
+    return [s.width / term.cols, s.height / term.rows]
+  }
+  const untouch = touchScroll(el, term, { rowHeight: () => cell()[1] })
   const off = (d: { dispose(): void }) => () => d.dispose()
   return {
     get cols() { return term.cols },
@@ -110,11 +118,7 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     resize: (c, r) => {
       if (c !== term.cols || r !== term.rows) term.resize(c, r)
     },
-    cell: () => {
-      const s = term.element?.querySelector('.xterm-screen')?.getBoundingClientRect()
-      if (!s || !term.cols || !term.rows) return [0, 0]
-      return [s.width / term.cols, s.height / term.rows]
-    },
+    cell,
     appCursor: () => term.modes.applicationCursorKeysMode,
     setTheme: (t) => {
       term.options.theme = t
@@ -125,6 +129,9 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     focus: () => term.focus(),
     onData: (fn) => off(term.onData(fn)),
     onBinary: (fn) => off(term.onBinary(fn)),
-    dispose: () => term.dispose(),
+    dispose: () => {
+      untouch()
+      term.dispose()
+    },
   }
 }

@@ -2,9 +2,9 @@
 // longer has the hub's link (spec §3 #170, decision 163): a new code from
 // that host links it again.
 import { Icon } from '../components/Icon'
-import { hub, useHost } from '../lib/scope'
+import { hub, nameOf, useHost } from '../lib/scope'
 import { hosts } from '../lib/store'
-import { nameOf, openHostSheet } from './HostSwitch'
+import { openHostSheet } from './HostSwitch'
 import { relinkHost } from './SettingsHosts'
 import './hostswitch.css'
 

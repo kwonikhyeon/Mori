@@ -3,6 +3,7 @@
 // the rest goes in a query. A host linked to the hub has the same screens
 // under #/h/<ID> (spec §3 #170).
 import { signal } from '@preact/signals'
+import { unmarked, writeHistory } from './backstack'
 
 /** A screen of one host. */
 export type Page =
@@ -91,11 +92,17 @@ export function plainClick(e: MouseEvent): boolean {
   return e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
 }
 
-/** Goes to r; replace leaves no step for the back button. */
+/**
+ * Goes to r; replace leaves no step for the back button. The screen changes
+ * at once; its history entry may wait for the step back over a menu's or a
+ * sheet's (lib/backstack.ts).
+ */
 export function navigate(r: Route, opts: { replace?: boolean } = {}): void {
   const h = href(r)
-  if (opts.replace) history.replaceState(history.state, '', location.pathname + location.search + h)
-  else if (location.hash !== h) location.hash = h
+  writeHistory(() => {
+    if (opts.replace) history.replaceState(unmarked(history.state), '', location.pathname + location.search + h)
+    else if (location.hash !== h) location.hash = h
+  })
   route.value = parseHash(h)
 }
 

@@ -1,7 +1,7 @@
 // One host at a time, switched from the header (spec §3 #170, candidate A):
 // a picker in the PC header, a button and a sheet on a phone, and a badge for
 // what waits on another host.
-import { computed, signal } from '@preact/signals'
+import { signal } from '@preact/signals'
 import { useEffect, useId, useRef } from 'preact/hooks'
 import { Icon } from '../components/Icon'
 import { Menu } from '../components/Menu'
@@ -10,7 +10,7 @@ import { versionText } from '../lib/format'
 import { scopeState } from '../lib/health'
 import { GROUP_TITLE, type GroupKey } from '../lib/queue'
 import { route } from '../lib/router'
-import { hub, others, scopeOf, useHost, type HostScope } from '../lib/scope'
+import { allScopes, hub, nameOf, useHost, type HostScope } from '../lib/scope'
 import { hosts } from '../lib/store'
 import './hostswitch.css'
 
@@ -23,12 +23,6 @@ export function countText(c: Record<GroupKey, number>): string {
     .map((k) => `${GROUP_TITLE[k]} ${c[k]}`)
     .join(' · ')
 }
-
-/** The name a host goes by; 이 호스트 while the hub has not said its own. */
-export const nameOf = (s: HostScope) => s.name.value || '이 호스트'
-
-/** The hub, then the hosts linked to it. */
-const all = computed(() => [hub, ...others.value.flatMap((h) => scopeOf(h.id) ?? [])])
 
 /** The host a switch went to: its header button takes the focus when it comes. */
 let focusOn: string | null = null
@@ -76,7 +70,7 @@ export function HostPicker() {
         </>
       }
       items={[
-        ...all.value.map((s) => ({
+        ...allScopes.value.map((s) => ({
           key: s.id || 'hub',
           label: [nameOf(s), countText(s.counts.value), s.problem.value && scopeState(s.conn.value, s.core.value, s.problem.value).text]
             .filter(Boolean)
@@ -158,7 +152,7 @@ function HostList({ id }: { id: string }) {
       <div class="sheet-body">
         <p class="hs-note">이 폰은 허브 {nameOf(hub)}에 페어링했습니다. 다른 호스트도 이 허브를 거쳐 엽니다.</p>
         <ul class="hs-list" aria-label="호스트 목록">
-          {all.value.map((s) => (
+          {allScopes.value.map((s) => (
             <HostRow key={s.id || 'hub'} s={s} current={s.id === cur.id} />
           ))}
         </ul>
@@ -216,7 +210,7 @@ function HostRow({ s, current }: { s: HostScope; current: boolean }) {
  */
 export function OthersBadge() {
   const cur = useHost()
-  const from = all.value.filter((s) => s.id !== cur.id && !s.problem.value)
+  const from = allScopes.value.filter((s) => s.id !== cur.id && !s.problem.value)
   for (const k of WAITING) {
     let best: HostScope | null = null
     let n = 0

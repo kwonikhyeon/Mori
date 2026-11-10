@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { pressBack } from '../../test/closewatcher'
 import { Confirm } from './Confirm'
 import { Menu, type MenuItem } from './Menu'
 
@@ -50,6 +51,19 @@ describe('Menu', () => {
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
     expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(btn)
+  })
+
+  it('closes with the back key and gives the focus back', () => {
+    const { btn, picked } = menu()
+    fireEvent.click(btn)
+    act(() => {
+      expect(pressBack()).toBe(true)
+    })
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(document.activeElement).toBe(btn)
+    expect(picked).toEqual([])
+    // Closed, it listens for the key no more: the browser goes back.
+    expect(pressBack()).toBe(false)
   })
 
   it('runs an item and closes', () => {

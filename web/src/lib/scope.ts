@@ -156,6 +156,12 @@ export function scopeOf(id: string): HostScope | undefined {
 /** The hosts linked to the hub, but not the page's own. */
 export const others = computed(() => hosts.value.filter((h) => !isHere(h.url)))
 
+/** The name a host goes by; 이 호스트 while the hub has not said its own. */
+export const nameOf = (s: HostScope) => s.name.value || '이 호스트'
+
+/** The hub, then the hosts linked to it, in the hub's order. */
+export const allScopes = computed(() => [hub, ...others.value.flatMap((h) => scopeOf(h.id) ?? [])])
+
 let reading: Promise<void> | null = null
 
 /** Reads the hub's list of hosts again; a read on its way is the one asked for. */

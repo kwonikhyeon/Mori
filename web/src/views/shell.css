@@ -201,6 +201,17 @@ a.fab:hover {
   background: var(--bg);
 }
 
+/* 밀어서 뒤로 (spec §3 #200): the screen follows the finger, its left edge
+   casting a shadow on a darker ground (lib/backswipe.ts). */
+#app:has(.ph-full.is-swiping) {
+  background: var(--track);
+}
+
+.ph-full.is-swiping {
+  will-change: transform, opacity;
+  box-shadow: -8px 0 24px rgba(28, 27, 25, .16);
+}
+
 .tabbar {
   display: flex;
   flex: none;

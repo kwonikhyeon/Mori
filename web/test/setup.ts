@@ -1,5 +1,11 @@
 // What jsdom leaves out and the components use.
 
+import { FakeCloseWatcher } from './closewatcher'
+
+// The back key closes a menu through a CloseWatcher, as in Chrome
+// (lib/backstack.ts); a test of the other path takes it away.
+if (!('CloseWatcher' in globalThis)) Object.assign(globalThis, { CloseWatcher: FakeCloseWatcher })
+
 // <dialog> is there without showModal and close. A modal dialog takes the
 // focus as a browser gives it: to its autofocus element, else to itself.
 if (!HTMLDialogElement.prototype.showModal) {

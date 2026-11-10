@@ -1,10 +1,11 @@
 // A modal panel for a choice that takes more than a menu: from the bottom
 // on a phone, in the middle on a PC. Like Confirm it is a <dialog>, so
 // the focus stays inside and goes back where it was; Escape, a press
-// outside and 닫기 close it.
+// outside, 닫기 and the back key close it.
 import type { ComponentChildren } from 'preact'
 import { useEffect, useRef } from 'preact/hooks'
 import { Icon } from './Icon'
+import { useLayer } from './useLayer'
 
 export interface SheetProps {
   open: boolean
@@ -21,6 +22,7 @@ export function Sheet({ open, labelledBy, onClose, class: cls, children }: Sheet
   // A press that starts on a field and ends outside is a text selection,
   // not a press outside.
   const outside = useRef(false)
+  useLayer(open, onClose, true)
   useEffect(() => {
     const d = ref.current
     if (!d) return

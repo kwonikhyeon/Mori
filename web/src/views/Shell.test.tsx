@@ -9,6 +9,7 @@ import { now } from '../lib/clock'
 import { viewportWidth } from '../lib/media'
 import { href, route, type Route } from '../lib/router'
 import { conn, core, folders, hostsReady, ready, resetStore, terminals } from '../lib/store'
+import { switcherOpen } from '../lib/switcher'
 import { theme } from '../lib/theme'
 import { toasts } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
@@ -104,6 +105,7 @@ afterEach(() => {
   route.value = { name: 'queue' }
   phoneBack.value = '#/'
   gitFrom.value = ''
+  switcherOpen.value = false
   forgetCommits()
   hostsReady.value = false
   toasts.value = []
@@ -359,6 +361,94 @@ describe('PC', () => {
     render(<Shell />)
     expect(document.querySelector('.pc-banner')!.textContent).toContain('마지막으로 본 목록입니다')
   })
+
+  describe('세션 이동', () => {
+    const sessions = () =>
+      load([
+        term({ address: 't1', display_title: '빌드 고치기', status: status('blocked', { kind: 'permission' }), status_ms: 9 }),
+        term({ address: 't2', display_title: '배포', status: status('working'), status_ms: 8 }),
+        term({ address: 't3', display_title: '정리', status: status('idle'), status_ms: 7 }),
+      ])
+    const titles = (d: HTMLElement) => within(d).getAllByRole('option').map((o) => o.querySelector('.qs-title')!.textContent)
+    const picked = (d: HTMLElement) => within(d).getAllByRole('option').map((o) => o.getAttribute('aria-selected') === 'true')
+
+    it('opens with Ctrl+P, picks a session from the keyboard and goes there', () => {
+      sessions()
+      at(1440, { name: 'terminal', addr: 't1', git: false })
+      render(<Shell />)
+      fireEvent.keyDown(document.body, { key: 'p', code: 'KeyP', ctrlKey: true })
+      const d = screen.getByRole('dialog', { name: '세션 이동' }) as HTMLDialogElement
+      expect(d.open).toBe(true)
+      const box = within(d).getByRole('combobox', { name: '세션 찾기' })
+      expect(document.activeElement).toBe(box)
+      // The queue's order; the session on the screen is not picked first.
+      expect(titles(d)).toEqual(['빌드 고치기', '정리', '배포'])
+      expect(within(d).getAllByRole('option')[0].textContent).toContain('보는 중')
+      expect(picked(d)).toEqual([false, true, false])
+      expect(box.getAttribute('aria-activedescendant')).toBe(within(d).getAllByRole('option')[1].id)
+      fireEvent.keyDown(box, { key: 'ArrowDown' })
+      expect(picked(d)).toEqual([false, false, true])
+      fireEvent.keyDown(box, { key: 'ArrowDown' })
+      expect(picked(d)).toEqual([true, false, false])
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      expect(picked(d)).toEqual([false, false, true])
+      fireEvent.input(box, { target: { value: '작업 중' } })
+      expect(titles(d)).toEqual(['배포'])
+      fireEvent.keyDown(box, { key: 'Enter' })
+      expect(location.hash).toBe('#/t/t2')
+      expect(d.open).toBe(false)
+    })
+
+    it('says so when nothing matches', () => {
+      sessions()
+      at(1440, { name: 'queue' })
+      render(<Shell />)
+      fireEvent.click(screen.getByRole('button', { name: '세션 이동' }))
+      const d = screen.getByRole('dialog', { name: '세션 이동' })
+      expect(picked(d)).toEqual([true, false, false])
+      fireEvent.input(within(d).getByRole('combobox', { name: '세션 찾기' }), { target: { value: '없는 이름' } })
+      expect(within(d).queryByRole('listbox')).toBeNull()
+      expect(within(d).getByRole('status').textContent).toBe('맞는 세션이 없습니다')
+    })
+
+    it('opens a session clicked in the list, and closes for another screen', () => {
+      sessions()
+      at(1440, { name: 'terminal', addr: 't1', git: true })
+      render(<Shell />)
+      fireEvent.click(screen.getByRole('button', { name: '세션 이동' }))
+      const d = screen.getByRole('dialog', { name: '세션 이동' }) as HTMLDialogElement
+      fireEvent.click(within(d).getByRole('option', { name: /정리/ }))
+      // The Git panel stays, as the sidebar's links keep it.
+      expect(location.hash).toBe('#/t/t3/git')
+      expect(d.open).toBe(false)
+
+      fireEvent.keyDown(document.body, { key: 'p', code: 'KeyP', ctrlKey: true })
+      expect(d.open).toBe(true)
+      act(() => {
+        route.value = { name: 'folders' }
+      })
+      expect(d.open).toBe(false)
+    })
+
+    it('goes to the next and the previous session that waits for approval', () => {
+      load([
+        term({ address: 't1', status: status('blocked', { kind: 'permission' }), status_ms: 9 }),
+        term({ address: 't2', status: status('working'), status_ms: 8 }),
+        term({ address: 't3', status: status('blocked', { kind: 'question' }), status_ms: 7 }),
+      ])
+      at(1440, { name: 'queue' })
+      render(<Shell />)
+      const step = (key: string) => fireEvent.keyDown(document.body, { key, altKey: true, shiftKey: true })
+      step('ArrowDown')
+      expect(location.hash).toBe('#/t/t1')
+      step('ArrowDown')
+      expect(location.hash).toBe('#/t/t3')
+      step('ArrowDown')
+      expect(location.hash).toBe('#/t/t1')
+      step('ArrowUp')
+      expect(location.hash).toBe('#/t/t3')
+    })
+  })
 })
 
 describe('phone', () => {
@@ -521,5 +611,57 @@ describe('phone', () => {
     })
     expect(screen.getByRole('heading', { level: 1, name: 'Claude Code' })).toBeTruthy()
     expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/folders')
+  })
+  describe('밀어서 뒤로', () => {
+    /** A touch event at the points given, as a phone sends it. */
+    function touch(el: Element, type: string, points: [number, number][]) {
+      const e = new Event(type, { bubbles: true, cancelable: true })
+      Object.defineProperty(e, 'touches', { value: points.map(([clientX, clientY]) => ({ clientX, clientY })) })
+      fireEvent(el, e)
+    }
+    function swipe(el: Element, to: number) {
+      touch(el, 'touchstart', [[40, 300]])
+      for (let x = 60; x <= to; x += 40) touch(el, 'touchmove', [[x, 302]])
+      touch(el, 'touchend', [])
+    }
+
+    it('goes where ‹ goes once the screen has slid out', () => {
+      load([term({ address: 't1', status: status('idle') })])
+      at(390, { name: 'folders' })
+      render(<Shell />)
+      act(() => {
+        route.value = { name: 'terminal', addr: 't1', git: false }
+      })
+      expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/folders')
+      const full = document.querySelector<HTMLElement>('.ph-full')!
+      swipe(screen.getByRole('heading', { level: 1 }), 260)
+      expect(full.classList.contains('is-swiping')).toBe(true)
+      expect(location.hash).toBe('#/')
+      fireEvent(full, new Event('transitionend'))
+      expect(location.hash).toBe('#/folders')
+      expect(route.value).toEqual({ name: 'folders' })
+      expect(screen.getByRole('navigation', { name: '주 메뉴' })).toBeTruthy()
+    })
+
+    it('stays while a sheet is open', () => {
+      vi.useFakeTimers()
+      try {
+        load([term({ address: 't1', status: status('idle') })])
+        at(390, { name: 'terminal', addr: 't1', git: false })
+        render(<Shell />)
+        fireEvent.keyDown(document.body, { key: 'p', code: 'KeyP', ctrlKey: true })
+        expect((screen.getByRole('dialog', { name: '세션 이동' }) as HTMLDialogElement).open).toBe(true)
+        const full = document.querySelector<HTMLElement>('.ph-full')!
+        swipe(screen.getByRole('heading', { level: 1, name: 'Claude Code' }), 260)
+        expect(full.classList.contains('is-swiping')).toBe(false)
+        act(() => {
+          vi.advanceTimersByTime(300)
+        })
+        expect(location.hash).toBe('#/')
+        expect(route.value).toEqual({ name: 'terminal', addr: 't1', git: false })
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })

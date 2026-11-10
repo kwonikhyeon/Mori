@@ -9,6 +9,7 @@ import { ConnBanner } from '../components/ConnBanner'
 import { Icon } from '../components/Icon'
 import { totals } from '../lib/diff'
 import { branchLine, changeGroups, fileParts, shortPath, wtLabel, type ChangeGroup, type ChangeItem } from '../lib/format'
+import { href, route } from '../lib/router'
 import { useHost, type HostScope } from '../lib/scope'
 import { DiffView } from './Diff'
 import { ChangeCards, ChangeList } from './GitChanges'
@@ -71,9 +72,12 @@ function AheadBehind({ g }: { g: GitData }) {
 
 const graphHref = (h: HostScope, g: GitData) => h.href({ name: 'graph', folder: g.f!.id, path: g.shown, head: false })
 
-/** The graph's way back is the screen it was opened from. */
+/**
+ * The graph's way back is the screen it was opened from: the route's, as the
+ * hash may still wait for the step back over a menu's entry (lib/backstack.ts).
+ */
 const fromHere = (h: HostScope, g: GitData) => () => {
-  graphFrom.value = { host: h.id, folder: g.f!.id, href: location.hash }
+  graphFrom.value = { host: h.id, folder: g.f!.id, href: href(route.peek()) }
 }
 
 function BranchRow({ g }: { g: GitData }) {

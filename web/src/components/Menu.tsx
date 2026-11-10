@@ -1,9 +1,10 @@
 // A button that opens a list of actions (the WAI-ARIA menu button): the
-// arrows move between the items, Escape closes and gives the focus back,
-// Tab and a press elsewhere close.
+// arrows move between the items, Escape and the back key close and give
+// the focus back, Tab and a press elsewhere close.
 import type { ComponentChildren } from 'preact'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Icon, type IconName } from './Icon'
+import { useLayer } from './useLayer'
 
 export interface MenuItem {
   /** Tells apart items of one label; the label unless given. */
@@ -51,6 +52,7 @@ export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass =
     setOpen(null)
     btn.current?.focus()
   }
+  useLayer(!!open, close, false)
 
   const onButtonKey = (e: KeyboardEvent) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return

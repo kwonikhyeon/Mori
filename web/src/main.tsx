@@ -5,11 +5,12 @@ import './styles/ui.css'
 import { effect } from '@preact/signals'
 import { render } from 'preact'
 import { App } from './app'
+import { initBackstack } from './lib/backstack'
 import { showNeeds } from './lib/badge'
 import { boot } from './lib/boot'
 import { startClock } from './lib/clock'
 import { trackWidth } from './lib/media'
-import { initRouter } from './lib/router'
+import { initRouter, navigate, parseHash } from './lib/router'
 import { totalNeeds } from './lib/scope'
 import { initTheme } from './lib/theme'
 import { trackViewport } from './lib/viewport'
@@ -19,6 +20,7 @@ initTheme()
 trackViewport()
 trackWidth()
 initRouter()
+initBackstack()
 startClock()
 startWake()
 effect(() => showNeeds(totalNeeds.value))
@@ -33,6 +35,6 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
     const msg = e.data as { type?: string; url?: string } | null
     if (msg?.type !== 'navigate' || typeof msg.url !== 'string') return
     const url = new URL(msg.url, location.origin)
-    if (url.origin === location.origin) location.hash = url.hash
+    if (url.origin === location.origin) navigate(parseHash(url.hash))
   })
 }

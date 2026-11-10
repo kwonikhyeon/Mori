@@ -1,0 +1,127 @@
+/* 세션 이동 (spec §3 #198): a field over every session, near the top on a
+   PC so the list grows down from where the eye is. */
+
+@media (min-width: 768px) {
+  dialog.sheet.qs {
+    width: min(600px, calc(100vw - 32px));
+    max-height: min(560px, calc(100dvh - 96px));
+    margin-top: max(48px, 12dvh);
+  }
+}
+
+.qs-field {
+  flex: none;
+  padding: 12px 16px 4px;
+}
+
+.qs-input {
+  width: 100%;
+}
+
+.qs-body {
+  padding: 8px;
+}
+
+.qs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.qs-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.qs-row:hover {
+  background: var(--surface-2);
+}
+
+.qs-row[aria-selected="true"] {
+  background: var(--selected);
+}
+
+.qs-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.qs-title,
+.qs-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qs-title {
+  font-weight: 600;
+}
+
+.qs-row.is-finished .qs-title {
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.qs-sub {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.qs-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.qs-here {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.qs-note {
+  padding: 24px 8px;
+  color: var(--text-2);
+  font-size: 14px;
+  text-align: center;
+}
+
+.qs-foot {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.qs-foot kbd {
+  display: inline-block;
+  min-width: 20px;
+  margin-right: 2px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+@media (max-width: 767px) {
+  .qs-foot {
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+}

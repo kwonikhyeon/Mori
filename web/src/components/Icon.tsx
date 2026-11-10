@@ -86,6 +86,12 @@ const SHAPES = {
       <path d="M20 4v5h-5" />
     </>
   ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l4 4" />
+    </>
+  ),
   send: <path d="M12 19V5M6 11l6-6 6 6" />,
   sliders: (
     <>

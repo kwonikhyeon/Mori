@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { initBackstack, marked, resetBackstack } from '../lib/backstack'
 import { Sheet, SheetHead } from './Sheet'
 
 afterEach(cleanup)
@@ -32,6 +33,26 @@ describe('Sheet', () => {
     fireEvent.pointerDown(d)
     fireEvent.click(d)
     expect(close).toHaveBeenCalledTimes(3)
+  })
+
+  it('closes with the back key where the browser has no CloseWatcher', async () => {
+    vi.stubGlobal('CloseWatcher', undefined)
+    const stop = initBackstack()
+    try {
+      history.replaceState(null, '', '/#/')
+      const close = vi.fn()
+      const { rerender } = render(sheet(true, close))
+      expect(marked(history.state)).toBe(true)
+      history.back()
+      await waitFor(() => expect(close).toHaveBeenCalledTimes(1))
+      rerender(sheet(false, close))
+      expect(marked(history.state)).toBe(false)
+      expect(location.hash).toBe('#/')
+    } finally {
+      stop()
+      resetBackstack()
+      vi.unstubAllGlobals()
+    }
   })
 
   it('stays open after a press that starts inside and ends outside', () => {

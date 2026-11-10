@@ -1,6 +1,7 @@
 // Asks before something that cannot be undone, in a modal <dialog>: the
-// focus starts on 취소, and Escape or a press outside cancels.
+// focus starts on 취소, and Escape, a press outside or the back key cancels.
 import { useEffect, useId, useLayoutEffect, useRef } from 'preact/hooks'
+import { useLayer } from './useLayer'
 
 export interface ConfirmProps {
   open: boolean
@@ -16,6 +17,7 @@ export interface ConfirmProps {
 export function Confirm({ open, title, text, confirm, danger, busy, onConfirm, onCancel }: ConfirmProps) {
   const ref = useRef<HTMLDialogElement>(null)
   const id = useId()
+  useLayer(open, onCancel, true)
   useEffect(() => {
     const d = ref.current
     if (!d) return

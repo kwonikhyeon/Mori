@@ -18,6 +18,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -40,7 +41,8 @@ type fakeHost struct {
 	sub       map[string]any // the last push subscription asked for
 	push      *http.Client   // what the host sends its test notification with; nil: it sends none
 	hello     string
-	subStatus int // the answer to POST /api/push/subscriptions; 0: 201
+	subStatus int                   // the answer to POST /api/push/subscriptions; 0: 201
+	onSub     func(endpoint string) // runs before a push subscription replaces the last; nil: none
 }
 
 func newFakeHost(t *testing.T, code string) *fakeHost {
@@ -83,6 +85,13 @@ func newFakeHost(t *testing.T, code string) *fakeHost {
 		f.record(r)
 		var body map[string]any
 		json.NewDecoder(r.Body).Decode(&body)
+		var onSub func(string)
+		f.with(func() { onSub = f.onSub })
+		if onSub != nil {
+			s, _ := body["subscription"].(map[string]any)
+			endpoint, _ := s["endpoint"].(string)
+			onSub(endpoint)
+		}
 		f.mu.Lock()
 		f.sub = body
 		status := cmp.Or(f.subStatus, http.StatusCreated)
@@ -435,6 +444,75 @@ func TestSetupRelay(t *testing.T) {
 	}
 	if _, err := m.SetupRelay(ctx, "h_nope0000"); kindOf(err) != "not_found" {
 		t.Errorf("SetupRelay of no host: %v", err)
+	}
+}
+
+// Two relay setups of one host at once, or a link and a relay setup, must
+// not leave the hub saying the relay is on while the host sends to a secret
+// the hub no longer holds.
+func TestRelaySetupsAtOnce(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		other func(m *peer.Manager, f *fakeHost) // runs beside a relay setup
+	}{
+		{"two relay setups", func(m *peer.Manager, _ *fakeHost) { m.SetupRelay(context.Background(), "h_desk0001") }},
+		{"a link and a relay setup", func(m *peer.Manager, f *fakeHost) { m.Link(context.Background(), f.srv.URL, "ABCD-EFGH", "") }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFakeHost(t, "ABCD-EFGH")
+			receiver := httptest.NewUnstartedServer(nil)
+			pub := "https://" + receiver.Listener.Addr().String()
+			m, st := newManager(t, peer.Options{PublicURL: func() string { return pub }})
+			addHosts(t, st, store.Host{ID: "h_desk0001", Name: "desk", URL: f.srv.URL, Link: store.HostLink{Token: "tok-0", Version: "9.9.9"}})
+			tested := make(chan struct{}) // a test notification found the secret the hub holds
+			var once sync.Once
+			receiver.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if _, _, _, ok := m.Relay(strings.TrimPrefix(r.URL.Path, "/api/relay/")); !ok {
+					w.WriteHeader(http.StatusGone)
+					return
+				}
+				once.Do(func() { close(tested) })
+				w.WriteHeader(http.StatusCreated)
+			})
+			receiver.StartTLS()
+			t.Cleanup(receiver.Close)
+			// When the two meet at the host, the one whose secret the hub
+			// holds subscribes first, and the other then replaces it.
+			met := make(chan struct{})
+			var arrived atomic.Int32
+			f.with(func() {
+				f.push = receiver.Client()
+				f.onSub = func(endpoint string) {
+					if arrived.Add(1) == 2 {
+						close(met)
+					}
+					select {
+					case <-met:
+					case <-time.After(500 * time.Millisecond): // alone: nothing to order
+						return
+					}
+					if _, _, _, ok := m.Relay(strings.TrimPrefix(endpoint, pub+"/api/relay/")); !ok {
+						select {
+						case <-tested:
+						case <-time.After(5 * time.Second):
+						}
+					}
+				}
+			})
+			var wg sync.WaitGroup
+			wg.Go(func() { tc.other(m, f) })
+			wg.Go(func() { m.SetupRelay(context.Background(), "h_desk0001") })
+			wg.Wait()
+			r := st.Hosts()[0].Link.Relay
+			var endpoint string
+			f.with(func() { endpoint, _ = f.sub["subscription"].(map[string]any)["endpoint"].(string) })
+			if same := endpoint == pub+"/api/relay/"+r.Secret; !r.OK || !same {
+				t.Fatalf("relay ok %v, the host sends to the secret the hub holds: %v", r.OK, same)
+			}
+			if v := m.Views()[0]; !v.Relay {
+				t.Fatalf("%+v", v)
+			}
+		})
 	}
 }
 

@@ -85,6 +85,8 @@ type Manager struct {
 	mu       sync.Mutex
 	pub      string
 	pubUntil time.Time
+
+	busy sync.Map // origin → chan struct{} of cap 1, held while that host is linked or its relay set up
 }
 
 // New makes a Manager over o.Store.
@@ -139,6 +141,20 @@ func (m *Manager) publicURL() string {
 		m.pub, m.pubUntil = strings.TrimRight(m.o.PublicURL(), "/"), now.Add(pubTTL)
 	}
 	return m.pub
+}
+
+// lockHost holds the host at origin while it is linked or its relay set up:
+// two at once leave the hub holding one relay secret while the host sends
+// to the other. It gives up when ctx ends.
+func (m *Manager) lockHost(ctx context.Context, origin string) (unlock func(), err error) {
+	v, _ := m.busy.LoadOrStore(origin, make(chan struct{}, 1))
+	ch := v.(chan struct{})
+	select {
+	case ch <- struct{}{}:
+		return func() { <-ch }, nil
+	case <-ctx.Done():
+		return nil, errorf("conflict", "이 호스트의 연결이나 알림 중계 설정이 아직 끝나지 않았습니다. 잠시 뒤 다시 하세요")
+	}
 }
 
 // View is what the API shows of a host (spec §3 #168). It never holds the
@@ -457,7 +473,8 @@ func (m *Manager) logout(ctx context.Context, origin, token string) {
 // Link pairs the hub with the host at rawURL (spec §6.9). A host linked
 // before keeps its ID and name and gets the new token; the old one is
 // logged out. created tells a new host. A relay that cannot be made is no
-// error: the view says why.
+// error: the view says why. It waits for a link or relay setup of the same
+// host already under way.
 func (m *Manager) Link(ctx context.Context, rawURL, code, name string) (v View, created bool, err error) {
 	ctx, cancel := context.WithTimeout(ctx, linkTimeout)
 	defer cancel()
@@ -474,6 +491,11 @@ func (m *Manager) Link(ctx context.Context, rawURL, code, name string) (v View, 
 	if name, err = cleanName(name, true); err != nil {
 		return View{}, false, err
 	}
+	unlock, err := m.lockHost(ctx, origin)
+	if err != nil {
+		return View{}, false, err
+	}
+	defer unlock()
 	h, err := m.hello(ctx, origin)
 	if err != nil {
 		return View{}, false, err
@@ -505,7 +527,7 @@ func (m *Manager) Link(ctx context.Context, rawURL, code, name string) (v View, 
 	if old != "" && old != token {
 		m.logout(ctx, origin, old)
 	}
-	v, err = m.SetupRelay(ctx, id)
+	v, err = m.setupRelay(ctx, id)
 	return v, created, err
 }
 
@@ -556,11 +578,28 @@ func (m *Manager) Rename(id, name string) (View, error) {
 
 // SetupRelay makes the relay subscription on the host id again with new
 // keys (spec §6.11). It is off, with the reason kept, when the hub is not
-// on https or the host does not take it. It ends within 30 s: the
+// on https or the host does not take it. It waits for a link or relay setup
+// of the same host already under way, and ends within 30 s all told: the
 // transport has no response timeout.
 func (m *Manager) SetupRelay(ctx context.Context, id string) (View, error) {
 	ctx, cancel := context.WithTimeout(ctx, linkTimeout)
 	defer cancel()
+	t, ok := m.Target(id)
+	if !ok {
+		return View{}, errorf("not_found", "그런 호스트가 없습니다: %s", id)
+	}
+	origin, _, _ := ParseTarget(t.Base.String()) // "": a hand-edited URL, which is not linked
+	unlock, err := m.lockHost(ctx, origin)
+	if err != nil {
+		return View{}, err
+	}
+	defer unlock()
+	return m.setupRelay(ctx, id)
+}
+
+// setupRelay is SetupRelay with the host held. It reads the host again: a
+// link it waited for may have changed the token.
+func (m *Manager) setupRelay(ctx context.Context, id string) (View, error) {
 	t, ok := m.Target(id)
 	switch {
 	case !ok:

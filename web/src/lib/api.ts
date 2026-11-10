@@ -108,75 +108,121 @@ export interface DiffQuery {
   orig?: string
 }
 
+/** The path in front of a host's calls: none for the hub, /h/<ID> for a host linked to it (spec §3 #170). */
+export function hostPrefix(id: string): string {
+  return id ? '/h/' + seg(id) : ''
+}
+
+/** What the hub says of a linked host it cannot speak to: unlinked (409) or out of reach (502). */
+export type HostError = 'host_unlinked' | 'host_unreachable'
+
+const HOST_ERRORS: ReadonlySet<string> = new Set<HostError>(['host_unlinked', 'host_unreachable'])
+
+/**
+ * The calls a host answers, each under prefix: the hub's own with '', a
+ * linked host's through the hub with hostPrefix(id). It has only what the hub
+ * relays (spec §7.1). onHostError hears when the hub says that host is
+ * unlinked or out of reach; the error still goes to the caller.
+ */
+export function apiFor(prefix: string, onHostError?: (kind: HostError) => void) {
+  const req = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
+    try {
+      return await request<T>(method, prefix + path, body)
+    } catch (e) {
+      if (onHostError && e instanceof ApiError && HOST_ERRORS.has(e.kind)) onHostError(e.kind as HostError)
+      throw e
+    }
+  }
+  const get = <T>(path: string) => req<T>('GET', path)
+  return {
+    hello: () => get<Hello>('/api/hello'),
+    overview: () => get<Overview>('/api/overview'),
+
+    folders: {
+      list: () => get<FolderView[]>('/api/folders'),
+      add: (path: string, name = '') => req<FolderView>('POST', '/api/folders', { path, name }),
+      rename: (id: string, name: string) => req<FolderView>('PATCH', '/api/folders/' + seg(id), { name }),
+      remove: (id: string) => req<void>('DELETE', '/api/folders/' + seg(id)),
+      git: (id: string) => get<GitSummary>(`/api/folders/${seg(id)}/git`),
+      branches: (id: string) => get<Branches>(`/api/folders/${seg(id)}/branches`),
+      addWorktree: (id: string, w: NewWorktree) => req<Worktree>('POST', `/api/folders/${seg(id)}/worktrees`, w),
+      removeWorktree: (id: string, path: string, force: boolean) =>
+        req<void>('DELETE', `/api/folders/${seg(id)}/worktrees` + query({ path, force })),
+    },
+
+    fs: (path = '', hidden = false) => get<FsListing>('/api/fs' + query({ path, hidden })),
+
+    git: {
+      status: (path: string) => get<GitStatus>('/api/git/status' + query({ path })),
+      diff: (path: string, d: DiffQuery = {}) => get<Diff>('/api/git/diff' + query({ path, ...d })),
+      log: (path: string, o: { limit?: number; head?: boolean } = {}) =>
+        get<Graph>('/api/git/log' + query({ path, limit: o.limit, head: o.head })),
+      commit: (path: string, rev: string) => get<Commit>('/api/git/commit' + query({ path, rev })),
+    },
+
+    terminals: {
+      list: (all = false) => get<TerminalView[]>('/api/terminals' + query({ all })),
+      create: (t: CreateTerminal) => req<TerminalView>('POST', '/api/terminals', t),
+      get: (addr: string) => get<TerminalView>(termPath(addr)),
+      rename: (addr: string, title: string) => req<TerminalView>('PATCH', termPath(addr), { title }),
+      remove: (addr: string) => req<void>('DELETE', termPath(addr)),
+      send: (addr: string, text: string, force = false) =>
+        req<SendResult>('POST', termPath(addr) + '/send', force ? { text, force } : { text }),
+      keys: (addr: string, keys: string[]) => req<unknown>('POST', termPath(addr) + '/keys', { keys }),
+      interrupt: (addr: string) => req<unknown>('POST', termPath(addr) + '/interrupt', {}),
+      kill: (addr: string) => req<TerminalView>('POST', termPath(addr) + '/kill'),
+      upload: (addr: string, file: File) => {
+        const form = new FormData()
+        form.append('file', file, file.name)
+        return req<Upload>('POST', termPath(addr) + '/files', form)
+      },
+      text: (addr: string, lines?: number) => get<ScreenText>(termPath(addr) + '/text' + query({ lines })),
+    },
+
+    presets: {
+      get: () => get<Preset[]>('/api/presets'),
+      put: (ps: Preset[]) => req<Preset[]>('PUT', '/api/presets', ps),
+    },
+
+    push: {
+      settings: () => get<PushSettings>('/api/push/settings'),
+      putSettings: (s: PushSettings) => req<PushSettings>('PUT', '/api/push/settings', s),
+    },
+  }
+}
+
+/** The calls of one host: see apiFor. */
+export type HostApi = ReturnType<typeof apiFor>
+
+const hub = apiFor('')
 const get = <T>(path: string) => request<T>('GET', path)
 
+/** The hub's calls: what every host answers, and what only the hub does. */
 export const api = {
-  hello: () => get<Hello>('/api/hello'),
+  ...hub,
   pair: (code: string, name: string) => request<void>('POST', '/api/pair', { code, name }),
   logout: () => request<void>('POST', '/api/logout'),
-  overview: () => get<Overview>('/api/overview'),
 
   devices: () => get<Device[]>('/api/devices'),
   revokeDevice: (id: string) => request<void>('DELETE', '/api/devices/' + seg(id)),
   pairCode: (name: string) => request<PairCode>('POST', '/api/pair-codes', { name }),
 
-  folders: {
-    list: () => get<FolderView[]>('/api/folders'),
-    add: (path: string, name = '') => request<FolderView>('POST', '/api/folders', { path, name }),
-    rename: (id: string, name: string) => request<FolderView>('PATCH', '/api/folders/' + seg(id), { name }),
-    remove: (id: string) => request<void>('DELETE', '/api/folders/' + seg(id)),
-    git: (id: string) => get<GitSummary>(`/api/folders/${seg(id)}/git`),
-    branches: (id: string) => get<Branches>(`/api/folders/${seg(id)}/branches`),
-    addWorktree: (id: string, w: NewWorktree) => request<Worktree>('POST', `/api/folders/${seg(id)}/worktrees`, w),
-    removeWorktree: (id: string, path: string, force: boolean) =>
-      request<void>('DELETE', `/api/folders/${seg(id)}/worktrees` + query({ path, force })),
-  },
-
-  fs: (path = '', hidden = false) => get<FsListing>('/api/fs' + query({ path, hidden })),
-
-  git: {
-    status: (path: string) => get<GitStatus>('/api/git/status' + query({ path })),
-    diff: (path: string, d: DiffQuery = {}) => get<Diff>('/api/git/diff' + query({ path, ...d })),
-    log: (path: string, o: { limit?: number; head?: boolean } = {}) =>
-      get<Graph>('/api/git/log' + query({ path, limit: o.limit, head: o.head })),
-    commit: (path: string, rev: string) => get<Commit>('/api/git/commit' + query({ path, rev })),
-  },
-
-  terminals: {
-    list: (all = false) => get<TerminalView[]>('/api/terminals' + query({ all })),
-    create: (req: CreateTerminal) => request<TerminalView>('POST', '/api/terminals', req),
-    get: (addr: string) => get<TerminalView>(termPath(addr)),
-    rename: (addr: string, title: string) => request<TerminalView>('PATCH', termPath(addr), { title }),
-    remove: (addr: string) => request<void>('DELETE', termPath(addr)),
-    send: (addr: string, text: string, force = false) =>
-      request<SendResult>('POST', termPath(addr) + '/send', force ? { text, force } : { text }),
-    keys: (addr: string, keys: string[]) => request<unknown>('POST', termPath(addr) + '/keys', { keys }),
-    interrupt: (addr: string) => request<unknown>('POST', termPath(addr) + '/interrupt', {}),
-    kill: (addr: string) => request<TerminalView>('POST', termPath(addr) + '/kill'),
-    upload: (addr: string, file: File) => {
-      const form = new FormData()
-      form.append('file', file, file.name)
-      return request<Upload>('POST', termPath(addr) + '/files', form)
-    },
-    text: (addr: string, lines?: number) => get<ScreenText>(termPath(addr) + '/text' + query({ lines })),
-  },
-
-  presets: {
-    get: () => get<Preset[]>('/api/presets'),
-    put: (ps: Preset[]) => request<Preset[]>('PUT', '/api/presets', ps),
-  },
   hosts: {
     get: () => get<Host[]>('/api/hosts'),
   },
 
   push: {
+    ...hub.push,
     key: () => get<{ key: string }>('/api/push/key'),
     list: () => get<PushSubscriptionView[]>('/api/push/subscriptions'),
     subscribe: (subscription: PushSubscriptionJSON, kinds: PushKind[]) =>
       request<PushSubscriptionView>('POST', '/api/push/subscriptions', { subscription, kinds }),
     unsubscribe: (endpoint: string) => request<void>('DELETE', '/api/push/subscriptions', { endpoint }),
     test: () => request<{ sent: number }>('POST', '/api/push/test'),
-    settings: () => get<PushSettings>('/api/push/settings'),
-    putSettings: (s: PushSettings) => request<PushSettings>('PUT', '/api/push/settings', s),
   },
+}
+
+/** Says the hub no longer pairs this device: runs what onUnauthorized set. */
+export function hubUnpaired(): void {
+  unauthorized?.()
 }

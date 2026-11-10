@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { api, ApiError, onUnauthorized, request, termPath, wsURL } from './api'
+import { api, ApiError, apiFor, hostPrefix, hubUnpaired, onUnauthorized, request, termPath, wsURL, type HostApi } from './api'
 
 type Call = { url: string; init: RequestInit }
 
@@ -115,5 +115,57 @@ describe('paths', () => {
   it('makes WebSocket addresses of this host', () => {
     expect(wsURL('/ws/events', { protocol: 'https:', host: 'macmini.example.ts.net' })).toBe('wss://macmini.example.ts.net/ws/events')
     expect(wsURL('/ws/events', { protocol: 'http:', host: '127.0.0.1:7761' })).toBe('ws://127.0.0.1:7761/ws/events')
+  })
+})
+
+describe('another host', () => {
+  let desk: HostApi
+  beforeEach(() => {
+    desk = apiFor(hostPrefix('h_desk0001'))
+  })
+
+  it('goes through the hub under /h/<ID>', async () => {
+    await desk.terminals.send('machine/t7', 'hello')
+    await desk.git.log('/r', { head: true })
+    await desk.overview()
+    expect(calls.map((c) => c.url)).toEqual([
+      '/h/h_desk0001/api/terminals/machine%2Ft7/send',
+      '/h/h_desk0001/api/git/log?path=%2Fr&head=1',
+      '/h/h_desk0001/api/overview',
+    ])
+  })
+
+  it('keeps the hub at its own paths', async () => {
+    await api.overview()
+    await api.push.key()
+    await api.hosts.get()
+    expect(calls.map((c) => c.url)).toEqual(['/api/overview', '/api/push/key', '/api/hosts'])
+    expect(hostPrefix('')).toBe('')
+    expect(hostPrefix('h 1')).toBe('/h/h%201')
+  })
+
+  it('has only what the hub relays', () => {
+    expect(Object.keys(desk).sort()).toEqual(['folders', 'fs', 'git', 'hello', 'overview', 'presets', 'push', 'terminals'])
+    expect(Object.keys(desk.push).sort()).toEqual(['putSettings', 'settings'])
+  })
+
+  it('tells when the hub says the host is unlinked or out of reach', async () => {
+    const seen: string[] = []
+    const d = apiFor(hostPrefix('h_desk0001'), (k) => seen.push(k))
+    for (const [status, kind] of [[409, 'host_unlinked'], [502, 'host_unreachable'], [404, 'not_found']] as const) {
+      reply = () => json(status, { error: { kind, message: '안 됩니다' } })
+      await expect(d.overview()).rejects.toMatchObject({ status, kind })
+    }
+    expect(seen).toEqual(['host_unlinked', 'host_unreachable'])
+  })
+
+  it('takes a 401 under /h/ as the hub forgetting this device', async () => {
+    const hook = vi.fn()
+    onUnauthorized(hook)
+    reply = () => json(401, { error: { kind: 'unauthorized', message: '페어링이 필요합니다' } })
+    await expect(desk.overview()).rejects.toBeInstanceOf(ApiError)
+    expect(hook).toHaveBeenCalledTimes(1)
+    hubUnpaired()
+    expect(hook).toHaveBeenCalledTimes(2)
   })
 })

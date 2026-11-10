@@ -1,9 +1,11 @@
 // The screens as hash routes (spec §3 #121). Every segment is one
 // encodeURIComponent, so an address like machine/t7 keeps its slash inside;
-// the rest goes in a query.
+// the rest goes in a query. A host linked to the hub has the same screens
+// under #/h/<ID> (spec §3 #170).
 import { signal } from '@preact/signals'
 
-export type Route =
+/** A screen of one host. */
+export type Page =
   | { name: 'queue' }
   | { name: 'folders' }
   | { name: 'settings' }
@@ -11,6 +13,9 @@ export type Route =
   | { name: 'terminal'; addr: string; git: boolean }
   | { name: 'git'; folder: string; path?: string }
   | { name: 'graph'; folder: string; path?: string; head: boolean; c?: string }
+
+/** A screen and its host: none is the hub, else the ID of a host linked to it. */
+export type Route = Page & { host?: string }
 
 const QUEUE: Route = { name: 'queue' }
 
@@ -21,20 +26,45 @@ function qs(params: Record<string, string | undefined>): string {
   return s ? '?' + s : ''
 }
 
-export function href(r: Route): string {
+/** The path of a screen in its host, without the hash. */
+export function pagePath(r: Page): string {
   const seg = encodeURIComponent
   switch (r.name) {
-    case 'queue': return '#/'
-    case 'folders': return '#/folders'
-    case 'settings': return '#/settings'
-    case 'new': return '#/new' + qs({ folder: r.folder, wt: r.wt })
-    case 'terminal': return `#/t/${seg(r.addr)}` + (r.git ? '/git' : '')
-    case 'git': return `#/git/${seg(r.folder)}` + qs({ path: r.path })
-    case 'graph': return `#/graph/${seg(r.folder)}` + qs({ path: r.path, head: r.head ? '1' : undefined, c: r.c })
+    case 'queue': return '/'
+    case 'folders': return '/folders'
+    case 'settings': return '/settings'
+    case 'new': return '/new' + qs({ folder: r.folder, wt: r.wt })
+    case 'terminal': return `/t/${seg(r.addr)}` + (r.git ? '/git' : '')
+    case 'git': return `/git/${seg(r.folder)}` + qs({ path: r.path })
+    case 'graph': return `/graph/${seg(r.folder)}` + qs({ path: r.path, head: r.head ? '1' : undefined, c: r.c })
   }
 }
 
-/** The route of a hash; anything it does not know is the queue. */
+export function href(r: Route): string {
+  const p = pagePath(r)
+  return r.host ? '#/h/' + encodeURIComponent(r.host) + (p === '/' ? '' : p) : '#' + p
+}
+
+/** The screen of a path in its host; null for one it does not know. */
+function parsePage(s: string[], p: URLSearchParams): Page | null {
+  const opt = (k: string) => p.get(k) || undefined
+  switch (s[0]) {
+    case undefined: return QUEUE
+    case 'folders': return s.length === 1 ? { name: 'folders' } : null
+    case 'settings': return s.length === 1 ? { name: 'settings' } : null
+    case 'new': return s.length === 1 ? { name: 'new', folder: opt('folder'), wt: opt('wt') } : null
+    case 't':
+      if (s.length === 2) return { name: 'terminal', addr: s[1], git: false }
+      if (s.length === 3 && s[2] === 'git') return { name: 'terminal', addr: s[1], git: true }
+      return null
+    case 'git': return s.length === 2 ? { name: 'git', folder: s[1], path: opt('path') } : null
+    case 'graph':
+      return s.length === 2 ? { name: 'graph', folder: s[1], path: opt('path'), head: p.get('head') === '1', c: opt('c') } : null
+    default: return null
+  }
+}
+
+/** The route of a hash; anything it does not know is the hub's queue. */
 export function parseHash(hash: string): Route {
   const raw = hash.replace(/^#/, '')
   const q = raw.indexOf('?')
@@ -47,21 +77,11 @@ export function parseHash(hash: string): Route {
     return QUEUE // a broken escape
   }
   if (s.some((x) => x === '')) return QUEUE
-  const opt = (k: string) => p.get(k) || undefined
-  switch (s[0]) {
-    case undefined: return QUEUE
-    case 'folders': return s.length === 1 ? { name: 'folders' } : QUEUE
-    case 'settings': return s.length === 1 ? { name: 'settings' } : QUEUE
-    case 'new': return s.length === 1 ? { name: 'new', folder: opt('folder'), wt: opt('wt') } : QUEUE
-    case 't':
-      if (s.length === 2) return { name: 'terminal', addr: s[1], git: false }
-      if (s.length === 3 && s[2] === 'git') return { name: 'terminal', addr: s[1], git: true }
-      return QUEUE
-    case 'git': return s.length === 2 ? { name: 'git', folder: s[1], path: opt('path') } : QUEUE
-    case 'graph':
-      return s.length === 2 ? { name: 'graph', folder: s[1], path: opt('path'), head: p.get('head') === '1', c: opt('c') } : QUEUE
-    default: return QUEUE
+  if (s[0] === 'h') {
+    const page = s.length >= 2 ? parsePage(s.slice(2), p) : null
+    return page ? { ...page, host: s[1] } : QUEUE
   }
+  return parsePage(s, p) ?? QUEUE
 }
 
 export const route = signal<Route>(QUEUE)

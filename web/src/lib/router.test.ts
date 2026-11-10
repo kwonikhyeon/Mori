@@ -64,3 +64,34 @@ describe('plainClick', () => {
     expect(plainClick(click({ button: 1 }))).toBe(false)
   })
 })
+
+describe('another host', () => {
+  it('reads a route under #/h/<ID>', () => {
+    expect(parseHash('#/h/h_1/t/machine%2Ft7')).toEqual({ name: 'terminal', addr: 'machine/t7', git: false, host: 'h_1' })
+    expect(parseHash('#/h/h_1')).toEqual({ name: 'queue', host: 'h_1' })
+    expect(parseHash('#/h/h_1/settings')).toEqual({ name: 'settings', host: 'h_1' })
+  })
+
+  it('writes a host route back to the same hash', () => {
+    const routes: Route[] = [
+      { name: 'queue', host: 'h_1' },
+      { name: 'terminal', addr: 'machine/t7', git: true, host: 'h_1' },
+      { name: 'terminal', addr: 't1', git: false, host: 'h 1' },
+      { name: 'graph', folder: 'f1', path: '/r', head: true, c: 'abc', host: 'h_1' },
+      { name: 'new', folder: 'f1', host: 'h_1' },
+    ]
+    for (const r of routes) expect(parseHash(href(r))).toEqual(r)
+    expect(href({ name: 'queue', host: 'h_1' })).toBe('#/h/h_1')
+    expect(href({ name: 'terminal', addr: 't1', git: false, host: 'h 1' })).toBe('#/h/h%201/t/t1')
+    expect(href({ name: 'folders', host: '' })).toBe('#/folders')
+  })
+
+  it("takes a host route it does not know for the hub's queue", () => {
+    for (const h of ['#/h', '#/h/', '#/h/h_1/모르는것', '#/h/h_1/h/h_2', '#/h//t/t1']) expect(parseHash(h)).toEqual({ name: 'queue' })
+  })
+
+  it('opens the terminal of a relayed notification', () => {
+    const hash = new URL('https://macmini.example.ts.net/#/h/h_desk0001/t/machine%2Ft7').hash
+    expect(parseHash(hash)).toEqual({ name: 'terminal', addr: 'machine/t7', git: false, host: 'h_desk0001' })
+  })
+})

@@ -2,7 +2,7 @@
 // it runs and why it ended; and how a worktree's branch and changes read.
 
 import type { DiffQuery } from './api'
-import { relTime } from './time'
+import { dayClock, duration, relTime } from './time'
 import type { Change, Commit, CommitFile, FolderView, Preset, TerminalView, Worktree } from './types'
 
 export type ChipKind = 'blocked' | 'error' | 'waiting' | 'working' | 'none' | 'exited'
@@ -39,6 +39,26 @@ export function chip(t: TerminalView): ChipInfo {
   const p = t.status?.progress
   if (kind === 'working' && p != null) return { kind, label: `작업 중 ${p}%` }
   return { kind, label: LABELS[kind] }
+}
+
+export interface SinceInfo {
+  /** "12분째" while it works, "3분 전" once it stopped or asked. */
+  text: string
+  /** "오늘 14:12부터 작업 중". */
+  title: string
+}
+
+/**
+ * How long a live terminal has been in its state (spec §3 #189). hc's
+ * status_ms moves when the program's word changes, not with its progress;
+ * nothing when the program never said.
+ */
+export function since(t: TerminalView, now: number): SinceInfo | null {
+  if (t.state === 'finished' || t.status_ms == null) return null
+  const kind = stateKind(t)
+  const d = now - t.status_ms
+  const text = d < 60_000 ? '방금' : kind === 'working' ? `${duration(d)}째` : relTime(t.status_ms, now)
+  return { text, title: `${dayClock(t.status_ms, now)}부터 ${LABELS[kind]}` }
 }
 
 /** The preset's name, else the program's file name; no program is the shell. */

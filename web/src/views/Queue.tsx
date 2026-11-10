@@ -1,5 +1,6 @@
 // "지금 볼 것" (spec §3 #122): what waits for a person first, then what is
-// working, the rest folded. The PC sidebar and the phone home share it.
+// working, the rest folded, each with how long it has been so (#189). The PC
+// sidebar and the phone home share it.
 import { useState } from 'preact/hooks'
 import { Chip } from '../components/Chip'
 import { Icon } from '../components/Icon'
@@ -10,7 +11,7 @@ import { useHost } from '../lib/scope'
 import type { HostStore } from '../lib/store'
 import { relTime } from '../lib/time'
 import type { TerminalView } from '../lib/types'
-import { ListFrame, Loading, TermRow, termHref, titleOf, type ListProps } from './rows'
+import { ListFrame, Loading, Since, TermRow, termHref, titleOf, type ListProps } from './rows'
 import './lists.css'
 
 const appPlace = (h: HostStore, t: TerminalView) => `${appName(t, h.presets.value)} · ${place(t, h.folders.value)}`
@@ -24,6 +25,7 @@ function AlertCard({ t, kind, p }: { t: TerminalView; kind: 'blocked' | 'error';
       <span class="qcard-top">
         <Chip info={chip(t)} big={phone} />
         {phone && <span class="qcard-app">{appName(t, h.presets.value)}</span>}
+        <Since t={t} />
         {phone ? <Icon name="chevron-right" size={18} class="qcard-go" /> : sel && <span class="qcard-seeing">보는 중</span>}
       </span>
       <span class="qcard-title">{titleOf(t, h.presets.value)}</span>
@@ -45,7 +47,10 @@ function WorkCard({ t, p }: { t: TerminalView; p: ListProps }) {
           <span class="qrow-title">{titleOf(t, h.presets.value)}</span>
           <span class="qrow-sub">{appPlace(h, t)}</span>
         </span>
-        <Chip info={chip(t)} />
+        <span class="qrow-state">
+          <Since t={t} />
+          <Chip info={chip(t)} />
+        </span>
       </span>
       {progress != null && (
         <span class="bar" aria-hidden="true">

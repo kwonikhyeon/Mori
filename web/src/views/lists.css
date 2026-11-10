@@ -297,6 +297,47 @@ a.qrow:hover {
   white-space: nowrap;
 }
 
+/* How long it has been in its state (spec §3 #189), beside the chip. */
+.qrow-state {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.qtime {
+  flex: none;
+  color: var(--text-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* On a card it stands at the right, before 보는 중 or the arrow. */
+.qcard-top .qtime {
+  margin-left: auto;
+}
+
+.qcard-top .qtime + .qcard-go,
+.qcard-top .qtime + .qcard-seeing {
+  margin-left: 0;
+}
+
+/* A finish not opened on this device yet (#190). */
+.qrow-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 1px;
+}
+
+.qrow.is-unseen .qrow-title {
+  font-weight: 700;
+}
+
 /* The folded groups. */
 .qfolds {
   display: flex;

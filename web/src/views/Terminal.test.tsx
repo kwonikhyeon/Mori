@@ -6,6 +6,7 @@ import { folder, status, term } from '../../test/fixtures'
 import { inHost, withHost } from '../../test/scopes'
 import { now } from '../lib/clock'
 import { route } from '../lib/router'
+import { resetSeen, seenMarks } from '../lib/seen'
 import { core, folders, ready, resetStore, terminals } from '../lib/store'
 import { resetTermFont } from '../lib/termfont'
 import { toasts } from '../lib/toast'
@@ -413,6 +414,73 @@ describe('Terminal on a PC', () => {
     const tag = within(document.querySelector('.term-head') as HTMLElement).getByText('desk')
     // A class the two share gives the screen's box the name's pill: it clips the screen.
     expect([...tag.classList].filter((c) => box.classList.contains(c))).toEqual([])
+  })
+})
+
+describe('Looking at a session', () => {
+  let close: ReturnType<typeof vi.fn>
+  let getNotifications: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    resetSeen()
+    close = vi.fn()
+    getNotifications = vi.fn(async () => [{ close }])
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { getRegistration: async () => ({ getNotifications }) },
+    })
+  })
+
+  afterEach(() => {
+    delete (navigator as { serviceWorker?: unknown }).serviceWorker
+    resetSeen()
+  })
+
+  const done = (over: Partial<TerminalView> = {}) => term({ status: status('done'), status_ms: 10 * HOUR - 60_000, turn: 2, ...over })
+
+  it('sees its finish and closes its notifications while a person looks', async () => {
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+    await mount(done())
+    await vi.waitFor(() => expect(close).toHaveBeenCalled())
+    expect(getNotifications).toHaveBeenCalledWith({ tag: 't1' })
+    expect(JSON.parse(localStorage.getItem('mori.seen')!)['|t1']).toMatchObject({ c: 1000, turn: 2 })
+  })
+
+  it('sees the next finish as it ends', async () => {
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+    await mount(done())
+    await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(1))
+    act(() => {
+      terminals.value = new Map([['t1', done({ turn: 3 })]])
+    })
+    await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(2))
+    expect(seenMarks.value['|t1'].turn).toBe(3)
+  })
+
+  it('leaves them while nobody looks, until the window has the focus', async () => {
+    const focus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    await mount(done())
+    await Promise.resolve()
+    expect(localStorage.getItem('mori.seen')).toBeNull()
+    expect(getNotifications).not.toHaveBeenCalled()
+    focus.mockReturnValue(true)
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await vi.waitFor(() => expect(close).toHaveBeenCalled())
+    expect(seenMarks.value['|t1']).toMatchObject({ turn: 2 })
+  })
+
+  it("closes a host's notifications by that host's tag", async () => {
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+    const s = withHost()
+    s.terminals.value = new Map([['t1', done()]])
+    s.folders.value = [folder()]
+    s.ready.value = true
+    render(inHost(s, <Terminal addr="t1" variant="pc" />))
+    await vi.waitFor(() => expect(getNotifications).toHaveBeenCalledWith({ tag: 'h_desk0001/t1' }))
+    expect(seenMarks.value['h_desk0001|t1']).toMatchObject({ turn: 2 })
+    expect(seenMarks.value['|t1']).toBeUndefined()
   })
 })
 

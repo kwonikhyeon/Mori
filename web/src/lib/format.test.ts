@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { folder, status, term, worktree } from '../../test/fixtures'
-import { appName, askText, branchLine, branchOf, changeGroups, chip, commitItems, endText, fileParts, fileTotals, finishedLine, homeWorktree, place, shortHash, shortPath, splitMessage, versionText } from './format'
+import { appName, askText, branchLine, branchOf, changeGroups, chip, commitItems, endText, fileParts, fileTotals, finishedLine, homeWorktree, place, shortHash, shortPath, since, splitMessage, versionText } from './format'
 import type { Change, Commit, CommitFile, Preset } from './types'
 
 const presets: Preset[] = [
@@ -18,6 +18,33 @@ describe('chip', () => {
     expect(chip(term({ status: status('working', { progress: 40 }) }))).toEqual({ kind: 'working', label: '작업 중 40%' })
     expect(chip(term())).toEqual({ kind: 'none', label: '상태 없음' })
     expect(chip(term({ state: 'finished', status: status('working') }))).toEqual({ kind: 'exited', label: '종료' })
+  })
+})
+
+describe('since', () => {
+  const NOW = 100 * 3_600_000
+  const MIN = 60_000
+
+  it('counts how long it has worked, and how long ago it stopped or asked', () => {
+    expect(since(term({ status: status('working'), status_ms: NOW - 12 * MIN }), NOW)?.text).toBe('12분째')
+    expect(since(term({ status: status('working'), status_ms: NOW - 65 * MIN }), NOW)?.text).toBe('1시간 5분째')
+    expect(since(term({ status: status('idle'), status_ms: NOW - 3 * MIN }), NOW)?.text).toBe('3분 전')
+    expect(since(term({ status: status('blocked'), status_ms: NOW - 2 * 3_600_000 }), NOW)?.text).toBe('2시간 전')
+  })
+
+  it('says 방금 within a minute, also for a host whose clock runs ahead', () => {
+    expect(since(term({ status: status('working'), status_ms: NOW - 20_000 }), NOW)?.text).toBe('방금')
+    expect(since(term({ status: status('done'), status_ms: NOW + 5_000 }), NOW)?.text).toBe('방금')
+  })
+
+  it('tells when the state began', () => {
+    const at = new Date(2026, 10, 9, 14, 12).getTime()
+    expect(since(term({ status: status('working'), status_ms: at }), at + 5 * MIN)?.title).toBe('오늘 14:12부터 작업 중')
+  })
+
+  it('says nothing of a program that never said or that ended', () => {
+    expect(since(term(), NOW)).toBeNull()
+    expect(since(term({ state: 'finished', status: status('done'), status_ms: NOW - MIN }), NOW)).toBeNull()
   })
 })
 

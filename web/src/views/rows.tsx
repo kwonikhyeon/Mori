@@ -1,9 +1,12 @@
 // What the queue and the folder screen share: a terminal's title, where its
-// link goes and the one-line row.
+// link goes, how long it has been in its state (spec §3 #189) and the
+// one-line row, with a dot for a finish not opened here yet (#190).
 import type { ComponentChildren } from 'preact'
 import { Chip } from '../components/Chip'
-import { appName, chip } from '../lib/format'
+import { now } from '../lib/clock'
+import { appName, chip, since } from '../lib/format'
 import { useHost, type HostScope } from '../lib/scope'
+import { unseen } from '../lib/seen'
 import type { Preset, TerminalView } from '../lib/types'
 
 export type Variant = 'pc' | 'phone'
@@ -55,6 +58,17 @@ export function Loading() {
   )
 }
 
+/** "12분째", "3분 전": how long t has been in its state; nothing when its program never said. */
+export function Since({ t, class: cls = 'qtime' }: { t: TerminalView; class?: string }) {
+  const s = since(t, now.value)
+  if (!s || t.status_ms == null) return null
+  return (
+    <time class={cls} dateTime={new Date(t.status_ms).toISOString()} title={s.title}>
+      {s.text}
+    </time>
+  )
+}
+
 export interface TermRowProps {
   t: TerminalView
   p: ListProps
@@ -66,15 +80,25 @@ export interface TermRowProps {
 export function TermRow({ t, p, sub, end }: TermRowProps) {
   const h = useHost()
   const sel = p.selected === t.address
-  const cls = 'qrow' + (t.state === 'finished' ? ' is-finished' : '') + (sel ? ' is-selected' : '')
+  const fresh = unseen(h.id, t, now.value)
+  const cls = 'qrow' + (t.state === 'finished' ? ' is-finished' : '') + (sel ? ' is-selected' : '') + (fresh ? ' is-unseen' : '')
   return (
     <li>
       <a class={cls} href={termHref(h, t, p)} aria-current={sel ? 'true' : undefined}>
         <span class="qrow-main">
-          <span class="qrow-title">{titleOf(t, h.presets.value)}</span>
+          <span class="qrow-title">
+            {fresh && <span class="qrow-dot" aria-hidden="true" />}
+            {titleOf(t, h.presets.value)}
+            {fresh && <span class="sr-only"> · 새 결과</span>}
+          </span>
           <span class="qrow-sub">{sub}</span>
         </span>
-        {end ?? <Chip info={chip(t)} />}
+        {end ?? (
+          <span class="qrow-state">
+            <Since t={t} />
+            <Chip info={chip(t)} />
+          </span>
+        )}
       </a>
     </li>
   )

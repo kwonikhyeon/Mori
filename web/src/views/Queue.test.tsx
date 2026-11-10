@@ -1,14 +1,16 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { folder, status, term } from '../../test/fixtures'
 import { inHost, withHost } from '../../test/scopes'
 import { now } from '../lib/clock'
+import { markSeen, resetSeen } from '../lib/seen'
 import { folders, presets, ready, resetStore, terminals } from '../lib/store'
 import type { TerminalView } from '../lib/types'
 import { FolderList } from './Folders'
 import { QueueList } from './Queue'
 
 const NOW = 10 * 3_600_000
+const MIN = 60_000
 
 function load(ts: TerminalView[]) {
   terminals.value = new Map(ts.map((t) => [t.address, t]))
@@ -16,6 +18,8 @@ function load(ts: TerminalView[]) {
 }
 
 beforeEach(() => {
+  localStorage.clear()
+  resetSeen()
   now.value = NOW
   folders.value = [folder()]
   presets.value = [{ id: 'claude', name: 'Claude Code', argv: ['claude'], task: true }]
@@ -24,7 +28,15 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   resetStore()
+  localStorage.clear()
+  resetSeen()
 })
+
+/** The time on each link of a group, null where there is none. */
+const times = (name: string) =>
+  within(screen.getByRole('region', { name }))
+    .getAllByRole('link')
+    .map((a) => a.querySelector('time')?.textContent ?? null)
 
 describe('QueueList', () => {
   it('waits for the first snapshot before saying anything is empty', () => {
@@ -87,6 +99,40 @@ describe('QueueList', () => {
     expect(row.getAttribute('href')).toBe('#/t/t2')
     expect(row.textContent).toContain('코드 0 · 2시간 전')
   })
+
+  it('tells how long each has worked, asked or waited', () => {
+    load([
+      term({ address: 't1', status: status('working'), status_ms: NOW - 12 * MIN }),
+      term({ address: 't2', status: status('blocked', { kind: 'permission' }), status_ms: NOW - 30_000 }),
+      term({ address: 't3', status: status('idle'), status_ms: NOW - 3 * MIN }),
+      term({ address: 't4', status: status('idle') }),
+    ])
+    render(<QueueList variant="pc" />)
+    expect(times('작업 중 1')).toEqual(['12분째'])
+    expect(times('승인 대기 1')).toEqual(['방금'])
+    expect(times('입력 대기 2')).toEqual(['3분 전', null])
+    const work = within(screen.getByRole('region', { name: '작업 중 1' })).getByRole('link').querySelector('time')!
+    expect(work.getAttribute('title')).toMatch(/^오늘 \d\d:\d\d부터 작업 중$/)
+    expect(work.getAttribute('dateTime')).toBe(new Date(NOW - 12 * MIN).toISOString())
+  })
+
+  it('marks a finish not opened here yet, until it is', () => {
+    const done = term({ address: 't1', status: status('done'), status_ms: NOW - 5 * MIN, turn: 3, display_title: '빌드' })
+    load([done, term({ address: 't2', status: status('idle'), status_ms: NOW - 9 * MIN, display_title: '셸' })])
+    render(<QueueList variant="phone" />)
+    const [fresh, quiet] = within(screen.getByRole('region', { name: '입력 대기 2' })).getAllByRole('link')
+    expect(fresh.classList.contains('is-unseen')).toBe(true)
+    expect(fresh.querySelector('.qrow-dot')).toBeTruthy()
+    expect(fresh.textContent).toContain('빌드 · 새 결과')
+    expect(quiet.classList.contains('is-unseen')).toBe(false)
+    act(() => markSeen('', done, NOW))
+    expect(fresh.classList.contains('is-unseen')).toBe(false)
+    expect(fresh.textContent).not.toContain('새 결과')
+    act(() => {
+      terminals.value = new Map([['t1', { ...done, turn: 4, status_ms: NOW - MIN }]])
+    })
+    expect(screen.getByRole('link').textContent).toContain('새 결과')
+  })
 })
 
 describe('QueueList on another host', () => {
@@ -97,6 +143,19 @@ describe('QueueList on another host', () => {
     render(inHost(s, <QueueList variant="pc" />))
     const blocked = screen.getByRole('region', { name: '승인 대기 1' })
     expect(within(blocked).getByRole('link').getAttribute('href')).toBe('#/h/h_desk0001/t/t1')
+  })
+
+  it("keeps that host's seen finishes apart", () => {
+    const s = withHost()
+    const done = term({ status: status('done'), status_ms: NOW - 5 * MIN, turn: 1 })
+    s.terminals.value = new Map([['t1', done]])
+    s.ready.value = true
+    render(inHost(s, <QueueList variant="pc" />))
+    const row = () => within(screen.getByRole('region', { name: '입력 대기 1' })).getByRole('link')
+    act(() => markSeen('', done, NOW))
+    expect(row().classList.contains('is-unseen')).toBe(true)
+    act(() => markSeen('h_desk0001', done, NOW))
+    expect(row().classList.contains('is-unseen')).toBe(false)
   })
 
   it('points at a new session on that host', () => {

@@ -52,6 +52,25 @@ export function sameKey(sub: PushSubscription, key: string): boolean {
   return a.length === b.length && a.every((x, i) => x === b[i])
 }
 
+/** The tag of a session's notifications: its address, after the host's ID when the hub relays them (decision 166). */
+export function noteTag(host: string, addr: string): string {
+  return host ? `${host}/${addr}` : addr
+}
+
+/**
+ * Closes this device's notifications about a session (spec §3 #191): it is
+ * open and a person looks at it. A browser that cannot list them keeps them.
+ */
+export async function closeNotes(tag: string): Promise<void> {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration()
+    if (!reg || typeof reg.getNotifications !== 'function') return
+    for (const n of await reg.getNotifications({ tag })) n.close()
+  } catch {
+    // Nothing to close.
+  }
+}
+
 async function current(): Promise<PushSubscription | null> {
   const reg = await navigator.serviceWorker?.getRegistration()
   return (await reg?.pushManager.getSubscription()) ?? null

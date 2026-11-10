@@ -3,6 +3,8 @@
 // under it the keys a blocked program waits for, the quick keys on a
 // phone and a box that sends several lines at once. A screen scrolled back
 // offers its end (#183); on a PC a key pressed outside it still types (#188).
+// Open while a person looks, its finish is seen here and its notifications
+// close (#190, #191).
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Chip } from '../components/Chip'
 import { Confirm } from '../components/Confirm'
@@ -14,12 +16,15 @@ import type { Closed, Size } from '../lib/attach'
 import { now } from '../lib/clock'
 import { draftKey, loadDraft, saveDraft } from '../lib/drafts'
 import { fitSize } from '../lib/fit'
+import { watchFocus } from '../lib/focus'
 import { appName, askText, chip, endText, place, type EndFacts } from '../lib/format'
 import { useChordSubmit } from '../lib/ime'
 import { isMod, NO_MODS, QUICK_KEYS, strayBytes } from '../lib/keys'
 import { isApple } from '../lib/platform'
+import { closeNotes, noteTag } from '../lib/push'
 import { navigate, parseHash } from '../lib/router'
 import { others, useHost } from '../lib/scope'
+import { markSeen } from '../lib/seen'
 import { DEFAULT_FONT, fontFor, termFont, type Layout } from '../lib/termfont'
 import { TermLink } from '../lib/termlink'
 import { attachNote, BLOCKED_KEYS, quotePath, type AnswerKey, type AttachNote } from '../lib/termview'
@@ -79,6 +84,8 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   // The screen is scrolled back from its end, and output came since.
   const [away, setAway] = useState(false)
   const [fresh, setFresh] = useState(false)
+  // The page is seen and has the focus.
+  const [looking, setLooking] = useState(false)
   const layout: Layout = phone ? 'phone' : 'pc'
   const fontPx = fontFor(layout)
 
@@ -200,6 +207,16 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     look(false)
     return s.onView(look)
   }, [link])
+
+  useEffect(() => watchFocus(setLooking), [])
+  // Each turn that ends while it is looked at is seen as it ends.
+  const here = t != null
+  useEffect(() => {
+    const cur = h.terminals.peek().get(addr)
+    if (!looking || !cur) return
+    markSeen(h.id, cur)
+    void closeNotes(noteTag(h.id, addr))
+  }, [h, addr, looking, here, t?.turn, t?.created_ms])
 
   const st = link?.state.value ?? 'connecting'
   const observing = link?.observing.value ?? false

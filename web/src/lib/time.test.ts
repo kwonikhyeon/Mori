@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clock, commitTime, relTime } from './time'
+import { clock, commitTime, dayClock, duration, relTime } from './time'
 
 // Local times, so the tests hold in any time zone.
 const now = new Date(2026, 10, 9, 14, 12, 30).getTime()
@@ -41,5 +41,25 @@ describe('commitTime', () => {
 
   it('writes hours and minutes with two digits', () => {
     expect(clock(at(2026, 1, 1, 7, 4))).toBe('07:04')
+  })
+})
+
+describe('dayClock', () => {
+  it('names the day and the clock', () => {
+    expect(dayClock(at(2026, 11, 9, 9, 3), now)).toBe('오늘 09:03')
+    expect(dayClock(at(2026, 11, 8, 23, 5), now)).toBe('어제 23:05')
+    expect(dayClock(at(2026, 11, 2, 8, 0), now)).toBe('11월 2일 08:00')
+  })
+})
+
+describe('duration', () => {
+  it('counts whole minutes, then hours and minutes, then days', () => {
+    expect(duration(0)).toBe('1분')
+    expect(duration(59_000)).toBe('1분')
+    expect(duration(12 * 60_000 + 59_000)).toBe('12분')
+    expect(duration(60 * 60_000)).toBe('1시간')
+    expect(duration(65 * 60_000)).toBe('1시간 5분')
+    expect(duration(23 * 3_600_000 + 59 * 60_000)).toBe('23시간 59분')
+    expect(duration(50 * 3_600_000)).toBe('2일')
   })
 })

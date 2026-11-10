@@ -528,9 +528,112 @@ a.term-note-link:hover {
 
 /* ---------- several lines at once ---------- */
 .term-compose {
+  position: relative; /* the slash list sits above it */
   flex: none;
   border-top: 1px solid var(--border);
   background: var(--surface);
+}
+
+/* ---------- slash commands (spec §3 #197) ---------- */
+/* Over the terminal rather than in the column: the terminal keeps its size,
+   so its program does not redraw as the list opens and closes. */
+.term-slash {
+  position: absolute;
+  right: 16px;
+  bottom: calc(100% + 6px);
+  left: 16px;
+  z-index: 20;
+  max-height: min(360px, 45vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.term-slash-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.term-slash-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.term-slash-row:hover {
+  background: var(--surface-2);
+}
+
+.term-slash-row[aria-selected="true"] {
+  background: var(--selected);
+}
+
+.term-slash-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.term-slash-name {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.term-slash-alias,
+.term-slash-hint,
+.term-slash-desc {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.term-slash-alias,
+.term-slash-hint {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.term-slash-src {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.term-slash-menu {
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--chip);
+  color: var(--chip-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.term-slash-desc {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.term-slash-note {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--text-3);
+  font-size: 13px;
 }
 
 .term-send {
@@ -600,6 +703,16 @@ textarea.term-send-input {
 .term-phone .term-held,
 .term-phone .term-reject {
   padding: 0 4px 8px;
+}
+
+.term-phone .term-slash {
+  right: 0;
+  left: 0;
+  max-height: min(300px, 40vh);
+}
+
+.term-phone .term-slash-row {
+  min-height: 44px;
 }
 
 /* ---------- only watching ---------- */

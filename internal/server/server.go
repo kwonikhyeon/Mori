@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kwonikhyeon/mori/internal/auth"
+	"github.com/kwonikhyeon/mori/internal/commands"
 	"github.com/kwonikhyeon/mori/internal/core"
 	"github.com/kwonikhyeon/mori/internal/folders"
 	"github.com/kwonikhyeon/mori/internal/gitx"
@@ -54,6 +55,10 @@ type Deps struct {
 	// proxy and the relay (spec §3 #158). Without it the hosts are listed
 	// but cannot be linked.
 	Links *peer.Manager
+	// Commands lists the slash commands Claude Code takes in a terminal's
+	// folder (spec §3 #197). New makes one over Claude Code's config
+	// folder when it is nil.
+	Commands *commands.Lister
 }
 
 // Server routes requests. Build it with New and serve Handler().
@@ -89,6 +94,9 @@ func New(d Deps) *Server {
 	}
 	if d.Presence == nil {
 		d.Presence = presence.New()
+	}
+	if d.Commands == nil {
+		d.Commands = commands.New(commands.ConfigDir())
 	}
 	if d.Names == nil {
 		d.Names = func() []string { return []string{d.PublicURL()} }
@@ -145,6 +153,7 @@ func (s *Server) routes() {
 	api.HandleFunc("POST /api/terminals/{t}/kill", s.handleKill)
 	api.HandleFunc("POST /api/terminals/{t}/files", s.handleUpload)
 	api.HandleFunc("GET /api/terminals/{t}/text", s.handleText)
+	api.HandleFunc("GET /api/terminals/{t}/commands", s.handleCommands)
 	api.HandleFunc("GET /api/presets", s.handleGetPresets)
 	api.HandleFunc("PUT /api/presets", s.handlePutPresets)
 	api.HandleFunc("GET /api/hosts", s.handleGetHosts)

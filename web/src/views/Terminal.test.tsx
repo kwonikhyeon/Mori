@@ -7,6 +7,7 @@ import { inHost, withHost } from '../../test/scopes'
 import { now } from '../lib/clock'
 import { route } from '../lib/router'
 import { resetSeen, seenMarks } from '../lib/seen'
+import { forgetCommands } from '../lib/slash'
 import { core, folders, ready, resetStore, terminals } from '../lib/store'
 import { resetTermFont } from '../lib/termfont'
 import { toasts } from '../lib/toast'
@@ -63,6 +64,7 @@ const sent = (path: string, method = 'POST') => calls.filter((c) => c.url === pa
 
 beforeEach(() => {
   localStorage.clear()
+  forgetCommands()
   resetTermFont()
   FakeWebSocket.reset()
   FakeScreen.reset()
@@ -520,6 +522,133 @@ describe('Terminal on a PC', () => {
     const tag = within(document.querySelector('.term-head') as HTMLElement).getByText('desk')
     // A class the two share gives the screen's box the name's pill: it clips the screen.
     expect([...tag.classList].filter((c) => box.classList.contains(c))).toEqual([])
+  })
+})
+
+describe('The slash list', () => {
+  const commands = {
+    commands: [
+      { name: 'clear', desc: '맥락을 비우고 새 대화를 시작합니다', hint: '[name]', source: 'builtin', aliases: ['reset', 'new'] },
+      { name: 'compact', desc: '대화를 요약해 맥락 공간을 비웁니다', hint: '[instructions]', source: 'builtin' },
+      { name: 'model', desc: '모델을 바꿉니다', hint: '[model]', source: 'builtin', menu: true },
+      { name: 'deploy', desc: '스테이징에 배포합니다', source: 'project' },
+      { name: 'tidy-up', desc: '코드를 정리합니다', source: 'user', skill: true },
+    ],
+    partial: false,
+  }
+  const box = () => screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+  const rows = (lb: HTMLElement) => within(lb).getAllByRole('option').map((o) => o.querySelector('.term-slash-name')!.textContent)
+  const type = (value: string) => fireEvent.input(box(), { target: { value } })
+
+  beforeEach(() => {
+    reply = (c) => (c.url === '/api/terminals/t1/commands' ? Response.json(commands) : undefined)
+  })
+
+  it('lists the commands of a Claude Code terminal on a "/" at the start', async () => {
+    await mount()
+    type('/')
+    const lb = await screen.findByRole('listbox', { name: '슬래시 명령' })
+    expect(rows(lb)).toEqual(['/compact', '/clear', '/model', '/deploy', '/tidy-up'])
+    const [compact, clear, model, deploy, tidy] = within(lb).getAllByRole('option')
+    expect(clear.textContent).toContain('(/reset /new)')
+    expect(clear.textContent).toContain('[name]')
+    expect(model.querySelector('.term-slash-menu')?.textContent).toBe('메뉴')
+    expect(deploy.querySelector('.term-slash-src')?.textContent).toBe('프로젝트')
+    expect(tidy.querySelector('.term-slash-src')?.textContent).toBe('스킬')
+    expect(compact.querySelector('.term-slash-src')).toBeNull()
+    expect(compact.getAttribute('aria-selected')).toBe('true')
+    expect(box().getAttribute('aria-activedescendant')).toBe(compact.id)
+    expect(box().getAttribute('aria-controls')).toBe(lb.id)
+    // narrowed by what follows, an alias as well
+    type('/res')
+    await vi.waitFor(() => expect(rows(screen.getByRole('listbox'))).toEqual(['/clear']))
+    type('/nothing')
+    expect(await screen.findByText('맞는 명령이 없습니다')).toBeTruthy()
+    // not inside a text
+    type('fix /compact')
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(sent('/api/terminals/t1/commands', 'GET')).toHaveLength(1) // kept a while
+  })
+
+  it('moves with the arrows and puts the name in the box with Enter, without sending it', async () => {
+    await mount()
+    type('/')
+    const lb = await screen.findByRole('listbox')
+    fireEvent.keyDown(box(), { key: 'ArrowDown' })
+    expect(within(lb).getAllByRole('option')[1].getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(box(), { key: 'ArrowUp' })
+    fireEvent.keyDown(box(), { key: 'ArrowUp' })
+    expect(within(lb).getAllByRole('option')[4].getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(box(), { key: 'ArrowUp' })
+    fireEvent.keyDown(box(), { key: 'ArrowUp' })
+    fireEvent.keyDown(box(), { key: 'Enter' })
+    expect(box().value).toBe('/model ')
+    expect(box().selectionStart).toBe(7)
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(toasts.value.map((t) => t.text)).toEqual(['/model: 보내면 터미널에 메뉴가 열립니다'])
+    expect(sent('/api/terminals/t1/send')).toEqual([])
+    // Tab does the same, and a tap; what came after the word stays
+    type('/co')
+    await screen.findByRole('listbox')
+    fireEvent.keyDown(box(), { key: 'Tab' })
+    expect(box().value).toBe('/compact ')
+    type('/de 지금')
+    box().setSelectionRange(3, 3)
+    fireEvent.keyUp(box(), { key: 'ArrowLeft' })
+    fireEvent.click(within(await screen.findByRole('listbox')).getByText('/deploy'))
+    expect(box().value).toBe('/deploy 지금')
+  })
+
+  it('closes with Esc until the text changes, and sends with ⌘ or Ctrl + Enter as before', async () => {
+    await mount()
+    type('/dep')
+    await screen.findByRole('listbox')
+    fireEvent.keyDown(box(), { key: 'Escape' })
+    expect(screen.queryByRole('listbox')).toBeNull()
+    type('/depl')
+    await screen.findByRole('listbox')
+    fireEvent.keyDown(box(), { key: 'Enter', isComposing: true })
+    expect(box().value).toBe('/depl')
+    type('/deploy')
+    fireEvent.keyDown(box(), { key: 'Enter', ctrlKey: true })
+    await vi.waitFor(() => expect(box().value).toBe(''))
+    expect(sent('/api/terminals/t1/send').map((c) => c.body)).toEqual([{ text: '/deploy' }])
+    // this device sent it lately: it comes first
+    type('/')
+    expect(rows(await screen.findByRole('listbox'))[0]).toBe('/deploy')
+  })
+
+  it('says when the list could not be read or is not all there', async () => {
+    reply = (c) =>
+      c.url === '/api/terminals/t1/commands' ? Response.json({ error: { kind: 'internal', message: '읽지 못했습니다' } }, { status: 500 }) : undefined
+    await mount()
+    type('/')
+    expect(await screen.findByText('명령 목록을 읽지 못했습니다: 읽지 못했습니다')).toBeTruthy()
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(box().getAttribute('aria-activedescendant')).toBeNull()
+    cleanup()
+    reply = (c) => (c.url === '/api/terminals/t1/commands' ? Response.json({ ...commands, partial: true }) : undefined)
+    await mount()
+    type('/')
+    expect(await screen.findByText('일부만 읽었습니다 — 여기 없는 명령도 쓸 수 있습니다')).toBeTruthy()
+  })
+
+  it('shows so many rows and counts the rest', async () => {
+    const many = Array.from({ length: 85 }, (_, i) => ({ name: `c${String(i).padStart(2, '0')}`, desc: '', source: 'builtin' }))
+    reply = (c) => (c.url === '/api/terminals/t1/commands' ? Response.json({ commands: many, partial: false }) : undefined)
+    await mount()
+    type('/')
+    expect(within(await screen.findByRole('listbox')).getAllByRole('option')).toHaveLength(80)
+    expect(screen.getByText('5개 더 — 더 적어서 좁히세요')).toBeTruthy()
+  })
+
+  it('stays away from a terminal that does not run Claude Code', async () => {
+    await mount(term({ argv: ['/bin/zsh'], preset: undefined, display_title: 'zsh' }))
+    type('/')
+    await act(() => Promise.resolve())
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(box().hasAttribute('aria-autocomplete')).toBe(false)
+    expect(sent('/api/terminals/t1/commands', 'GET')).toEqual([])
   })
 })
 

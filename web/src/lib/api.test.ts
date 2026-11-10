@@ -181,10 +181,12 @@ describe('another host', () => {
 
   it('goes through the hub under /h/<ID>', async () => {
     await desk.terminals.send('machine/t7', 'hello')
+    await desk.terminals.commands('machine/t7')
     await desk.git.log('/r', { head: true })
     await desk.overview()
     expect(calls.map((c) => c.url)).toEqual([
       '/h/h_desk0001/api/terminals/machine%2Ft7/send',
+      '/h/h_desk0001/api/terminals/machine%2Ft7/commands',
       '/h/h_desk0001/api/git/log?path=%2Fr&head=1',
       '/h/h_desk0001/api/overview',
     ])

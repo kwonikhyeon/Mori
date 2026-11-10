@@ -3,8 +3,8 @@
 // carries the server's message for the screen.
 
 import type {
-  Branches, Commit, Device, Diff, FolderView, FsListing, GitStatus, GitSummary, Graph, Hello, Host,
-  Overview, PairCode, Preset, PushKind, PushSettings, PushSubscriptionView, ScreenText, SendResult,
+  Branches, CommandList, Commit, Device, Diff, FolderView, FsListing, GitStatus, GitSummary, Graph, Hello,
+  Host, Overview, PairCode, Preset, PushKind, PushSettings, PushSubscriptionView, ScreenText, SendResult,
   TerminalView, Upload, Worktree,
 } from './types'
 
@@ -219,6 +219,8 @@ export function apiFor(prefix: string, onHostError?: (kind: HostError) => void) 
         return req<Upload>('POST', termPath(addr) + '/files', form)
       },
       text: (addr: string, lines?: number) => get<ScreenText>(termPath(addr) + '/text' + query({ lines })),
+      /** The slash commands Claude Code takes there (spec §3 #197). */
+      commands: (addr: string) => get<CommandList>(termPath(addr) + '/commands'),
     },
 
     presets: {

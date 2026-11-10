@@ -18,6 +18,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/kwonikhyeon/mori/internal/commands"
 	"github.com/kwonikhyeon/mori/internal/core"
 	"github.com/kwonikhyeon/mori/internal/hc"
 	"github.com/kwonikhyeon/mori/internal/store"
@@ -373,6 +374,28 @@ func (s *Server) handleText(w http.ResponseWriter, r *http.Request) {
 		params["lines"] = n
 	}
 	s.relay(w, r, "terminal.read", params)
+}
+
+// handleCommands lists the slash commands Claude Code takes in the
+// terminal's folder, for the web UI to offer as the user types a slash
+// (spec §3 #197). A terminal of another machine, whose address has the
+// machine's name in front, gets the built-in ones alone: its files are not
+// here.
+func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
+	t, err := s.terminal(r.Context(), terminalParam(r))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	cwd := t.Cwd
+	if t.Foreground != nil && t.Foreground.Cwd != "" {
+		cwd = t.Foreground.Cwd // where Claude Code is now, after a /cd
+	}
+	if strings.Contains(t.Address, "/") || !filepath.IsAbs(cwd) {
+		writeJSON(w, http.StatusOK, commands.List{Commands: commands.Builtins(), Partial: true})
+		return
+	}
+	writeJSON(w, http.StatusOK, s.d.Commands.List(r.Context(), cwd))
 }
 
 // handleUpload hands one file to the core, which places it beside the

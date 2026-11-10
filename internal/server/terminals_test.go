@@ -237,7 +237,7 @@ func TestTerminalAddressWithSlash(t *testing.T) { // Review Focus 3
 	// unknown path: the core is down, so the handler answers 503.
 	e := newTestEnv(t)
 	e.pair()
-	for _, path := range []string{"/api/terminals/rohan%2Ft7", "/api/terminals/rohan%2Ft7/text"} {
+	for _, path := range []string{"/api/terminals/rohan%2Ft7", "/api/terminals/rohan%2Ft7/text", "/api/terminals/rohan%2Ft7/commands"} {
 		if eb := e.expectError("GET", path, nil, 503); eb.Error.Kind != "core_unavailable" {
 			t.Fatal(path, eb)
 		}

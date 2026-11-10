@@ -18,6 +18,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/kwonikhyeon/mori/internal/auth"
+	"github.com/kwonikhyeon/mori/internal/commands"
 	"github.com/kwonikhyeon/mori/internal/core"
 	"github.com/kwonikhyeon/mori/internal/store"
 )
@@ -48,7 +49,9 @@ func startTestEnv(t *testing.T, srv *httptest.Server, useTLS bool, opts ...func(
 	a := auth.New(st, auth.Options{})
 	discard := slog.New(slog.DiscardHandler)
 	d := Deps{Version: "test", HostName: "testhost", Store: st, Auth: a, UI: http.NotFoundHandler(), Logger: discard,
-		Core: core.New(core.Options{Logger: discard})} // never started: the core is down
+		Core:     core.New(core.Options{Logger: discard}), // never started: the core is down
+		Commands: commands.New(t.TempDir()),               // not the real ~/.claude
+	}
 	for _, o := range opts {
 		o(&d)
 	}

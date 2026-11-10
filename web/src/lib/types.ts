@@ -279,6 +279,29 @@ export interface ScreenText {
   how: string
 }
 
+/** Where a slash command comes from (spec §3 #197). */
+export type CommandSource = 'builtin' | 'project' | 'user' | 'plugin'
+
+/** A slash command Claude Code takes in a terminal's folder (spec §3 #197). */
+export interface SlashCommand {
+  name: string
+  desc: string
+  hint?: string
+  source: CommandSource | string
+  /** A skill rather than a command file. */
+  skill?: boolean
+  /** Sent alone, it opens a menu in the terminal. */
+  menu?: boolean
+  /** Other names it answers to. */
+  aliases?: string[]
+}
+
+/** The commands of a terminal; partial says some were not read in time, so one not in it may still be there. */
+export interface CommandList {
+  commands: SlashCommand[]
+  partial: boolean
+}
+
 export type PushKind = 'blocked' | 'waiting' | 'error' | 'exited'
 
 export interface PushSubscriptionView {

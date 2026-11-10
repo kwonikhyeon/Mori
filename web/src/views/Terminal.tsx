@@ -6,7 +6,7 @@
 // Open while a person looks, its finish is seen here and its notifications
 // close (#190, #191). An answer names the question it is for (#194), and a
 // question can be turned down with what to do instead (#195).
-import { useEffect, useId, useRef, useState } from 'preact/hooks'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { Chip } from '../components/Chip'
 import { Confirm } from '../components/Confirm'
 import { ConnBanner } from '../components/ConnBanner'
@@ -30,6 +30,7 @@ import { DEFAULT_FONT, fontFor, termFont, type Layout } from '../lib/termfont'
 import { TermLink } from '../lib/termlink'
 import { attachNote, BLOCKED_KEYS, quotePath, type AnswerKey, type AttachNote } from '../lib/termview'
 import { effectiveTheme, terminalTheme } from '../lib/theme'
+import { isClaude, note as noteSlash } from '../lib/slash'
 import { relTime } from '../lib/time'
 import { toast, toastError } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
@@ -37,6 +38,7 @@ import { openScreen, type Screen } from '../lib/xterm'
 import { gitFrom } from './Git'
 import { nameOf } from './HostSwitch'
 import { titleOf, type Variant } from './rows'
+import { useSlash } from './Slash'
 import { TermFontSheet } from './TermFont'
 import './terminal.css'
 
@@ -471,7 +473,17 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const observeBar = observing && active && <ObserveBar onOff={() => observe(false)} />
   const endBar = finished && <EndBar t={t} ended={ended} onRemove={() => void remove()} />
   const composer = canType && (
-    <Composer key={draftKey(h.id, addr)} addr={addr} phone={phone} id={id} onSent={toEnd} ask={ask} rejecting={rejecting} onReject={setRejecting} />
+    <Composer
+      key={draftKey(h.id, addr)}
+      addr={addr}
+      phone={phone}
+      id={id}
+      onSent={toEnd}
+      ask={ask}
+      rejecting={rejecting}
+      onReject={setRejecting}
+      claude={!!t && isClaude(t)}
+    />
   )
 
   if (!phone) {
@@ -818,6 +830,8 @@ interface ComposerProps {
   /** The question this box rejects: what it sends goes instead (spec §3 #195). */
   rejecting: string | null
   onReject: (ask: string | null) => void
+  /** It runs Claude Code: a "/" at the start lists its commands (spec §3 #197). */
+  claude: boolean
 }
 
 /**
@@ -825,18 +839,43 @@ interface ComposerProps {
  * stays as this device's draft until it is sent (spec §3 #181). Rejecting a
  * question, it presses Esc first and sends once the question is gone.
  */
-function Composer({ addr, phone, id, onSent, ask, rejecting, onReject }: ComposerProps) {
+function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude }: ComposerProps) {
   const h = useHost()
   const draft = draftKey(h.id, addr)
   const [text, setText] = useState(() => loadDraft(draft))
   const [busy, setBusy] = useState(false)
   const [held, setHeld] = useState(false)
+  const [caret, setCaret] = useState<number | null>(null) // null: the box does not have the focus
+  const box = useRef<HTMLTextAreaElement>(null)
+  const moveTo = useRef<number | null>(null)
   const field = id + '-send'
   const apple = isApple()
   const edit = (v: string) => {
     setText(v)
     saveDraft(draft, v)
   }
+  const track = (e: Event) => setCaret((e.currentTarget as HTMLTextAreaElement).selectionStart)
+  const slash = useSlash({
+    on: claude,
+    text,
+    caret,
+    host: h.id,
+    addr,
+    api: h.api,
+    id: id + '-slash',
+    apply: (v, at) => {
+      edit(v)
+      setHeld(false)
+      setCaret(at)
+      moveTo.current = at
+    },
+  })
+  // the caret a choice in the list puts after "/name ", once the box has the text
+  useLayoutEffect(() => {
+    if (moveTo.current === null || !box.current) return
+    box.current.setSelectionRange(moveTo.current, moveTo.current)
+    moveTo.current = null
+  })
   const submit = async (value: string, against: string | null) => {
     if (busy || value.trim() === '') return
     setBusy(true)
@@ -844,6 +883,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject }: Compose
     try {
       if (against) await h.api.terminals.reject(addr, value, against)
       else await h.api.terminals.send(addr, value)
+      if (claude) noteSlash(value)
       edit('')
       onReject(null)
       onSent()
@@ -858,6 +898,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject }: Compose
   const sendLabel = rejecting ? '거절하고 보내기' : '보내기'
   return (
     <div class="term-compose">
+      {slash.view}
       {rejecting && (
         <div class="term-reject" role="status" aria-labelledby={field + '-reject'}>
           <Icon name="pencil" size={15} />
@@ -888,12 +929,14 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject }: Compose
           {rejecting ? '거절하고 대신 보낼 글' : '터미널에 여러 줄 보내기'}
         </label>
         <textarea
+          ref={box}
           id={field}
           class="input term-send-input"
           data-draft=""
           rows={phone ? 1 : 2}
           value={text}
           readOnly={busy}
+          {...slash.aria}
           placeholder={
             rejecting ? '대신 할 일을 적으세요' : phone ? '여러 줄로 보내기' : `여러 줄로 보내기 · ${apple ? '⌘Enter' : 'Ctrl+Enter'}`
           }
@@ -901,8 +944,15 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject }: Compose
           onInput={(e) => {
             edit(e.currentTarget.value)
             setHeld(false)
+            track(e)
           }}
+          onFocus={track}
+          onBlur={() => setCaret(null)}
+          onClick={track}
+          onKeyUp={track}
+          onSelect={track}
           onKeyDown={(e) => {
+            if (slash.onKeyDown(e)) return
             if (rejecting && e.key === 'Escape' && !e.isComposing) {
               e.preventDefault()
               onReject(null)

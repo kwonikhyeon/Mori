@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { folder } from '../../test/fixtures'
+import { inHost, withHost } from '../../test/scopes'
 import { A, B, C, COMMITS, diffOf, LOG, linear, MAIN, NOW } from '../../test/history'
 import { spoken } from '../../test/spoken'
 import { now } from '../lib/clock'
@@ -242,17 +243,32 @@ describe('GraphScreen on a PC', () => {
 
   it('goes back to the screen it was opened from', async () => {
     serve()
-    graphFrom.value = { folder: 'f1', href: href({ name: 'terminal', addr: 't1', git: true }) }
+    graphFrom.value = { host: '', folder: 'f1', href: href({ name: 'terminal', addr: 't1', git: true }) }
     open('pc')
     expect(screen.getByRole('link', { name: '작업 화면으로' }).getAttribute('href')).toBe('#/t/t1/git')
     cleanup()
-    graphFrom.value = { folder: 'f1', href: href({ name: 'git', folder: 'f1', path: MAIN }) }
+    graphFrom.value = { host: '', folder: 'f1', href: href({ name: 'git', folder: 'f1', path: MAIN }) }
     open('pc')
     expect(screen.getByRole('link', { name: 'Git 화면으로' }).getAttribute('href')).toBe(href({ name: 'git', folder: 'f1', path: MAIN }))
     cleanup()
-    graphFrom.value = { folder: 'f2', href: '#/t/t9/git' }
+    graphFrom.value = { host: '', folder: 'f2', href: '#/t/t9/git' }
     open('pc', { path: MAIN })
     expect(screen.getByRole('link', { name: 'Git 화면으로' }).getAttribute('href')).toBe(href({ name: 'git', folder: 'f1', path: MAIN }))
+  })
+
+  it('keeps where it was opened apart for each host', async () => {
+    const s = withHost()
+    s.folders.value = [folder()]
+    s.ready.value = true
+    serve((c) => (url(c).pathname === '/h/h_desk0001/api/git/log' ? Response.json(LOG) : undefined))
+    graphFrom.value = { host: 'h_desk0001', folder: 'f1', href: s.href({ name: 'terminal', addr: 't1', git: true }) }
+    route.value = { name: 'graph', folder: 'f1', head: false, host: 'h_desk0001' }
+    render(inHost(s, <Routed variant="pc" />))
+    expect(screen.getByRole('link', { name: '작업 화면으로' }).getAttribute('href')).toBe('#/h/h_desk0001/t/t1/git')
+    cleanup()
+    graphFrom.value = { host: '', folder: 'f1', href: '#/t/t1/git' }
+    render(inHost(s, <Routed variant="pc" />))
+    expect(screen.getByRole('link', { name: 'Git 화면으로' }).getAttribute('href')).toBe('#/h/h_desk0001/git/f1')
   })
 })
 

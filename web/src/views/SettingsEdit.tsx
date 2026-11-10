@@ -1,15 +1,15 @@
-// What Settings edits for the whole host: the folders of the list (spec §3
-// #37) and the presets a session starts (#42). It also shows the hosts
-// linked to this hub (#168).
+// What Settings edits for the whole host shown: the folders of the list
+// (spec §3 #37) and the presets a session starts (#42). It also shows the
+// hosts linked to this hub (#168).
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import type { RefObject } from 'preact'
 import { Confirm } from '../components/Confirm'
 import { Icon } from '../components/Icon'
-import { api } from '../lib/api'
 import { formatArgv, parseArgv } from '../lib/argv'
 import { shortPath } from '../lib/format'
 import { isHere } from '../lib/hosts'
-import { apply, folders, hosts, presets } from '../lib/store'
+import { useHost } from '../lib/scope'
+import { hosts } from '../lib/store'
 import { errorText, toast, toastError } from '../lib/toast'
 import type { FolderView, Preset } from '../lib/types'
 import { FolderPicker } from './FolderPicker'
@@ -36,9 +36,10 @@ function baseName(p: string): string {
 
 export function FoldersCard() {
   const id = useId()
+  const h = useHost()
   const card = useRef<HTMLElement>(null)
   const focusAfter = useFocusAfter(card)
-  const list = folders.value
+  const list = h.folders.value
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
@@ -71,8 +72,8 @@ export function FoldersCard() {
     if (name === f.name) return done()
     setSaving(true)
     try {
-      const v = await api.folders.rename(f.id, name)
-      apply({ type: 'folders', folders: folders.value.map((x) => (x.id === v.id ? v : x)) })
+      const v = await h.api.folders.rename(f.id, name)
+      h.apply({ type: 'folders', folders: h.folders.value.map((x) => (x.id === v.id ? v : x)) })
       done()
     } catch (err) {
       toastError(err, '이름을 바꾸지 못했습니다')
@@ -85,8 +86,8 @@ export function FoldersCard() {
     if (!f || removing) return
     setRemoving(true)
     try {
-      await api.folders.remove(f.id)
-      apply({ type: 'folders', folders: folders.value.filter((x) => x.id !== f.id) })
+      await h.api.folders.remove(f.id)
+      h.apply({ type: 'folders', folders: h.folders.value.filter((x) => x.id !== f.id) })
       setAsk(null)
       focusAfter('.st-card-head .btn')
       toast(`${f.name} 폴더를 목록에서 뺐습니다`)
@@ -296,9 +297,10 @@ interface PresetDraft {
 
 export function PresetsCard() {
   const id = useId()
+  const h = useHost()
   const card = useRef<HTMLElement>(null)
   const focusAfter = useFocusAfter(card)
-  const list = presets.value
+  const list = h.presets.value
   const [draft, setDraft] = useState<PresetDraft[] | null>(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -345,7 +347,7 @@ export function PresetsCard() {
     setSaving(true)
     setError('')
     try {
-      presets.value = await api.presets.put(out)
+      h.presets.value = await h.api.presets.put(out)
       stop()
       toast('프리셋을 저장했습니다')
     } catch (err) {

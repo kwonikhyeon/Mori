@@ -1,10 +1,11 @@
 import { connBanner } from '../lib/health'
-import { conn, core } from '../lib/store'
+import { useHost } from '../lib/scope'
 import { Icon } from './Icon'
 
-/** What is wrong with the server or the core, above the content. */
+/** What is wrong with the server or the core of the host shown, above the content. */
 export function ConnBanner({ class: cls = '' }: { class?: string }) {
-  const b = connBanner(conn.value, core.value)
+  const h = useHost()
+  const b = connBanner(h.conn.value, h.core.value)
   return (
     <div class={cls} role="status" aria-live="polite">
       {b && (

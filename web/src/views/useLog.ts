@@ -4,8 +4,7 @@
 // those read stay remembered.
 import { signal } from '@preact/signals'
 import { useLayoutEffect, useState } from 'preact/hooks'
-import { api } from '../lib/api'
-import { folders } from '../lib/store'
+import { useHost } from '../lib/scope'
 import { errorText } from '../lib/toast'
 import type { Commit, FolderView, Graph, LogCommit } from '../lib/types'
 import { gitState, offline, pickShown, useTicker, type GitState } from './useGit'
@@ -15,11 +14,11 @@ export const LOG_STEP = 200
 /** The most the server gives; older ones are for the terminal. */
 export const LOG_MAX = 2000
 
-/** The log the graph screen shows, for the commit beside it: its names and its parents' subjects. */
-export const shownLog = signal<{ path: string; byHash: Map<string, LogCommit> } | null>(null)
+/** The log the graph screen shows, for the commit beside it: its names and its parents' subjects. host is the ID of its host. */
+export const shownLog = signal<{ host: string; path: string; byHash: Map<string, LogCommit> } | null>(null)
 
-/** The screen a PC opened a folder's graph from, for the way back. */
-export const graphFrom = signal<{ folder: string; href: string } | null>(null)
+/** The screen a PC opened a folder's graph from, for the way back. host is the ID of the folder's host. */
+export const graphFrom = signal<{ host: string; folder: string; href: string } | null>(null)
 
 export interface Repo {
   state: GitState
@@ -29,8 +28,9 @@ export interface Repo {
 }
 
 export function useRepo(fid: string, want: string | undefined): Repo {
-  const f = folders.value.find((x) => x.id === fid)
-  const state = gitState(f)
+  const h = useHost()
+  const f = h.folders.value.find((x) => x.id === fid)
+  const state = gitState(f, h.ready.value)
   const shown = state === 'ok' && f ? pickShown(f, f.worktrees.filter((w) => !w.bare), want) : ''
   return { state, f, shown }
 }
@@ -47,15 +47,16 @@ export interface LogData {
 
 /** The log of one worktree: of all branches, or what HEAD reaches. The last one read stays while it is read again or longer. */
 export function useLog(path: string, head: boolean): LogData {
+  const h = useHost()
   const [tick, t] = useTicker(undefined, 0)
   const [limit, setLimit] = useState(LOG_STEP)
-  const key = path + '\n' + (head ? 'head' : 'all')
+  const key = h.id + '\n' + path + '\n' + (head ? 'head' : 'all')
   const [st, setSt] = useState<{ key: string; limit: number; data?: Graph; error?: string }>({ key: '', limit: 0 })
   useLayoutEffect(() => {
     if (!path) return
     let live = true
     t.mark()
-    api.git.log(path, { limit, head }).then(
+    h.api.git.log(path, { limit, head }).then(
       (data) => {
         if (live) setSt({ key, limit, data })
       },
@@ -69,8 +70,8 @@ export function useLog(path: string, head: boolean): LogData {
     return () => {
       live = false
     }
-    // The key says the path and the scope the read uses.
-  }, [key, limit, tick, t])
+    // The key says the host, the path and the scope the read uses.
+  }, [key, limit, tick, t, h])
   const cur = st.key === key ? st : null
   return {
     data: cur?.data,
@@ -99,13 +100,15 @@ export interface CommitRead {
   error?: string
 }
 
+/** A commit of a worktree of the host shown; a commit read is kept by its host, path and hash. */
 export function useCommit(path: string, rev: string): CommitRead {
-  const key = path && rev ? path + '\n' + rev : ''
+  const h = useHost()
+  const key = path && rev ? h.id + '\n' + path + '\n' + rev : ''
   const [st, setSt] = useState<{ key: string } & CommitRead>({ key: '' })
   useLayoutEffect(() => {
     if (!key || commits.has(key)) return
     let live = true
-    api.git.commit(path, rev).then(
+    h.api.git.commit(path, rev).then(
       (data) => {
         commits.set(key, data)
         if (commits.size > KEEP) commits.delete(commits.keys().next().value!)
@@ -118,7 +121,7 @@ export function useCommit(path: string, rev: string): CommitRead {
     return () => {
       live = false
     }
-  }, [key])
+  }, [key, h])
   const known = key ? commits.get(key) : undefined
   if (known) return { data: known }
   return st.key === key ? st : {}

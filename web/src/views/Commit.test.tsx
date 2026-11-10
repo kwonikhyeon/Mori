@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { folder } from '../../test/fixtures'
+import { inHost, withHost } from '../../test/scopes'
 import { A, B, C, commit, COMMITS, diffOf, file, HOUR, LOG, MAIN, NOW } from '../../test/history'
 import { spoken } from '../../test/spoken'
 import { now } from '../lib/clock'
@@ -77,7 +78,7 @@ beforeEach(() => {
   ready.value = true
   now.value = NOW
   toasts.value = []
-  shownLog.value = { path: MAIN, byHash: new Map(LOG.commits.map((x) => [x.hash, x])) }
+  shownLog.value = { host: '', path: MAIN, byHash: new Map(LOG.commits.map((x) => [x.hash, x])) }
 })
 
 afterEach(() => {
@@ -228,5 +229,23 @@ describe('CommitPanel', () => {
     } finally {
       delete (document as Partial<Document>).execCommand
     }
+  })
+
+  it('reads the same commit of two hosts apart', async () => {
+    serve()
+    open(C)
+    await screen.findByRole('heading', { level: 3, name: 'fix/notify 병합' })
+    cleanup()
+    const s = withHost()
+    s.folders.value = [folder()]
+    s.ready.value = true
+    const hubReply = reply
+    reply = (c) => hubReply({ ...c, url: c.url.replace('/h/h_desk0001', '') })
+    shownLog.value = { host: 'h_desk0001', path: MAIN, byHash: new Map(LOG.commits.map((x) => [x.hash, x])) }
+    route.value = { ...at(C), host: 'h_desk0001' }
+    render(inHost(s, <Routed />))
+    await screen.findByRole('heading', { level: 3, name: 'fix/notify 병합' })
+    expect(reads('/api/git/commit')).toHaveLength(1)
+    expect(reads('/h/h_desk0001/api/git/commit')).toHaveLength(1)
   })
 })

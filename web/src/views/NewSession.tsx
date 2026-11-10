@@ -5,15 +5,12 @@
 import { Fragment, type ComponentChildren } from 'preact'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Icon } from '../components/Icon'
-import { api } from '../lib/api'
-import { hostLabel } from '../lib/boot'
 import { homeWorktree, shortPath, wtLabel } from '../lib/format'
 import { isApple } from '../lib/platform'
-import { navigate } from '../lib/router'
 import { sessionsByWorktree } from '../lib/queue'
+import { useHost } from '../lib/scope'
 import { planOf, worktreeRequest } from '../lib/slug'
 import { load, save } from '../lib/storage'
-import { apply, folders, presets, ready, terminals } from '../lib/store'
 import { errorText } from '../lib/toast'
 import type { Branches, Worktree } from '../lib/types'
 import { BranchFields } from './BranchFields'
@@ -43,6 +40,7 @@ const NEW = ':new'
 
 
 export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
+  const h = useHost()
   const id = useId()
   const [last] = useState(() => load<Last>(LAST, {}))
   const [pick, setPick] = useState(folder)
@@ -62,9 +60,9 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
   const nameRef = useRef<HTMLInputElement>(null)
   const focusName = useRef(false)
 
-  const fs = folders.value
+  const fs = h.folders.value
   const f = fs.find((x) => x.id === pick) ?? fs.find((x) => x.id === last.folder) ?? fs[0] ?? null
-  const ps = presets.value
+  const ps = h.presets.value
   const preset = ps.find((p) => p.id === presetPick) ?? ps.find((p) => p.id === last.preset) ?? ps[0]
 
   const ws = f ? f.worktrees.filter((w) => !w.bare) : []
@@ -81,7 +79,7 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
   useEffect(() => {
     if (!needBr || !fid) return
     let live = true
-    api.folders.branches(fid).then(
+    h.api.folders.branches(fid).then(
       (b) => {
         if (live) setBr({ id: fid, b })
       },
@@ -92,7 +90,7 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
     return () => {
       live = false
     }
-  }, [needBr, fid])
+  }, [needBr, fid, h])
   useEffect(() => {
     if (choice !== NEW || !focusName.current) return
     focusName.current = false
@@ -107,7 +105,7 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
   const req = worktreeRequest(plan, name, baseValue)
 
   // The sessions running in each worktree, so a busy one shows.
-  const counts = fid ? sessionsByWorktree(terminals.value.values(), fid) : new Map<string, number>()
+  const counts = fid ? sessionsByWorktree(h.terminals.value.values(), fid) : new Map<string, number>()
 
   const takesTask = !!preset?.task
   const ok = !!f && !!preset && !busy && (choice !== NEW || (!needBr && !!req))
@@ -127,7 +125,7 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
       if (choice === NEW && req) {
         let w: Worktree
         try {
-          w = await api.folders.addWorktree(f.id, req)
+          w = await h.api.folders.addWorktree(f.id, req)
         } catch (e) {
           setError('브랜치를 만들지 못했습니다. ' + errorText(e))
           return
@@ -138,7 +136,7 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
         setBase(null)
         at = w.path
       }
-      const t = await api.terminals.create({
+      const t = await h.api.terminals.create({
         folder_id: f.id,
         preset: preset.id,
         ...(at ? { worktree: at } : {}),
@@ -146,9 +144,9 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
         ...(title.trim() ? { title: title.trim() } : {}),
       })
       // The list has it before the event stream brings it.
-      apply({ type: 'terminal', terminal: t })
+      h.apply({ type: 'terminal', terminal: t })
       save(LAST, { folder: f.id, preset: preset.id } satisfies Last)
-      navigate({ name: 'terminal', addr: t.address, git: false }, { replace: true })
+      h.go({ name: 'terminal', addr: t.address, git: false }, { replace: true })
     } catch (e) {
       setError('세션을 만들지 못했습니다. ' + errorText(e))
     } finally {
@@ -174,11 +172,11 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
   }
 
   const apple = isApple()
-  const hostName = hostLabel.value
+  const hostName = h.name.value
   const head =
     variant === 'phone' ? (
       <header class="ns-head">
-        <a class="btn btn-icon btn-ghost ns-back" href={back ?? '#/'} aria-label="뒤로">
+        <a class="btn btn-icon btn-ghost ns-back" href={back ?? h.href({ name: 'queue' })} aria-label="뒤로">
           <Icon name="back" size={22} />
         </a>
         <h1>새 세션</h1>
@@ -191,7 +189,7 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
       </header>
     )
 
-  if (!ready.value || ps.length === 0) {
+  if (!h.ready.value || ps.length === 0) {
     return (
       <div class={'ns ns-' + variant}>
         {head}

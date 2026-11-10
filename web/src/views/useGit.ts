@@ -1,5 +1,5 @@
 // What the Git panel and screen read: the folder's worktrees from the
-// store, and one worktree's changes and a file's diff from the server.
+// host's store, and one worktree's changes and a file's diff from the host.
 // Both are read again every 10 seconds while the page is seen, when the
 // window gets the focus, when the session's status moves and on 새로 고침;
 // never twice within two seconds unless asked (spec §3 #137).
@@ -7,10 +7,10 @@
 // The reads run in layout effects: a read asked for by a timer starts as
 // the page renders, not a frame later.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
-import { api, ApiError } from '../lib/api'
+import { ApiError } from '../lib/api'
 import { parseDiff, type DiffFile } from '../lib/diff'
 import { homeWorktree, type ChangeItem } from '../lib/format'
-import { folders, ready } from '../lib/store'
+import { useHost } from '../lib/scope'
 import { errorText } from '../lib/toast'
 import type { Diff, FolderView, GitStatus, Worktree } from '../lib/types'
 import { onWake } from '../lib/wake'
@@ -76,9 +76,9 @@ export function useTicker(pulse: number | null | undefined, every = EVERY): [num
 
 export type GitState = 'loading' | 'missing' | 'norepo' | 'ok'
 
-/** Whether a folder's Git can be read: not before the folders are, nor of one not there or not a repository. */
-export function gitState(f: FolderView | undefined): GitState {
-  return !ready.value ? 'loading' : !f ? 'missing' : !f.repo ? 'norepo' : 'ok'
+/** Whether a folder's Git can be read: not before the host's folders are (ready), nor of one not there or not a repository. */
+export function gitState(f: FolderView | undefined, ready: boolean): GitState {
+  return !ready ? 'loading' : !f ? 'missing' : !f.repo ? 'norepo' : 'ok'
 }
 
 /** The worktree to show: the one asked for while it is there, else the folder's own; before the server has listed them, the folder. */
@@ -109,10 +109,11 @@ export interface GitData {
 }
 
 export function useGit(fid: string, want: string | undefined, pulse?: number | null): GitData {
+  const h = useHost()
   const [tick, t] = useTicker(pulse)
   const [made, setMade] = useState<Worktree | null>(null)
-  const f = folders.value.find((x) => x.id === fid)
-  const state = gitState(f)
+  const f = h.folders.value.find((x) => x.id === fid)
+  const state = gitState(f, h.ready.value)
 
   const ws = state === 'ok' && f ? f.worktrees.filter((w) => !w.bare) : []
   const known = !!made && ws.some((w) => w.path === made.path)
@@ -129,7 +130,7 @@ export function useGit(fid: string, want: string | undefined, pulse?: number | n
     if (!shown) return
     let live = true
     t.mark()
-    api.git.status(shown).then(
+    h.api.git.status(shown).then(
       (data) => {
         if (live) setSt({ path: shown, data })
       },
@@ -140,13 +141,13 @@ export function useGit(fid: string, want: string | undefined, pulse?: number | n
     return () => {
       live = false
     }
-  }, [shown, tick, t])
+  }, [shown, tick, t, h])
 
   // The server lists the worktrees again as it answers, and tells every
   // page through the event stream when they changed.
   useLayoutEffect(() => {
-    if (state === 'ok') api.folders.git(fid).catch(() => {})
-  }, [fid, tick, state])
+    if (state === 'ok') h.api.folders.git(fid).catch(() => {})
+  }, [fid, tick, state, h])
 
   return {
     state,
@@ -170,12 +171,13 @@ export interface DiffRead {
 
 /** The diff of a change in the worktree shown; the one before stays while it is read again. */
 export function useDiff(shown: string, item: ChangeItem | undefined, tick: number): DiffRead {
-  const key = item ? shown + '\n' + JSON.stringify(item.diff) : ''
+  const h = useHost()
+  const key = item ? h.id + '\n' + shown + '\n' + JSON.stringify(item.diff) : ''
   const [d, setD] = useState<{ key: string; diff?: Diff; error?: string }>({ key: '' })
   useLayoutEffect(() => {
     if (!item) return
     let live = true
-    api.git.diff(shown, item.diff).then(
+    h.api.git.diff(shown, item.diff).then(
       (diff) => {
         if (live) setD({ key, diff })
       },
@@ -186,7 +188,7 @@ export function useDiff(shown: string, item: ChangeItem | undefined, tick: numbe
     return () => {
       live = false
     }
-    // The key says all of the item and the worktree that the read uses.
+    // The key says the host, all of the item and the worktree that the read uses.
   }, [key, tick])
   const cur = d.key === key ? d : null
   const text = cur?.diff?.diff

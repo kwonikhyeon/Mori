@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { folder, term, worktree } from '../../test/fixtures'
+import { inHost, withHost } from '../../test/scopes'
 import { route } from '../lib/router'
 import { folders, presets, ready, resetStore, terminals } from '../lib/store'
 import type { Branches, Preset, TerminalView } from '../lib/types'
@@ -120,6 +121,21 @@ describe('NewSession', () => {
     expect(location.hash).toBe('#/t/t9')
     // The list has it before the event stream does.
     expect(terminals.value.get('t9')?.display_title).toBe('새 세션')
+  })
+
+  it('starts the session on the host it was opened on', async () => {
+    const s = withHost()
+    s.folders.value = [mori()]
+    s.presets.value = PRESETS
+    s.ready.value = true
+    serve((c) => (c.url === '/h/h_desk0001/api/terminals' ? Response.json(made, { status: 201 }) : undefined))
+    render(inHost(s, <NewSession variant="pc" folder="f1" wt={WT} />))
+    submit()
+    await vi.waitFor(() => expect(location.hash).toBe('#/h/h_desk0001/t/t9'))
+    expect(route.value).toEqual({ name: 'terminal', addr: 't9', git: false, host: 'h_desk0001' })
+    expect(sent('/api/terminals')).toHaveLength(0)
+    expect(s.terminals.value.get('t9')?.display_title).toBe('새 세션')
+    expect(terminals.value.has('t9')).toBe(false)
   })
 
   it('takes no task for a program without one and remembers the choice', async () => {

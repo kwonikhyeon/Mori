@@ -1,12 +1,11 @@
 // Picks where a new session runs: a registered folder, or any directory of
-// this computer (GET /api/fs, spec §3 #74), which is registered on the way.
+// the host's computer (GET /api/fs, spec §3 #74), which is registered on the way.
 // Settings opens it on browsing only, to add a folder.
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Icon } from '../components/Icon'
 import { Sheet, SheetHead } from '../components/Sheet'
-import { api } from '../lib/api'
 import { shortPath } from '../lib/format'
-import { apply, folders } from '../lib/store'
+import { useHost } from '../lib/scope'
 import { errorText } from '../lib/toast'
 import type { FolderView, FsListing } from '../lib/types'
 import './folderpicker.css'
@@ -33,8 +32,9 @@ export function FolderPicker({ open, ...p }: FolderPickerProps) {
 type PickerProps = Omit<FolderPickerProps, 'open'> & { id: string }
 
 function Picker(p: PickerProps) {
+  const host = useHost()
   // With nothing registered yet there is nothing to pick from.
-  const [adding, setAdding] = useState(() => !!p.browse || folders.peek().length === 0)
+  const [adding, setAdding] = useState(() => !!p.browse || host.folders.peek().length === 0)
   // The button that switched is gone; the new title takes the focus.
   const first = useRef(true)
   useEffect(() => {
@@ -42,19 +42,20 @@ function Picker(p: PickerProps) {
     else document.getElementById(p.id)?.focus()
   }, [adding])
   return adding ? (
-    <Browse {...p} onList={!p.browse && folders.value.length > 0 ? () => setAdding(false) : undefined} />
+    <Browse {...p} onList={!p.browse && host.folders.value.length > 0 ? () => setAdding(false) : undefined} />
   ) : (
     <List {...p} onAdd={() => setAdding(true)} />
   )
 }
 
 function List({ id, value, onPick, onClose, onAdd }: PickerProps & { onAdd: () => void }) {
+  const host = useHost()
   return (
     <>
       <SheetHead id={id} title="폴더 고르기" onClose={onClose} />
       <div class="sheet-body">
         <ul class="fp-list">
-          {folders.value.map((f) => {
+          {host.folders.value.map((f) => {
             const on = f.id === value
             return (
               <li key={f.id}>
@@ -102,6 +103,7 @@ function Browse({ id, value, onPick, onClose, onList, browse }: PickerProps & { 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const host = useHost()
   const seq = useRef(0)
   const field = id + '-path'
 
@@ -110,7 +112,7 @@ function Browse({ id, value, onPick, onClose, onList, browse }: PickerProps & { 
     setLoading(true)
     setError(null)
     try {
-      const l = await api.fs(dir, h)
+      const l = await host.api.fs(dir, h)
       if (n !== seq.current) return
       setListing(l)
       setPath(l.path)
@@ -121,11 +123,11 @@ function Browse({ id, value, onPick, onClose, onList, browse }: PickerProps & { 
     }
   }
   useEffect(() => {
-    void go(startDir(folders.peek().find((f) => f.id === value)))
+    void go(startDir(host.folders.peek().find((f) => f.id === value)))
   }, [])
 
   const here = listing?.path
-  const known = here ? folders.value.find((f) => samePath(f.path, here)) : undefined
+  const known = here ? host.folders.value.find((f) => samePath(f.path, here)) : undefined
   const register = async () => {
     if (!here || saving || (browse && known)) return
     if (known) {
@@ -135,10 +137,10 @@ function Browse({ id, value, onPick, onClose, onList, browse }: PickerProps & { 
     setSaving(true)
     setError(null)
     try {
-      const f = await api.folders.add(here)
+      const f = await host.api.folders.add(here)
       // The event stream brings the same list soon; the screen needs it now.
-      const fs = folders.peek()
-      if (!fs.some((x) => x.id === f.id)) apply({ type: 'folders', folders: [...fs, f] })
+      const fs = host.folders.peek()
+      if (!fs.some((x) => x.id === f.id)) host.apply({ type: 'folders', folders: [...fs, f] })
       onPick(f)
     } catch (e) {
       setError(errorText(e, '폴더를 등록하지 못했습니다'))

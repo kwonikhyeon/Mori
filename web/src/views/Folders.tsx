@@ -4,21 +4,22 @@ import { Icon } from '../components/Icon'
 import { now } from '../lib/clock'
 import { appName, branchOf, finishedLine, place, shortPath } from '../lib/format'
 import { groupByFolder, type FolderGroup } from '../lib/queue'
-import { href } from '../lib/router'
-import { folders, presets, ready, terminals } from '../lib/store'
+import { useHost } from '../lib/scope'
+import type { HostStore } from '../lib/store'
 import type { FolderView, TerminalView } from '../lib/types'
 import { Loading, TermRow, type ListProps } from './rows'
 import './lists.css'
 
-function sub(t: TerminalView, f: FolderView | null): string {
-  if (t.state === 'finished') return finishedLine(t, presets.value, now.value)
-  const app = appName(t, presets.value)
-  if (!f) return `${app} · ${place(t, folders.value)}`
+function sub(h: HostStore, t: TerminalView, f: FolderView | null): string {
+  if (t.state === 'finished') return finishedLine(t, h.presets.value, now.value)
+  const app = appName(t, h.presets.value)
+  if (!f) return `${app} · ${place(t, h.folders.value)}`
   const b = branchOf(t, f)
   return b ? `${app} · ${b}` : app
 }
 
 function FolderSection({ g, p }: { g: FolderGroup; p: ListProps }) {
+  const h = useHost()
   const f = g.folder
   const id = `f-${p.variant}-${f ? f.id : 'rest'}`
   return (
@@ -30,13 +31,13 @@ function FolderSection({ g, p }: { g: FolderGroup; p: ListProps }) {
           {f ? <span class="fsec-path mono">{shortPath(f.path)}</span> : <span class="fsec-path">다른 컴퓨터나 등록되지 않은 폴더</span>}
         </div>
         {f?.repo && (
-          <a class="btn btn-sm" href={href({ name: 'git', folder: f.id })} aria-label={`${f.name} Git 보기`}>
+          <a class="btn btn-sm" href={h.href({ name: 'git', folder: f.id })} aria-label={`${f.name} Git 보기`}>
             <Icon name="git" size={15} />
             Git
           </a>
         )}
         {f && (
-          <a class="btn btn-sm" href={href({ name: 'new', folder: f.id })} aria-label={`${f.name}에서 새 세션`}>
+          <a class="btn btn-sm" href={h.href({ name: 'new', folder: f.id })} aria-label={`${f.name}에서 새 세션`}>
             <Icon name="plus" size={15} />새 세션
           </a>
         )}
@@ -44,7 +45,7 @@ function FolderSection({ g, p }: { g: FolderGroup; p: ListProps }) {
       {g.items.length > 0 ? (
         <ul class="qrows qrows-joined">
           {g.items.map((t) => (
-            <TermRow key={t.address} t={t} p={p} sub={sub(t, f)} />
+            <TermRow key={t.address} t={t} p={p} sub={sub(h, t, f)} />
           ))}
         </ul>
       ) : (
@@ -55,8 +56,9 @@ function FolderSection({ g, p }: { g: FolderGroup; p: ListProps }) {
 }
 
 export function FolderList(p: ListProps) {
-  if (!ready.value) return <Loading />
-  const groups = groupByFolder(terminals.value.values(), folders.value)
+  const h = useHost()
+  if (!h.ready.value) return <Loading />
+  const groups = groupByFolder(h.terminals.value.values(), h.folders.value)
   if (groups.length === 0) {
     return (
       <div class="empty">
@@ -65,7 +67,7 @@ export function FolderList(p: ListProps) {
         </span>
         <p class="empty-title">등록된 폴더가 없습니다</p>
         <p class="empty-text">새 세션에서 폴더를 고르면 여기에 생깁니다.</p>
-        <a class="btn btn-primary" href="#/new">
+        <a class="btn btn-primary" href={h.href({ name: 'new' })}>
           <Icon name="plus" stroke={2} />새 세션
         </a>
       </div>

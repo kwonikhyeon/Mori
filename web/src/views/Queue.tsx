@@ -6,26 +6,28 @@ import { Icon } from '../components/Icon'
 import { now } from '../lib/clock'
 import { appName, askText, chip, endText, finishedLine, place } from '../lib/format'
 import { groupQueue, type GroupKey, type QueueGroup } from '../lib/queue'
-import { folders, presets, ready, terminals } from '../lib/store'
+import { useHost } from '../lib/scope'
+import type { HostStore } from '../lib/store'
 import { relTime } from '../lib/time'
 import type { TerminalView } from '../lib/types'
 import { Loading, TermRow, termHref, titleOf, type ListProps } from './rows'
 import './lists.css'
 
-const appPlace = (t: TerminalView) => `${appName(t, presets.value)} · ${place(t, folders.value)}`
+const appPlace = (h: HostStore, t: TerminalView) => `${appName(t, h.presets.value)} · ${place(t, h.folders.value)}`
 
 function AlertCard({ t, kind, p }: { t: TerminalView; kind: 'blocked' | 'error'; p: ListProps }) {
+  const h = useHost()
   const phone = p.variant === 'phone'
   const sel = p.selected === t.address
   return (
-    <a class={`qcard qcard-${kind}` + (sel ? ' is-selected' : '')} href={termHref(t, p)} aria-current={sel ? 'true' : undefined}>
+    <a class={`qcard qcard-${kind}` + (sel ? ' is-selected' : '')} href={termHref(h, t, p)} aria-current={sel ? 'true' : undefined}>
       <span class="qcard-top">
         <Chip info={chip(t)} big={phone} />
-        {phone && <span class="qcard-app">{appName(t, presets.value)}</span>}
+        {phone && <span class="qcard-app">{appName(t, h.presets.value)}</span>}
         {phone ? <Icon name="chevron-right" size={18} class="qcard-go" /> : sel && <span class="qcard-seeing">보는 중</span>}
       </span>
-      <span class="qcard-title">{titleOf(t)}</span>
-      <span class="qcard-sub">{phone ? place(t, folders.value) : appPlace(t)}</span>
+      <span class="qcard-title">{titleOf(t, h.presets.value)}</span>
+      <span class="qcard-sub">{phone ? place(t, h.folders.value) : appPlace(h, t)}</span>
       <span class="qcard-msg">{askText(t, kind)}</span>
       {phone && kind === 'blocked' && <span class="qcard-foot">열어서 키로 응답</span>}
     </a>
@@ -33,14 +35,15 @@ function AlertCard({ t, kind, p }: { t: TerminalView; kind: 'blocked' | 'error';
 }
 
 function WorkCard({ t, p }: { t: TerminalView; p: ListProps }) {
+  const h = useHost()
   const sel = p.selected === t.address
   const progress = t.status?.progress
   return (
-    <a class={'qcard qwork' + (sel ? ' is-selected' : '')} href={termHref(t, p)} aria-current={sel ? 'true' : undefined}>
+    <a class={'qcard qwork' + (sel ? ' is-selected' : '')} href={termHref(h, t, p)} aria-current={sel ? 'true' : undefined}>
       <span class="qwork-top">
         <span class="qrow-main">
-          <span class="qrow-title">{titleOf(t)}</span>
-          <span class="qrow-sub">{appPlace(t)}</span>
+          <span class="qrow-title">{titleOf(t, h.presets.value)}</span>
+          <span class="qrow-sub">{appPlace(h, t)}</span>
         </span>
         <Chip info={chip(t)} />
       </span>
@@ -58,6 +61,7 @@ function rowsClass(p: ListProps): string {
 }
 
 function Group({ g, p }: { g: QueueGroup; p: ListProps }) {
+  const h = useHost()
   const id = `q-${p.variant}-${g.key}`
   const k = g.key
   let body
@@ -69,7 +73,7 @@ function Group({ g, p }: { g: QueueGroup; p: ListProps }) {
     body = (
       <ul class={rowsClass(p)}>
         {g.items.map((t) => (
-          <TermRow key={t.address} t={t} p={p} sub={appPlace(t)} />
+          <TermRow key={t.address} t={t} p={p} sub={appPlace(h, t)} />
         ))}
       </ul>
     )
@@ -85,8 +89,9 @@ function Group({ g, p }: { g: QueueGroup; p: ListProps }) {
 }
 
 function Fold({ g, p, open, onToggle }: { g: QueueGroup; p: ListProps; open: boolean; onToggle: () => void }) {
+  const h = useHost()
   const id = `q-${p.variant}-${g.key}`
-  const sub = g.key === 'finished' ? finishedLine(g.items[0], presets.value, now.value) : '상태를 보고하지 않는 프로그램'
+  const sub = g.key === 'finished' ? finishedLine(g.items[0], h.presets.value, now.value) : '상태를 보고하지 않는 프로그램'
   return (
     <section class="qfold-sec" aria-labelledby={id}>
       <h2 class="qfold-h">
@@ -106,7 +111,7 @@ function Fold({ g, p, open, onToggle }: { g: QueueGroup; p: ListProps; open: boo
                 key={t.address}
                 t={t}
                 p={p}
-                sub={appPlace(t)}
+                sub={appPlace(h, t)}
                 end={
                   <span class="qrow-end">
                     {endText(t)}
@@ -115,7 +120,7 @@ function Fold({ g, p, open, onToggle }: { g: QueueGroup; p: ListProps; open: boo
                 }
               />
             ) : (
-              <TermRow key={t.address} t={t} p={p} sub={appPlace(t)} />
+              <TermRow key={t.address} t={t} p={p} sub={appPlace(h, t)} />
             ),
           )}
         </ul>
@@ -125,6 +130,7 @@ function Fold({ g, p, open, onToggle }: { g: QueueGroup; p: ListProps; open: boo
 }
 
 function EmptyQueue() {
+  const h = useHost()
   return (
     <div class="empty">
       <span class="empty-icon">
@@ -132,7 +138,7 @@ function EmptyQueue() {
       </span>
       <p class="empty-title">아직 세션이 없습니다</p>
       <p class="empty-text">새 세션을 열면 여기에 모입니다.</p>
-      <a class="btn btn-primary" href="#/new">
+      <a class="btn btn-primary" href={h.href({ name: 'new' })}>
         <Icon name="plus" stroke={2} />새 세션
       </a>
     </div>
@@ -140,9 +146,10 @@ function EmptyQueue() {
 }
 
 export function QueueList(p: ListProps) {
+  const h = useHost()
   const [open, setOpen] = useState<ReadonlySet<GroupKey>>(new Set())
-  if (!ready.value) return <Loading />
-  const groups = groupQueue(terminals.value.values(), now.value).filter((g) => g.items.length > 0)
+  if (!h.ready.value) return <Loading />
+  const groups = groupQueue(h.terminals.value.values(), now.value).filter((g) => g.items.length > 0)
   if (groups.length === 0) return <EmptyQueue />
   const shown = groups.filter((g) => !g.collapsed)
   const folded = groups.filter((g) => g.collapsed)

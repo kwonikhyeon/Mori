@@ -3,9 +3,8 @@
 import type { ComponentChildren } from 'preact'
 import { Chip } from '../components/Chip'
 import { appName, chip } from '../lib/format'
-import { href } from '../lib/router'
-import { presets } from '../lib/store'
-import type { TerminalView } from '../lib/types'
+import { useHost, type HostScope } from '../lib/scope'
+import type { Preset, TerminalView } from '../lib/types'
 
 export type Variant = 'pc' | 'phone'
 
@@ -17,12 +16,13 @@ export interface ListProps {
   git?: boolean
 }
 
-export function titleOf(t: TerminalView): string {
-  return t.display_title || appName(t, presets.value)
+export function titleOf(t: TerminalView, presets: Preset[]): string {
+  return t.display_title || appName(t, presets)
 }
 
-export function termHref(t: TerminalView, p: ListProps): string {
-  return href({ name: 'terminal', addr: t.address, git: !!p.git })
+/** The terminal's screen on host h. */
+export function termHref(h: HostScope, t: TerminalView, p: ListProps): string {
+  return h.href({ name: 'terminal', addr: t.address, git: !!p.git })
 }
 
 export function Loading() {
@@ -42,13 +42,14 @@ export interface TermRowProps {
 }
 
 export function TermRow({ t, p, sub, end }: TermRowProps) {
+  const h = useHost()
   const sel = p.selected === t.address
   const cls = 'qrow' + (t.state === 'finished' ? ' is-finished' : '') + (sel ? ' is-selected' : '')
   return (
     <li>
-      <a class={cls} href={termHref(t, p)} aria-current={sel ? 'true' : undefined}>
+      <a class={cls} href={termHref(h, t, p)} aria-current={sel ? 'true' : undefined}>
         <span class="qrow-main">
-          <span class="qrow-title">{titleOf(t)}</span>
+          <span class="qrow-title">{titleOf(t, h.presets.value)}</span>
           <span class="qrow-sub">{sub}</span>
         </span>
         {end ?? <Chip info={chip(t)} />}

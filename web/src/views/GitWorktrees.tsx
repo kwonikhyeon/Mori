@@ -6,12 +6,11 @@ import { Confirm } from '../components/Confirm'
 import { Icon } from '../components/Icon'
 import { Menu, type MenuItem } from '../components/Menu'
 import { Sheet, SheetHead } from '../components/Sheet'
-import { api, ApiError } from '../lib/api'
+import { ApiError } from '../lib/api'
 import { shortPath, wtLabel } from '../lib/format'
 import { sessionsByWorktree } from '../lib/queue'
-import { navigate } from '../lib/router'
+import { useHost } from '../lib/scope'
 import { planOf, worktreeRequest } from '../lib/slug'
-import { terminals } from '../lib/store'
 import { errorText, toast, toastError } from '../lib/toast'
 import type { Branches, FolderView, Worktree } from '../lib/types'
 import { BranchFields } from './BranchFields'
@@ -45,13 +44,14 @@ export interface WorktreeListProps {
 }
 
 export function WorktreeList({ variant, g, own, onShow, onMade, onRemoved }: WorktreeListProps) {
+  const h = useHost()
   const f = g.f!
   const id = useId()
   const sheet = id + '-sheet'
   const [adding, setAdding] = useState(false)
   const [ask, setAsk] = useState<Ask | null>(null)
   const [busy, setBusy] = useState(false)
-  const counts = sessionsByWorktree(terminals.value.values(), f.id)
+  const counts = sessionsByWorktree(h.terminals.value.values(), f.id)
   const pc = variant === 'pc'
   const Head = pc ? 'h3' : 'h2'
 
@@ -60,7 +60,7 @@ export function WorktreeList({ variant, g, own, onShow, onMade, onRemoved }: Wor
     const { w, force } = ask
     setBusy(true)
     try {
-      await api.folders.removeWorktree(f.id, w.path, force !== null)
+      await h.api.folders.removeWorktree(f.id, w.path, force !== null)
       setAsk(null)
       toast('워크트리를 삭제했습니다')
       onRemoved(w.path)
@@ -97,7 +97,7 @@ export function WorktreeList({ variant, g, own, onShow, onMade, onRemoved }: Wor
         {g.ws.map((w) => {
           const n = counts.get(w.path) ?? 0
           const items: MenuItem[] = []
-          if (!w.prunable) items.push({ label: '이 워크트리에서 새 세션', icon: 'plus', onSelect: () => navigate({ name: 'new', folder: f.id, wt: w.path }) })
+          if (!w.prunable) items.push({ label: '이 워크트리에서 새 세션', icon: 'plus', onSelect: () => h.go({ name: 'new', folder: f.id, wt: w.path }) })
           // git keeps the main one, and a locked one even when forced once.
           if (!w.main && !w.locked) items.push({ label: '워크트리 삭제', icon: 'trash', danger: true, onSelect: () => setAsk({ w, force: null }) })
           return (
@@ -173,6 +173,7 @@ interface AddWorktreeProps {
 }
 
 function AddWorktree({ id, f, ws, onClose, onMade }: AddWorktreeProps) {
+  const h = useHost()
   const [name, setName] = useState('')
   const [base, setBase] = useState<string | null>(null)
   // undefined while they are read, null when they could not be.
@@ -181,7 +182,7 @@ function AddWorktree({ id, f, ws, onClose, onMade }: AddWorktreeProps) {
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     let live = true
-    api.folders.branches(f.id).then(
+    h.api.folders.branches(f.id).then(
       (b) => {
         if (live) setBr(b)
       },
@@ -192,7 +193,7 @@ function AddWorktree({ id, f, ws, onClose, onMade }: AddWorktreeProps) {
     return () => {
       live = false
     }
-  }, [f.id])
+  }, [f.id, h])
 
   const main = ws.find((w) => w.main)
   const n = name.trim()
@@ -206,7 +207,7 @@ function AddWorktree({ id, f, ws, onClose, onMade }: AddWorktreeProps) {
     setBusy(true)
     setError(null)
     try {
-      const w = await api.folders.addWorktree(f.id, req)
+      const w = await h.api.folders.addWorktree(f.id, req)
       toast('워크트리를 만들었습니다')
       onMade(w)
     } catch (e) {

@@ -9,6 +9,7 @@ import { now } from '../lib/clock'
 import { copyText } from '../lib/copy'
 import { commitItems, fileTotals, shortHash, splitMessage, type CommitItem } from '../lib/format'
 import { href, navigate, plainClick, type Route } from '../lib/router'
+import { useHost } from '../lib/scope'
 import { commitTime, relTime } from '../lib/time'
 import { toast } from '../lib/toast'
 import type { Commit } from '../lib/types'
@@ -121,10 +122,11 @@ function FilesFoot({ c }: { c: Commit }) {
   return <p class="qnote">파일이 너무 많아 앞의 {c.files.length.toLocaleString('ko-KR')}개만 보입니다</p>
 }
 
-/** The rows of the graph beside it, when it shows this worktree: the commit's names and its parents' subjects. */
-function knownOf(repo: Repo) {
+/** The rows of the graph beside it, when it shows this worktree of the same host: the commit's names and its parents' subjects. */
+function useKnown(repo: Repo) {
+  const h = useHost()
   const log = shownLog.value
-  return log && log.path === repo.shown ? log.byHash : undefined
+  return log && log.host === h.id && log.path === repo.shown ? log.byHash : undefined
 }
 
 /* ---------- PC ---------- */
@@ -132,7 +134,7 @@ function knownOf(repo: Repo) {
 function Summary({ c, r, repo }: { c: Commit; r: GraphRoute; repo: Repo }) {
   const { subject, body } = splitMessage(c.message)
   const t = now.value
-  const known = knownOf(repo)
+  const known = useKnown(repo)
   const self = known?.get(c.hash)
   const committed = c.committer !== c.author || c.committer_email !== c.email
   return (
@@ -249,7 +251,7 @@ export function CommitPanel({ r, onClose }: CommitProps) {
 function SheetSummary({ c, r, repo }: { c: Commit; r: GraphRoute; repo: Repo }) {
   const { subject, body } = splitMessage(c.message)
   // Its row has room for one name; here they all are.
-  const self = knownOf(repo)?.get(c.hash)
+  const self = useKnown(repo)?.get(c.hash)
   return (
     <section class="cs-sum" aria-label="커밋 내용">
       <h3 class="cs-subject">{subject}</h3>

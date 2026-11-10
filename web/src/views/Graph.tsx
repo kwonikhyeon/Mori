@@ -10,7 +10,8 @@ import { Segmented } from '../components/Segmented'
 import { now } from '../lib/clock'
 import { shortHash, shortPath } from '../lib/format'
 import { geom, graphWidth, isHead, laneX, PC, PHONE, rowPaths, tone, type Geom } from '../lib/graph'
-import { href, navigate, plainClick } from '../lib/router'
+import { parseHash, plainClick } from '../lib/router'
+import { useHost } from '../lib/scope'
 import { relTime } from '../lib/time'
 import type { LogCommit } from '../lib/types'
 import { CommitSheet } from './Commit'
@@ -28,7 +29,7 @@ export interface GraphScreenProps {
   head: boolean
   /** The commit picked. */
   c?: string
-  /** Where 뒤로 goes on a phone. */
+  /** Where 뒤로 goes on a phone; the host's folders unless given. */
   back?: string
 }
 
@@ -181,19 +182,21 @@ function Foot({ log }: { log: LogData }) {
   )
 }
 
-/** Back to the session or the Git screen the graph was opened from on a PC, else to the folder's Git. */
+/** Back to the session or the Git screen the graph was opened from on a PC, else to the folder's Git; only on the same host. */
 function BackLink({ folder, path }: { folder: string; path?: string }) {
+  const h = useHost()
   const from = graphFrom.value
-  const to = from && from.folder === folder ? from.href : href({ name: 'git', folder, path })
+  const to = from && from.host === h.id && from.folder === folder ? from.href : h.href({ name: 'git', folder, path })
   return (
     <a class="btn btn-sm gr-back" href={to}>
       <Icon name="back" size={15} />
-      {to.startsWith('#/t/') ? '작업 화면으로' : 'Git 화면으로'}
+      {parseHash(to).name === 'terminal' ? '작업 화면으로' : 'Git 화면으로'}
     </a>
   )
 }
 
-export function GraphScreen({ variant, folder, path, head, c, back = '#/folders' }: GraphScreenProps) {
+export function GraphScreen({ variant, folder, path, head, c, back }: GraphScreenProps) {
+  const h = useHost()
   const repo = useRepo(folder, path)
   const log = useLog(repo.shown, head)
   const data = log.data
@@ -202,8 +205,8 @@ export function GraphScreen({ variant, folder, path, head, c, back = '#/folders'
 
   // The commit beside the graph reads its names and its parents' subjects from here.
   useLayoutEffect(() => {
-    shownLog.value = repo.shown && data ? { path: repo.shown, byHash } : null
-  }, [repo.shown, byHash])
+    shownLog.value = repo.shown && data ? { host: h.id, path: repo.shown, byHash } : null
+  }, [repo.shown, byHash, h])
   useEffect(
     () => () => {
       shownLog.value = null
@@ -229,7 +232,7 @@ export function GraphScreen({ variant, folder, path, head, c, back = '#/folders'
   const byKey = useRef(false)
   const pick = (hash: string, key: boolean) => {
     byKey.current = key
-    navigate({ name: 'graph', folder, path, head, c: hash }, { replace: true })
+    h.go({ name: 'graph', folder, path, head, c: hash }, { replace: true })
   }
   const onClick = (e: MouseEvent) => {
     const a = (e.target as Element).closest<HTMLAnchorElement>('a.gr-row')
@@ -277,7 +280,7 @@ export function GraphScreen({ variant, folder, path, head, c, back = '#/folders'
 
   const t = now.value
   const tabAt = c && byHash.has(c) ? c : commits[0]?.hash
-  const to = (hash: string) => href({ name: 'graph', folder, path, head, c: hash })
+  const to = (hash: string) => h.href({ name: 'graph', folder, path, head, c: hash })
   const rows = commits.length > 0 && (
     <ol class="gr-list" aria-label="커밋" ref={listRef} onClick={onClick} onKeyDown={onKey}>
       {commits.map((x, i) => (
@@ -293,7 +296,7 @@ export function GraphScreen({ variant, folder, path, head, c, back = '#/folders'
         { value: 'head', label: 'HEAD만' },
       ]}
       value={head ? 'head' : 'all'}
-      onChange={(v) => navigate({ name: 'graph', folder, path, head: v === 'head', c }, { replace: true })}
+      onChange={(v) => h.go({ name: 'graph', folder, path, head: v === 'head', c }, { replace: true })}
     />
   )
   const refresh = (cls: string, size: number) => (
@@ -335,7 +338,7 @@ export function GraphScreen({ variant, folder, path, head, c, back = '#/folders'
   return (
     <div class={'gs gs-phone gr' + (c ? ' has-sheet' : '')}>
       <header class="gs-head">
-        <a class="btn btn-icon btn-ghost gs-back" href={back} aria-label="뒤로">
+        <a class="btn btn-icon btn-ghost gs-back" href={back ?? h.href({ name: 'folders' })} aria-label="뒤로">
           <Icon name="back" size={22} />
         </a>
         <div class="gs-titles">
@@ -358,9 +361,9 @@ export function GraphScreen({ variant, folder, path, head, c, back = '#/folders'
       </div>
       {c && (
         <CommitSheet
-          r={{ name: 'graph', folder, path, head, c }}
+          r={{ name: 'graph', folder, path, head, c, host: h.id || undefined }}
           focus={!byKey.current}
-          onClose={() => navigate({ name: 'graph', folder, path, head }, { replace: true })}
+          onClose={() => h.go({ name: 'graph', folder, path, head }, { replace: true })}
         />
       )}
     </div>

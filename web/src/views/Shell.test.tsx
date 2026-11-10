@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../../test/fakeWs'
 import { folder, linkedHost, status, term } from '../../test/fixtures'
 import { COMMITS, diffOf, LOG } from '../../test/history'
+import { withHost } from '../../test/scopes'
 import { hello } from '../lib/boot'
 import { now } from '../lib/clock'
 import { viewportWidth } from '../lib/media'
 import { href, route, type Route } from '../lib/router'
-import { conn, core, folders, hosts, ready, resetStore, terminals } from '../lib/store'
+import { conn, core, folders, hosts, hostsReady, ready, resetStore, terminals } from '../lib/store'
 import { theme } from '../lib/theme'
+import { toasts } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
 import { gitFrom } from './Git'
 import { phoneBack, Shell } from './Shell'
@@ -94,6 +96,8 @@ afterEach(() => {
   phoneBack.value = '#/'
   gitFrom.value = ''
   forgetCommits()
+  hostsReady.value = false
+  toasts.value = []
   vi.unstubAllGlobals()
 })
 
@@ -244,6 +248,28 @@ describe('PC', () => {
     fireEvent.click(screen.getByRole('button', { name: '화면 테마: 어둡게' }))
     expect(theme.value).toBe('system')
   })
+
+  it("waits for the host list before a host's link", async () => {
+    at(1440, { name: 'terminal', addr: 't1', git: false, host: 'h_desk0001' })
+    render(<Shell />)
+    expect(screen.getByText('불러오는 중')).toBeTruthy()
+    act(() => {
+      const s = withHost()
+      s.terminals.value = new Map([['t1', term()]])
+      s.ready.value = true
+    })
+    await vi.waitFor(() =>
+      expect(FakeWebSocket.all.map((w) => new URL(w.url).pathname)).toContain('/h/h_desk0001/ws/attach'),
+    )
+  })
+
+  it("goes to the hub's queue from a host it does not have", async () => {
+    hostsReady.value = true
+    at(1440, { name: 'terminal', addr: 't1', git: false, host: 'h_gone' })
+    render(<Shell />)
+    await vi.waitFor(() => expect(route.value).toEqual({ name: 'queue' }))
+    expect(toasts.value.map((t) => [t.text, t.kind])).toEqual([['이 허브에 없는 호스트입니다', 'error']])
+  })
 })
 
 describe('phone', () => {
@@ -295,6 +321,15 @@ describe('phone', () => {
     render(<Shell />)
     expect(screen.queryByRole('navigation', { name: '주 메뉴' })).toBeNull()
     expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/')
+  })
+
+  it("goes back to that host's queue from its session", () => {
+    const s = withHost()
+    s.terminals.value = new Map([['t1', term()]])
+    s.ready.value = true
+    at(390, { name: 'terminal', addr: 't1', git: false, host: 'h_desk0001' })
+    render(<Shell />)
+    expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/h/h_desk0001')
   })
 
   it('goes back from Git to where it was opened', async () => {

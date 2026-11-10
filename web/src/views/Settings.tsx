@@ -3,10 +3,11 @@
 // use this host, and what the host keeps for all of them.
 import { useId } from 'preact/hooks'
 import { Segmented } from '../components/Segmented'
-import { hello, hostLabel } from '../lib/boot'
+import { hello } from '../lib/boot'
 import { versionText } from '../lib/format'
-import { core, host } from '../lib/store'
+import { useHost } from '../lib/scope'
 import { setTheme, theme, THEME_LABEL, type ThemePref } from '../lib/theme'
+import type { CoreStatus } from '../lib/types'
 import { DeviceCards } from './SettingsDevices'
 import { FoldersCard, HostsCard, PresetsCard } from './SettingsEdit'
 import { PushCards } from './SettingsPush'
@@ -19,6 +20,7 @@ export interface SettingsProps {
 }
 
 export function Settings({ variant }: SettingsProps) {
+  const h = useHost()
   const col = (
     <div class="st-col">
       <PushCards />
@@ -37,7 +39,7 @@ export function Settings({ variant }: SettingsProps) {
       <header class="st-head">
         <h1>설정</h1>
         <span class="st-sub">
-          <b>{hostLabel.value || '이 호스트'}</b> · 이 호스트의 알림과 기기
+          <b>{h.name.value || '이 호스트'}</b> · 이 호스트의 알림과 기기
         </span>
       </header>
       <div class="st-scroll">{col}</div>
@@ -63,16 +65,17 @@ function ThemeCard() {
   )
 }
 
-/** What the core is to this host, in a word or two. */
-function coreText(): string {
-  const c = core.value
+/** What the core is to its host, in a word or two. */
+function coreText(c: CoreStatus): string {
   if (c.connected) return ['연결됨', c.version && versionText(c.version)].filter(Boolean).join(' · ')
   return c.error?.includes('hc not found') ? '설치되지 않음' : '연결 안 됨'
 }
 
 function AboutCard() {
   const id = useId()
-  const v = host.value?.version ?? hello.value?.version
+  const h = useHost()
+  // Before the overview, the hub's hello says its version; a linked host's is not known yet.
+  const v = h.host.value?.version ?? (h.id === '' ? hello.value?.version : undefined)
   return (
     <section class="st-card" aria-labelledby={id}>
       <h2 id={id} class="st-h2">
@@ -81,7 +84,7 @@ function AboutCard() {
       <dl class="st-facts">
         <div>
           <dt>호스트</dt>
-          <dd>{hostLabel.value || '알 수 없음'}</dd>
+          <dd>{h.name.value || '알 수 없음'}</dd>
         </div>
         <div>
           <dt>Mori</dt>
@@ -89,7 +92,7 @@ function AboutCard() {
         </div>
         <div>
           <dt>herdr-core</dt>
-          <dd>{coreText()}</dd>
+          <dd>{coreText(h.core.value)}</dd>
         </div>
       </dl>
     </section>

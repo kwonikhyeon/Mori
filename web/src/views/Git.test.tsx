@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { folder, term, worktree } from '../../test/fixtures'
+import { inHost, withHost } from '../../test/scopes'
 import { href, route } from '../lib/router'
 import { folders, ready, resetStore, terminals } from '../lib/store'
 import { toasts } from '../lib/toast'
@@ -104,6 +105,16 @@ afterEach(() => {
 })
 
 describe('GitPanel', () => {
+  it('reads the changes on the host it was opened on', async () => {
+    const s = withHost()
+    s.folders.value = [repo()]
+    s.ready.value = true
+    serve((c) => (url(c).pathname === '/h/h_desk0001/api/git/status' ? Response.json(status()) : undefined))
+    render(inHost(s, panel()))
+    await vi.waitFor(() => expect(calls.some((c) => url(c).pathname === '/h/h_desk0001/api/git/status')).toBe(true))
+    expect(statusCalls()).toEqual([])
+  })
+
   it('lists the changes by group and shows the first beside them', async () => {
     serve()
     const close = vi.fn()

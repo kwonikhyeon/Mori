@@ -8,16 +8,15 @@ import { Confirm } from '../components/Confirm'
 import { ConnBanner } from '../components/ConnBanner'
 import { Icon } from '../components/Icon'
 import { Menu, type MenuItem } from '../components/Menu'
-import { api, ApiError } from '../lib/api'
+import { ApiError } from '../lib/api'
 import type { Closed, Size } from '../lib/attach'
-import { toPairing } from '../lib/boot'
 import { now } from '../lib/clock'
 import { fitSize } from '../lib/fit'
 import { appName, askText, chip, endText, place, type EndFacts } from '../lib/format'
 import { QUICK_KEYS } from '../lib/keys'
 import { isApple } from '../lib/platform'
-import { href, navigate, parseHash } from '../lib/router'
-import { folders, presets, terminals } from '../lib/store'
+import { navigate, parseHash } from '../lib/router'
+import { useHost } from '../lib/scope'
 import { TermLink } from '../lib/termlink'
 import { attachNote, BLOCKED_KEYS, quotePath, type AnswerKey, type AttachNote } from '../lib/termview'
 import { effectiveTheme, terminalTheme } from '../lib/theme'
@@ -50,10 +49,12 @@ export interface TerminalProps {
   back?: string
 }
 
-export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalProps) {
+export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
+  const h = useHost()
+  const backTo = back ?? h.href({ name: 'queue' })
   const phone = variant === 'phone'
   const id = useId()
-  const t = terminals.value.get(addr)
+  const t = h.terminals.value.get(addr)
   const stage = useRef<HTMLDivElement>(null)
   const scroll = useRef<HTMLDivElement>(null)
   const host = useRef<HTMLDivElement>(null)
@@ -85,7 +86,7 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
     let dead = false
     let lk: TermLink | null = null
     let sc: Screen | null = null
-    const t0 = terminals.peek().get(addr)
+    const t0 = h.terminals.peek().get(addr)
     setBroken(false)
     openScreen(host.current!, {
       fontSize: phone ? 12 : 13,
@@ -105,7 +106,10 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
           screen: s,
           fit: measure(),
           start: t0 ? { cols: t0.cols, rows: t0.rows } : null,
-          onUnauthorized: toPairing,
+          api: h.api,
+          store: h,
+          url: h.ws('/ws/attach'),
+          onUnauthorized: () => void h.unauthorized(),
         })
         setLink(lk)
         // A phone would open its keyboard.
@@ -122,7 +126,7 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
       screen.current = null
       setLink(null)
     }
-  }, [addr, phone])
+  }, [addr, phone, h])
 
   // The terminal follows the stage once it has settled.
   useEffect(() => {
@@ -162,23 +166,23 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
   const differs = open && canType && !!fit && !!size && (fit.cols !== size.cols || fit.rows !== size.rows)
   const showFit = useLater(differs, FIT_LATE)
   const note = broken ? BROKEN : finished ? null : attachNote(st, reason)
-  const title = t ? titleOf(t) : addr
+  const title = t ? titleOf(t, h.presets.value) : addr
   // Git opens for a session in a folder that is a repository.
-  const repo = !!t?.folder_id && !!folders.value.find((f) => f.id === t.folder_id)?.repo
-  const sub = t ? `${appName(t, presets.value)} · ${place(t, folders.value)}` : ''
+  const repo = !!t?.folder_id && !!h.folders.value.find((f) => f.id === t.folder_id)?.repo
+  const sub = t ? `${appName(t, h.presets.value)} · ${place(t, h.folders.value)}` : ''
 
   const fail = (what: string) => (e: unknown) => toastError(e, what)
   const answer = (k: AnswerKey) => {
     if (link?.send(k.bytes)) return
-    api.terminals.keys(addr, [k.name]).catch(fail('키를 보내지 못했습니다'))
+    h.api.terminals.keys(addr, [k.name]).catch(fail('키를 보내지 못했습니다'))
   }
   const interrupt = () => {
-    api.terminals.interrupt(addr).catch(fail('중단하지 못했습니다'))
+    h.api.terminals.interrupt(addr).catch(fail('중단하지 못했습니다'))
   }
   const kill = async () => {
     setKillBusy(true)
     try {
-      await api.terminals.kill(addr)
+      await h.api.terminals.kill(addr)
     } catch (e) {
       toastError(e, '종료하지 못했습니다')
     } finally {
@@ -189,15 +193,16 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
   }
   const remove = async () => {
     try {
-      await api.terminals.remove(addr)
-      navigate(phone ? parseHash(back) : { name: 'queue' }, { replace: true })
+      await h.api.terminals.remove(addr)
+      if (phone) navigate(parseHash(backTo), { replace: true })
+      else h.go({ name: 'queue' }, { replace: true })
     } catch (e) {
       toastError(e, '지우지 못했습니다')
     }
   }
   const rename = (next: string | null) => {
     setRenaming(false)
-    if (next !== null) api.terminals.rename(addr, next).catch(fail('이름을 바꾸지 못했습니다'))
+    if (next !== null) h.api.terminals.rename(addr, next).catch(fail('이름을 바꾸지 못했습니다'))
   }
   const upload = async (files: File[]) => {
     for (const f of files) {
@@ -206,7 +211,7 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
         continue
       }
       try {
-        const r = await api.terminals.upload(addr, f)
+        const r = await h.api.terminals.upload(addr, f)
         // The path goes where the cursor is; a person sees it typed.
         if (!link?.send(quotePath(r.path) + ' ')) toast(`올렸습니다: ${r.path}`)
       } catch (e) {
@@ -219,7 +224,7 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
 
   const titleEl =
     renaming && t ? (
-      <RenameField initial={t.labels?.['mori.title'] ?? titleOf(t)} onDone={rename} />
+      <RenameField initial={t.labels?.['mori.title'] ?? titleOf(t, h.presets.value)} onDone={rename} />
     ) : (
       <h1 class="term-title">{title}</h1>
     )
@@ -266,7 +271,7 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
               {note.detail && <> {note.detail}</>}
             </span>
             {(st === 'gone' || st === 'error' || broken) && (
-              <a class="term-note-link" href="#/">
+              <a class="term-note-link" href={h.href({ name: 'queue' })}>
                 목록으로
               </a>
             )}
@@ -360,7 +365,7 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
                 class="btn btn-sm"
                 aria-pressed={git}
                 aria-controls={git ? 'pc-aside' : undefined}
-                onClick={() => navigate({ name: 'terminal', addr, git: !git })}
+                onClick={() => h.go({ name: 'terminal', addr, git: !git })}
               >
                 <Icon name="git" size={15} />
                 Git
@@ -407,7 +412,7 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
   return (
     <div class="term term-phone">
       <header class="term-head">
-        <a class="btn btn-icon btn-ghost term-back" href={back} aria-label="뒤로">
+        <a class="btn btn-icon btn-ghost term-back" href={backTo} aria-label="뒤로">
           <Icon name="back" size={22} />
         </a>
         <div class="term-id">
@@ -422,7 +427,7 @@ export function Terminal({ addr, variant, git = false, back = '#/' }: TerminalPr
         {t && repo && !renaming && (
           <a
             class="btn btn-ghost term-git"
-            href={href({ name: 'git', folder: t.folder_id, path: t.worktree || undefined })}
+            href={h.href({ name: 'git', folder: t.folder_id, path: t.worktree || undefined })}
             onClick={() => {
               gitFrom.value = addr
             }}
@@ -574,6 +579,7 @@ function QuickKeys({ link, open }: { link: TermLink | null; open: boolean }) {
 
 /** Several lines sent at once with POST send (spec §3 #124). */
 function Composer({ addr, phone, id }: { addr: string; phone: boolean; id: string }) {
+  const h = useHost()
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [held, setHeld] = useState(false)
@@ -584,7 +590,7 @@ function Composer({ addr, phone, id }: { addr: string; phone: boolean; id: strin
     setBusy(true)
     setHeld(false)
     try {
-      await api.terminals.send(addr, text)
+      await h.api.terminals.send(addr, text)
       setText('')
     } catch (e) {
       if (e instanceof ApiError && e.kind === 'blocked') setHeld(true)
@@ -656,6 +662,7 @@ interface EndBarProps {
 }
 
 function EndBar({ t, ended, onRemove }: EndBarProps) {
+  const h = useHost()
   const facts: EndFacts = t?.state === 'finished' ? t : (ended ?? t ?? NO_END)
   const when = t?.finished_ms != null ? ` · ${relTime(t.finished_ms, now.value)}` : ''
   return (
@@ -665,7 +672,7 @@ function EndBar({ t, ended, onRemove }: EndBarProps) {
         {when}
       </p>
       <div class="term-end-actions">
-        <a class="btn btn-sm" href={href({ name: 'new', folder: t?.folder_id || undefined, wt: t?.worktree || undefined })}>
+        <a class="btn btn-sm" href={h.href({ name: 'new', folder: t?.folder_id || undefined, wt: t?.worktree || undefined })}>
           <Icon name="plus" size={15} />새 세션
         </a>
         <button type="button" class="btn btn-sm btn-danger" onClick={onRemove}>

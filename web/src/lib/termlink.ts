@@ -5,12 +5,12 @@
 // session.
 
 import { effect, signal } from '@preact/signals'
-import { api } from './api'
+import { api, type HostApi } from './api'
 import { AttachSession, type AttachState, type Closed, type Size } from './attach'
 import type { SocketCtor } from './events'
 import { watchFocus } from './focus'
 import { keyBytes, type QuickKey } from './keys'
-import { core, terminals } from './store'
+import { hubStore, type HostStore } from './store'
 import { screenText } from './termview'
 import { displayFacts, effectiveTheme, terminalTheme } from './theme'
 import { onWake } from './wake'
@@ -31,6 +31,10 @@ export interface TermLinkOptions {
   url?: string
   socket?: SocketCtor
   onUnauthorized?: () => void
+  /** The calls of the terminal's host; the hub's unless given. */
+  api?: HostApi
+  /** What the terminal's host says of its core and terminals; the hub's unless given. */
+  store?: Pick<HostStore, 'core' | 'terminals'>
 }
 
 /** The lines of an ended program painted when there is no stream to replay. */
@@ -79,10 +83,11 @@ export class TermLink {
         this.session.focus(f)
       }),
     )
-    this.stops.push(effect(() => this.session.notifyCore(core.value.connected)))
+    const st = o.store ?? hubStore
+    this.stops.push(effect(() => this.session.notifyCore(st.core.value.connected)))
     this.stops.push(
       effect(() => {
-        const t = terminals.value.get(o.addr)
+        const t = st.terminals.value.get(o.addr)
         if (t) this.session.notifyTerminal(t)
       }),
     )
@@ -185,9 +190,9 @@ export class TermLink {
     sc.setInput(false)
     if (!this.live) {
       try {
-        const r = await api.terminals.text(this.o.addr, LAST_LINES)
+        const r = await (this.o.api ?? api).terminals.text(this.o.addr, LAST_LINES)
         if (this.disposed) return
-        const t = terminals.peek().get(this.o.addr)
+        const t = (this.o.store ?? hubStore).terminals.peek().get(this.o.addr)
         if (t) {
           sc.resize(t.cols, t.rows)
           this.size.value = { cols: t.cols, rows: t.rows }

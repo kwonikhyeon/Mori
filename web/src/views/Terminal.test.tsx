@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeScreen } from '../../test/fakeScreen'
 import { FakeWebSocket } from '../../test/fakeWs'
 import { folder, status, term } from '../../test/fixtures'
+import { inHost, withHost } from '../../test/scopes'
 import { now } from '../lib/clock'
 import { route } from '../lib/router'
 import { core, folders, ready, resetStore, terminals } from '../lib/store'
@@ -307,6 +308,26 @@ describe('An ended program', () => {
     expect(screen.getByText(/신호 9/)).toBeTruthy()
     // It was attached: the stream painted the end, so no text is fetched.
     expect(calls.filter((c) => c.url.includes('/text'))).toEqual([])
+  })
+
+  it('attaches to the host it was opened on and reads its last text there', async () => {
+    const s = withHost()
+    s.terminals.value = new Map([['t1', ended()]])
+    s.folders.value = [folder()]
+    s.ready.value = true
+    reply = (c) => (c.url.includes('/text') ? Response.json({ text: 'done\nbye', complete: true, how: 'screen' }) : undefined)
+    render(inHost(s, <Terminal addr="t1" variant="pc" />))
+    await vi.waitFor(() => expect(FakeWebSocket.all.length).toBeGreaterThan(0))
+    const ws = FakeWebSocket.last()
+    expect(new URL(ws.url).pathname).toBe('/h/h_desk0001/ws/attach')
+    await act(() => {
+      ws.open()
+      ws.json({ type: 'closed', reason: 'exited', exit_code: 0, signal: null })
+      ws.drop(1000)
+    })
+    await vi.waitFor(() => expect(FakeScreen.last().text).toBe('done\r\nbye\x1b[?25l'))
+    expect(sent('/h/h_desk0001/api/terminals/t1/text?lines=1000', 'GET')).toHaveLength(1)
+    expect(sent('/api/terminals/t1/text?lines=1000', 'GET')).toHaveLength(0)
   })
 })
 

@@ -9,8 +9,7 @@ import { ConnBanner } from '../components/ConnBanner'
 import { Icon } from '../components/Icon'
 import { totals } from '../lib/diff'
 import { branchLine, changeGroups, fileParts, shortPath, wtLabel, type ChangeGroup, type ChangeItem } from '../lib/format'
-import { href, navigate } from '../lib/router'
-import { terminals } from '../lib/store'
+import { useHost, type HostScope } from '../lib/scope'
 import { DiffView } from './Diff'
 import { ChangeCards, ChangeList } from './GitChanges'
 import { WorktreeList } from './GitWorktrees'
@@ -70,14 +69,15 @@ function AheadBehind({ g }: { g: GitData }) {
   )
 }
 
-const graphHref = (g: GitData) => href({ name: 'graph', folder: g.f!.id, path: g.shown, head: false })
+const graphHref = (h: HostScope, g: GitData) => h.href({ name: 'graph', folder: g.f!.id, path: g.shown, head: false })
 
 /** The graph's way back is the screen it was opened from. */
-const fromHere = (g: GitData) => () => {
-  graphFrom.value = { folder: g.f!.id, href: location.hash }
+const fromHere = (h: HostScope, g: GitData) => () => {
+  graphFrom.value = { host: h.id, folder: g.f!.id, href: location.hash }
 }
 
 function BranchRow({ g }: { g: GitData }) {
+  const h = useHost()
   const { line } = useBranch(g)
   return (
     <section class="gp-branch" aria-label="브랜치">
@@ -89,7 +89,7 @@ function BranchRow({ g }: { g: GitData }) {
         <span class="gp-branch-sub">{line.sub ? line.sub + ' · 보기만 합니다' : '보기만 합니다'}</span>
       </div>
       {g.shown && (
-        <a class="btn btn-sm gp-graph" href={graphHref(g)} onClick={fromHere(g)}>
+        <a class="btn btn-sm gp-graph" href={graphHref(h, g)} onClick={fromHere(h, g)}>
           <Icon name="graph" size={15} />
           그래프
         </a>
@@ -238,16 +238,17 @@ export interface GitScreenProps {
   folder: string
   /** The worktree to show; the folder's own when it is not one of them. */
   path?: string
-  /** Where 뒤로 goes on a phone. */
+  /** Where 뒤로 goes on a phone; the host's folders unless given. */
   back?: string
 }
 
 /** A screen of its own: the worktree shown is in the address. */
-export function GitScreen({ variant, folder, path, back = '#/folders' }: GitScreenProps) {
-  const from = variant === 'phone' && gitFrom.value ? terminals.value.get(gitFrom.value) : undefined
+export function GitScreen({ variant, folder, path, back }: GitScreenProps) {
+  const h = useHost()
+  const from = variant === 'phone' && gitFrom.value ? h.terminals.value.get(gitFrom.value) : undefined
   const g = useGit(folder, path, from?.status_ms)
   const { groups, item, setSel } = useChanges(g)
-  const show = (p: string) => navigate({ name: 'git', folder, path: p }, { replace: true })
+  const show = (p: string) => h.go({ name: 'git', folder, path: p }, { replace: true })
   const sub = g.f ? g.f.name + (g.shown ? ' · ' + shortPath(g.shown) : '') : ''
   const list = (
     <WorktreeList
@@ -262,7 +263,7 @@ export function GitScreen({ variant, folder, path, back = '#/folders' }: GitScre
       }}
       onRemoved={(p) => {
         g.drop(p)
-        if (g.shown === p) navigate({ name: 'git', folder }, { replace: true })
+        if (g.shown === p) h.go({ name: 'git', folder }, { replace: true })
         g.refresh()
       }}
     />
@@ -297,7 +298,7 @@ export function GitScreen({ variant, folder, path, back = '#/folders' }: GitScre
   return (
     <div class="gs gs-phone">
       <header class="gs-head">
-        <a class="btn btn-icon btn-ghost gs-back" href={back} aria-label="뒤로">
+        <a class="btn btn-icon btn-ghost gs-back" href={back ?? h.href({ name: 'folders' })} aria-label="뒤로">
           <Icon name="back" size={22} />
         </a>
         <div class="gs-titles">
@@ -314,7 +315,7 @@ export function GitScreen({ variant, folder, path, back = '#/folders' }: GitScre
           <>
             <BranchCard g={g} />
             {g.shown && (
-              <a class="gs-card gs-graph" href={graphHref(g)} onClick={fromHere(g)}>
+              <a class="gs-card gs-graph" href={graphHref(h, g)} onClick={fromHere(h, g)}>
                 <Icon name="graph" size={20} class="gs-graph-icon" />
                 <span class="gs-graph-text">
                   <span class="gs-graph-title">커밋 그래프</span>{' '}

@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { folder, status, term } from '../../test/fixtures'
+import { inHost, withHost } from '../../test/scopes'
 import { now } from '../lib/clock'
 import { folders, presets, ready, resetStore, terminals } from '../lib/store'
 import type { TerminalView } from '../lib/types'
@@ -85,6 +86,24 @@ describe('QueueList', () => {
     const row = screen.getByRole('link')
     expect(row.getAttribute('href')).toBe('#/t/t2')
     expect(row.textContent).toContain('코드 0 · 2시간 전')
+  })
+})
+
+describe('QueueList on another host', () => {
+  it("links that host's sessions", () => {
+    const s = withHost()
+    s.terminals.value = new Map([['t1', term({ status: status('blocked', { kind: 'permission' }) })]])
+    s.ready.value = true
+    render(inHost(s, <QueueList variant="pc" />))
+    const blocked = screen.getByRole('region', { name: '승인 대기 1' })
+    expect(within(blocked).getByRole('link').getAttribute('href')).toBe('#/h/h_desk0001/t/t1')
+  })
+
+  it('points at a new session on that host', () => {
+    const s = withHost()
+    s.ready.value = true
+    render(inHost(s, <QueueList variant="phone" />))
+    expect(screen.getByRole('link', { name: '새 세션' }).getAttribute('href')).toBe('#/h/h_desk0001/new')
   })
 })
 

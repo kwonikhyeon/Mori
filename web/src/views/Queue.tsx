@@ -1,5 +1,6 @@
 // "지금 볼 것" (spec §3 #122): what waits for a person first, then what is
 // working, the rest folded. The PC sidebar and the phone home share it.
+import type { ComponentChildren } from 'preact'
 import { useState } from 'preact/hooks'
 import { Chip } from '../components/Chip'
 import { Icon } from '../components/Icon'
@@ -145,12 +146,30 @@ function EmptyQueue() {
   )
 }
 
+// What the hub last saw of a host it cannot reach now: there to read, not to
+// use (decision 164); its banner tries again.
+const block = (e: Event) => {
+  e.preventDefault()
+  e.stopPropagation()
+}
+
 export function QueueList(p: ListProps) {
   const h = useHost()
   const [open, setOpen] = useState<ReadonlySet<GroupKey>>(new Set())
   if (!h.ready.value) return <Loading />
+  const stale = h.problem.value === 'unreachable'
+  const frame = (body: ComponentChildren) => (
+    <div
+      class={`qv qv-${p.variant}` + (stale ? ' is-stale' : '')}
+      role={stale ? 'group' : undefined}
+      aria-disabled={stale ? 'true' : undefined}
+      onClickCapture={stale ? block : undefined}
+    >
+      {body}
+    </div>
+  )
   const groups = groupQueue(h.terminals.value.values(), now.value).filter((g) => g.items.length > 0)
-  if (groups.length === 0) return <EmptyQueue />
+  if (groups.length === 0) return frame(<EmptyQueue />)
   const shown = groups.filter((g) => !g.collapsed)
   const folded = groups.filter((g) => g.collapsed)
   const toggle = (k: GroupKey) =>
@@ -159,8 +178,8 @@ export function QueueList(p: ListProps) {
       if (!next.delete(k)) next.add(k)
       return next
     })
-  return (
-    <div class={`qv qv-${p.variant}`}>
+  return frame(
+    <>
       {shown.length === 0 && <p class="qnote">지금 응답할 세션이 없습니다</p>}
       {shown.map((g) => (
         <Group key={g.key} g={g} p={p} />
@@ -172,6 +191,6 @@ export function QueueList(p: ListProps) {
           ))}
         </div>
       )}
-    </div>
+    </>,
   )
 }

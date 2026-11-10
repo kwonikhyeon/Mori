@@ -105,6 +105,26 @@ describe('QueueList on another host', () => {
     render(inHost(s, <QueueList variant="phone" />))
     expect(screen.getByRole('link', { name: '새 세션' }).getAttribute('href')).toBe('#/h/h_desk0001/new')
   })
+
+  it("greys a host's list that may be stale", () => {
+    const s = withHost()
+    s.ready.value = true
+    s.unreachable.value = true
+    render(inHost(s, <QueueList variant="pc" />))
+    const qv = document.querySelector('.qv')!
+    expect(qv.getAttribute('aria-disabled')).toBe('true')
+    expect(qv.classList.contains('is-stale')).toBe(true)
+  })
+
+  it("keeps a stale list's sessions from opening", () => {
+    const s = withHost()
+    s.terminals.value = new Map([['t1', term({ status: status('blocked', { kind: 'permission' }) })]])
+    s.ready.value = true
+    s.unreachable.value = true
+    render(inHost(s, <QueueList variant="pc" />))
+    const link = within(screen.getByRole('region', { name: '승인 대기 1' })).getByRole('link')
+    expect(fireEvent.click(link)).toBe(false)
+  })
 })
 
 describe('FolderList', () => {

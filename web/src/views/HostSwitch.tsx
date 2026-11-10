@@ -100,6 +100,12 @@ const closeSheet = () => {
   hostSheet.value = false
 }
 
+/** Opens the host sheet; the focus goes back to from when it closes. */
+export function openHostSheet(from: HTMLElement | null): void {
+  opener = from
+  hostSheet.value = true
+}
+
 /** The phone header's host: its state; opens the host sheet. */
 export function HostButton() {
   const { cur, st, label } = useCurrent()
@@ -112,10 +118,7 @@ export function HostButton() {
       class="host-btn"
       aria-haspopup="dialog"
       aria-label={label}
-      onClick={() => {
-        opener = ref.current
-        hostSheet.value = true
-      }}
+      onClick={() => openHostSheet(ref.current)}
     >
       <span class={`dot dot-${st.dot}`} aria-hidden="true" />
       <span class="host-name">{nameOf(cur)}</span>

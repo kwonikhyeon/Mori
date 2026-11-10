@@ -205,3 +205,20 @@ a.others-error:hover {
   flex: none;
   color: var(--accent-text);
 }
+
+/* ---------- a host that no longer has the hub's link ---------- */
+.hp-pc {
+  flex: 1;
+  justify-content: center;
+}
+
+.hp .empty-text {
+  max-width: 420px;
+}
+
+.hp-acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}

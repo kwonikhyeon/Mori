@@ -17,6 +17,17 @@
   gap: 18px;
 }
 
+/* What the hub last saw of a host it cannot reach now. */
+.qv.is-stale {
+  opacity: .55;
+  filter: grayscale(1);
+}
+
+.qv.is-stale a,
+.qv.is-stale button {
+  pointer-events: none;
+}
+
 .qnote {
   padding: 12px 4px;
   color: var(--text-3);

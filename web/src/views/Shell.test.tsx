@@ -304,6 +304,14 @@ describe('PC', () => {
     await vi.waitFor(() => expect(route.value).toEqual({ name: 'queue' }))
     expect(toasts.value.map((t) => [t.text, t.kind])).toEqual([['이 허브에 없는 호스트입니다', 'error']])
   })
+
+  it("shows an unlinked host's problem in place of its screen", () => {
+    withHost({ linked: false, version: '', relay: false })
+    at(1440, { name: 'terminal', addr: 't1', git: false, host: 'h_desk0001' })
+    render(<Shell />)
+    expect(screen.getByRole('heading', { name: 'desk 연결이 끊겼습니다' })).toBeTruthy()
+    expect(FakeWebSocket.all.filter((w) => w.url.includes('/ws/attach'))).toHaveLength(0)
+  })
 })
 
 describe('phone', () => {
@@ -370,6 +378,26 @@ describe('phone', () => {
     at(390, { name: 'terminal', addr: 't1', git: false, host: 'h_desk0001' })
     render(<Shell />)
     expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/h/h_desk0001')
+  })
+
+  it("takes a phone from an unlinked host's session to its problem", () => {
+    withHost({ linked: false, version: '', relay: false })
+    at(390, { name: 'terminal', addr: 't1', git: false, host: 'h_desk0001' })
+    render(<Shell />)
+    expect(location.hash).toBe('#/h/h_desk0001')
+    expect(screen.getByRole('heading', { name: 'desk 연결이 끊겼습니다' })).toBeTruthy()
+  })
+
+  it("opens the host sheet from an unlinked host's problem and gives the focus back", () => {
+    withHost({ linked: false, version: '', relay: false })
+    at(390, { name: 'queue', host: 'h_desk0001' })
+    render(<Shell />)
+    const btn = screen.getByRole('button', { name: '다른 호스트 보기' })
+    fireEvent.click(btn)
+    const sheet = screen.getByRole('dialog', { name: '호스트' }) as HTMLDialogElement
+    expect(sheet.open).toBe(true)
+    fireEvent(sheet, new Event('cancel', { cancelable: true }))
+    expect(document.activeElement).toBe(btn)
   })
 
   it('goes back from Git to where it was opened', async () => {

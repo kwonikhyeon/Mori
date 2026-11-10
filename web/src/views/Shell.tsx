@@ -19,6 +19,7 @@ import { CommitPanel } from './Commit'
 import { FolderList } from './Folders'
 import { GitPanel, GitScreen, gitFrom } from './Git'
 import { GraphScreen } from './Graph'
+import { HostProblem } from './HostProblem'
 import { HostButton, HostPicker, HostSheet, nameOf, OthersBadge } from './HostSwitch'
 import { NewSession } from './NewSession'
 import { QueueList } from './Queue'
@@ -161,6 +162,19 @@ function PcShell() {
   }, [r.name])
   const side = usePane(SIDEBAR)
   const right = usePane(ASIDE)
+  // An unlinked host has nothing to list or open: the header stays to pick another.
+  if (h.problem.value === 'unlinked') {
+    return (
+      <div class="pc">
+        <PcHeader />
+        <div class="pc-body">
+          <main class="pc-main">
+            <HostProblem variant="pc" />
+          </main>
+        </div>
+      </div>
+    )
+  }
   const aside = pcAside(r, h)
   const L = layout(viewportWidth.value, side.w, aside ? right.w : null)
   const pick = (t: SideTab) => {
@@ -293,19 +307,37 @@ export function ThemeButton() {
 
 type Tab = 'queue' | 'folders' | 'settings'
 
+const TAB_TITLE: Record<Tab, string> = { queue: '지금 볼 것', folders: '폴더', settings: '설정' }
+
+const isTab = (name: Route['name']): name is Tab => name === 'queue' || name === 'folders' || name === 'settings'
+
 function PhoneShell() {
   const h = useHost()
   const r = route.value
+  const unlinked = h.problem.value === 'unlinked'
+  const tab = isTab(r.name) ? r.name : null
+  // A session of an unlinked host cannot open: back to its list, which says why.
+  useEffect(() => {
+    if (unlinked && !tab) h.go({ name: 'queue' }, { replace: true })
+  }, [unlinked, tab])
+  if (unlinked) {
+    const t = tab ?? 'queue'
+    return (
+      <PhoneTab key={t} tab={t} title={TAB_TITLE[t]}>
+        <HostProblem variant="phone" />
+      </PhoneTab>
+    )
+  }
   switch (r.name) {
     case 'queue':
       return (
-        <PhoneTab key="queue" tab="queue" title="지금 볼 것" fab>
+        <PhoneTab key="queue" tab="queue" title={TAB_TITLE.queue} fab>
           <QueueList variant="phone" />
         </PhoneTab>
       )
     case 'folders':
       return (
-        <PhoneTab key="folders" tab="folders" title="폴더" fab>
+        <PhoneTab key="folders" tab="folders" title={TAB_TITLE.folders} fab>
           <FolderList variant="phone" />
         </PhoneTab>
       )
@@ -314,7 +346,7 @@ function PhoneShell() {
         <PhoneTab
           key="settings"
           tab="settings"
-          title="설정"
+          title={TAB_TITLE.settings}
           sub={
             <>
               <b>{nameOf(h)}</b> · {settingsSub(h)}

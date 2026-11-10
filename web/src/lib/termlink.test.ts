@@ -64,6 +64,20 @@ describe('TermLink', () => {
     expect(l.size.value).toEqual({ cols: 100, rows: 30 })
   })
 
+  it('paints the history with no blank line between it and the screen', () => {
+    const { screen, ws } = link()
+    attach(ws, 100, 3)
+    ws.receive(enc.encode('\x1b[H\x1b[2Ja\r\nb\r\n'))
+    ws.receive(enc.encode('\n\n\n\x1b[H\x1b[2J$ '))
+    expect(screen.text).toBe('\x1b[H\x1b[2Ja\r\nb\r\n\n\n\x1b[H\x1b[2J$ ')
+    // after a drop the history comes again, as it did the first time
+    ws.drop()
+    vi.advanceTimersByTime(60_000)
+    const again = attach(FakeWebSocket.last(), 100, 3)
+    again.receive(enc.encode('\x1b[H\x1b[2Ja\r\nb\r\n\n\n\n\x1b[H\x1b[2J$ '))
+    expect(screen.text).toBe('\x1b[H\x1b[2Ja\r\nb\r\n\n\n\x1b[H\x1b[2J$ ')
+  })
+
   it('attaches at the terminal\'s own size while the fit is unknown, so nothing is resized', () => {
     const { l, ws } = link({ fit: null, start: { cols: 120, rows: 40 } })
     expect([ws.query().get('cols'), ws.query().get('rows')]).toEqual(['120', '40'])

@@ -10,6 +10,7 @@ import { AttachSession, type AttachState, type Closed, type Size } from './attac
 import type { SocketCtor } from './events'
 import { watchFocus } from './focus'
 import { keyBytes, type QuickKey } from './keys'
+import { paintFilter } from './paint'
 import { hubStore, type HostStore } from './store'
 import { screenText } from './termview'
 import { displayFacts, effectiveTheme, terminalTheme } from './theme'
@@ -153,10 +154,12 @@ export class TermLink {
     })
     this.session = s
     this.live = false
+    let paint = (d: Uint8Array) => d
     this.offSession = [
-      s.on('data', (d) => sc.write(d)),
+      s.on('data', (d) => sc.write(paint(d))),
       s.on('attached', (a) => {
         // the history follows: the screen starts over
+        paint = paintFilter(a.rows)
         this.live = true
         this.ended.value = null
         sc.reset()

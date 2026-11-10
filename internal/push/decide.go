@@ -98,6 +98,18 @@ func entered(old, next *hc.Terminal) Kind {
 	return ""
 }
 
+// settled is the record of c once its event has settled. A status that
+// leaves working moves the turn on, and the turn event that says so comes
+// after the status event (spec §2.3): a question is named, as devices see
+// it, with the turn it will have.
+func settled(c core.Change) hc.Terminal {
+	t := *c.New
+	if c.Event != nil && c.Event.Type == "status" && state(c.Old) == "working" && state(c.New) != "working" {
+		t.Turn++
+	}
+	return t
+}
+
 func state(t *hc.Terminal) string {
 	if t.Status == nil {
 		return ""

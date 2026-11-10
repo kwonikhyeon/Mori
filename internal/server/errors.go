@@ -37,7 +37,7 @@ func statusFor(kind string) int {
 		return http.StatusNotFound
 	case "invalid_params":
 		return http.StatusBadRequest
-	case "blocked", "finished", "live", "name_taken", "conflict", "already_added", "host_unlinked":
+	case "blocked", "finished", "live", "name_taken", "conflict", "already_added", "host_unlinked", "changed", "answered":
 		return http.StatusConflict
 	case "unavailable", "core_unavailable":
 		return http.StatusServiceUnavailable

@@ -219,11 +219,12 @@ func TestHubRelaysHostNotifications(t *testing.T) {
 	// desk's terminal waits for approval: the phone hears it from the hub.
 	desk.s.d.Push.OnChange(core.Change{Address: "t1",
 		Old:   &hc.Terminal{Address: "t1", State: "live", Argv: []string{"claude"}, Status: &hc.Status{State: "working"}},
-		New:   &hc.Terminal{Address: "t1", State: "live", Argv: []string{"claude"}, Turn: 1, Status: &hc.Status{State: "blocked", Msg: "Allow Bash?"}},
+		New:   &hc.Terminal{Address: "t1", State: "live", Argv: []string{"claude"}, Status: &hc.Status{State: "blocked", Msg: "Allow Bash?"}},
 		Event: &hc.Event{Type: "status", Terminal: "t1", Data: json.RawMessage(`{}`)}})
 	desk.s.d.Push.Wait() // desk's delivery ends once the hub has taken it
 	hub.s.d.Push.Wait()
-	want := []push.Payload{{Title: "desk · 승인 대기", Body: "claude — Allow Bash?", Tag: v.ID + "/t1", URL: "/#/h/" + v.ID + "/t/t1", Kind: "blocked"}}
+	ask := core.AskID(hc.Terminal{State: "live", Turn: 1, Status: &hc.Status{State: "blocked", Msg: "Allow Bash?"}})
+	want := []push.Payload{{Title: "desk · 승인 대기", Body: "claude — Allow Bash?", Tag: v.ID + "/t1", URL: "/#/h/" + v.ID + "/t/t1", Kind: "blocked", Ask: ask}}
 	if got := phone.payloads(t); !slices.Equal(got, want) {
 		t.Fatalf("%+v", got)
 	}

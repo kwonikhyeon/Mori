@@ -329,8 +329,39 @@ a.term-note-link:hover {
   font-weight: 500;
 }
 
-.term-ask-key:hover {
+.term-ask-key:hover:not(:disabled) {
   background: var(--surface-2);
+}
+
+/* An answer is on its way: the keys wait for it (spec §3 #194). */
+.term-ask-key:disabled,
+.term-ask-reject:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+/* Turns the question down; the box below says what to do instead (spec §3 #195). */
+.term-ask-reject {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--blocked-key-border);
+  border-radius: 8px;
+  background: none;
+  color: var(--blocked-title);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.term-ask-reject:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.term-ask-reject[aria-pressed='true'] {
+  border-color: var(--blocked-title);
+  background: var(--surface);
 }
 
 .term-phone .term-ask {
@@ -424,6 +455,15 @@ a.term-note-link:hover {
   font-size: 15px;
 }
 
+.term-phone .term-ask-reject {
+  grid-column: 1 / -1;
+  justify-content: center;
+  height: 44px;
+  border-color: var(--blocked-border);
+  border-radius: 12px;
+  font-size: 15px;
+}
+
 /* ---------- quick keys (phone) ---------- */
 /* All eleven keys show on a phone: they share the row evenly, and a word key
    is never narrower than its word. A screen of 320px or more never needs to
@@ -512,11 +552,25 @@ textarea.term-send-input {
   field-sizing: content;
 }
 
-.term-held {
+.term-held,
+.term-reject {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
   padding: 10px 16px 0;
   color: var(--blocked-title);
   font-size: 13px;
   font-weight: 600;
+}
+
+.term-reject svg {
+  flex: none;
+}
+
+.term-reject span {
+  flex: 1;
+  min-width: 0;
 }
 
 .term-phone .term-compose {
@@ -543,7 +597,8 @@ textarea.term-send-input {
   border-radius: 12px;
 }
 
-.term-phone .term-held {
+.term-phone .term-held,
+.term-phone .term-reject {
   padding: 0 4px 8px;
 }
 

@@ -31,6 +31,9 @@ type Payload struct {
 	Tag   string `json:"tag"`            // a newer notification with the same tag replaces the older one
 	URL   string `json:"url"`            // what a tap opens, under the host's origin
 	Kind  string `json:"kind,omitempty"` // what it is about; a hub that relays it reads this (spec §3 #167)
+	// Ask names the question a blocked program asks, so that the
+	// notification's buttons answer that question only (spec §3 #196).
+	Ask string `json:"ask,omitempty"`
 }
 
 // Sender delivers one message to one subscription. It returns the push
@@ -155,7 +158,11 @@ func (n *Notifier) OnChange(c core.Change) {
 	if !n.claim(sentKey{c.Address, kind}) {
 		return
 	}
-	body, err := json.Marshal(payloadFor(n.o.Host, kind, c.New))
+	p := payloadFor(n.o.Host, kind, c.New)
+	if kind == KindBlocked {
+		p.Ask = core.AskID(settled(c))
+	}
+	body, err := json.Marshal(p)
 	if err != nil {
 		n.o.Logger.Error("encoding a notification", "err", err)
 		return

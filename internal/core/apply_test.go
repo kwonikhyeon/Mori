@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/kwonikhyeon/mori/internal/hc"
 )
@@ -138,5 +139,59 @@ func TestDisplayTitle(t *testing.T) {
 		if got := DisplayTitle(c.t); got != c.want {
 			t.Errorf("%q want %q", got, c.want)
 		}
+	}
+}
+
+func TestApplyStampsStatusWord(t *testing.T) { // spec §3 #189
+	ms := int64(7)
+	c := NewCache([]hc.Terminal{{Address: "t1", State: "live", StatusMs: &ms, Status: &hc.Status{State: "working"}}})
+	c.Apply(ev("status", "t1", `{"status":{"state":"working","progress":50},"records":{},"reported":true}`))
+	if *c["t1"].StatusMs != 7 {
+		t.Fatal("progress alone moved status_ms")
+	}
+	before := time.Now().UnixMilli()
+	c.Apply(ev("status", "t1", `{"status":{"state":"blocked","msg":"Allow?"},"records":{},"reported":true}`))
+	stamped := *c["t1"].StatusMs
+	if stamped < before || stamped > time.Now().UnixMilli() {
+		t.Fatalf("status_ms %d, want the time the word changed", stamped)
+	}
+	if ms != 7 {
+		t.Fatal("the old record changed")
+	}
+	c.Apply(ev("status", "t1", `{"status":{"state":"blocked","msg":"Allow this?"},"records":{},"reported":true}`))
+	c.Apply(ev("status", "t1", `{"status":null,"records":{},"reported":true}`))
+	if *c["t1"].StatusMs != stamped {
+		t.Fatal("a new message or an exit moved status_ms")
+	}
+	fresh := NewCache([]hc.Terminal{{Address: "t2", State: "live"}})
+	fresh.Apply(ev("status", "t2", `{"status":{"state":"idle"},"records":{},"reported":true}`))
+	if fresh["t2"].StatusMs == nil {
+		t.Fatal("a first word has no status_ms")
+	}
+}
+
+func TestAskID(t *testing.T) { // spec §3 #194
+	perm := "permission"
+	ask := func(state, msg string, kind *string, turn int64) string {
+		return AskID(hc.Terminal{State: "live", Turn: turn, Status: &hc.Status{State: state, Msg: msg, Kind: kind}})
+	}
+	a := ask("blocked", "Allow Bash?", &perm, 3)
+	if a == "" || a != ask("blocked", "Allow Bash?", &perm, 3) {
+		t.Fatalf("%q: the same question must have the same ID", a)
+	}
+	for _, other := range []string{
+		ask("blocked", "Allow Edit?", &perm, 3),
+		ask("blocked", "Allow Bash?", nil, 3),
+		ask("blocked", "Allow Bash?", &perm, 4),
+	} {
+		if other == a || other == "" {
+			t.Fatalf("%q and %q: a different question must differ", a, other)
+		}
+	}
+	if ask("working", "Allow Bash?", &perm, 3) != "" || AskID(hc.Terminal{State: "live"}) != "" {
+		t.Fatal("only a blocked program asks")
+	}
+	if AskID(hc.Terminal{State: "finished", Status: &hc.Status{State: "blocked"}}) != "" {
+		t.Fatal("a finished program asks nothing")
 	}
 }

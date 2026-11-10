@@ -65,6 +65,8 @@ export interface TerminalView {
   worktree: string
   display_title: string
   preset?: string
+  /** What a blocked program asks; an answer names it (spec §3 #194). */
+  ask?: string
 }
 
 export interface Worktree {

@@ -61,6 +61,7 @@ var proxied = []string{
 	"DELETE /api/terminals/{t}",
 	"POST /api/terminals/{t}/send",
 	"POST /api/terminals/{t}/keys",
+	"POST /api/terminals/{t}/reject",
 	"POST /api/terminals/{t}/interrupt",
 	"POST /api/terminals/{t}/kill",
 	"POST /api/terminals/{t}/files",

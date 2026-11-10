@@ -127,6 +127,17 @@ describe('paths', () => {
     expect(calls[0].url).toBe('/api/terminals/machine%2Ft7/send')
   })
 
+  it('names the question an answer is for only when there is one', async () => {
+    await api.terminals.keys('t1', ['1'], '1.0badc0de')
+    await api.terminals.keys('t1', ['enter'])
+    await api.terminals.reject('machine/t7', '대신 테스트만 돌려', '2.0badc0de')
+    expect(calls.map((c) => [c.url, JSON.parse(String(c.init.body))])).toEqual([
+      ['/api/terminals/t1/keys', { keys: ['1'], expect: '1.0badc0de' }],
+      ['/api/terminals/t1/keys', { keys: ['enter'] }],
+      ['/api/terminals/machine%2Ft7/reject', { text: '대신 테스트만 돌려', expect: '2.0badc0de' }],
+    ])
+  })
+
   it('carries Korean and spaces in a query and back', async () => {
     reply = () => json(200, { head: 'abc', branch: 'main', detached: false, upstream: '', ahead: 0, behind: 0, changes: [] })
     const path = '/Users/me/내 프로젝트/a+b'

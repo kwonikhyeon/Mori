@@ -308,9 +308,12 @@ func (s *Server) handleSend(w http.ResponseWriter, r *http.Request) {
 	s.relay(w, r, "terminal.send", map[string]any{"terminal": terminalParam(r), "text": req.Text, "force": req.Force})
 }
 
+// handleKeys presses named keys. With expect they answer that question,
+// and only while the program still asks it (spec §3 #194).
 func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Keys []string `json:"keys"`
+		Keys   []string `json:"keys"`
+		Expect string   `json:"expect"`
 	}
 	if err := readJSON(w, r, &req); err != nil {
 		writeError(w, err)
@@ -320,7 +323,17 @@ func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 		writeError(w, invalid("보낼 keys가 없습니다"))
 		return
 	}
-	s.relay(w, r, "terminal.keys", map[string]any{"terminal": terminalParam(r), "keys": req.Keys})
+	addr := terminalParam(r)
+	if req.Expect == "" {
+		s.relay(w, r, "terminal.keys", map[string]any{"terminal": addr, "keys": req.Keys})
+		return
+	}
+	res, err := s.answer(r.Context(), addr, req.Expect, req.Keys)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 // handleInterrupt stops the current turn. timeout is how many seconds the

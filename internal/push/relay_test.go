@@ -14,8 +14,8 @@ func TestRelayed(t *testing.T) {
 		ok       bool
 	}{
 		{"with its kind",
-			push.Payload{Title: "desk · 승인 대기", Body: "claude — Allow Bash?", Tag: "machine/t7", URL: "/#/t/machine%2Ft7", Kind: "blocked"},
-			push.Payload{Title: "desk · 승인 대기", Body: "claude — Allow Bash?", Tag: "h_abc/machine/t7", URL: "/#/h/h_abc/t/machine%2Ft7", Kind: "blocked"},
+			push.Payload{Title: "desk · 승인 대기", Body: "claude — Allow Bash?", Tag: "machine/t7", URL: "/#/t/machine%2Ft7", Kind: "blocked", Ask: "1.0badc0de"},
+			push.Payload{Title: "desk · 승인 대기", Body: "claude — Allow Bash?", Tag: "h_abc/machine/t7", URL: "/#/h/h_abc/t/machine%2Ft7", Kind: "blocked", Ask: "1.0badc0de"},
 			push.KindBlocked, true},
 		{"from a Mori without kinds",
 			push.Payload{Title: "desk · 오류", Body: "make", Tag: "t1", URL: "/#/t/t1"},

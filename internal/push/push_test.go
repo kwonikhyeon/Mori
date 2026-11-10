@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/kwonikhyeon/mori/internal/core"
+	"github.com/kwonikhyeon/mori/internal/hc"
 	"github.com/kwonikhyeon/mori/internal/push"
 	"github.com/kwonikhyeon/mori/internal/store"
 )
@@ -158,8 +159,10 @@ func (e *env) subscribe(t *testing.T, device, endpoint string, kinds ...push.Kin
 	return s
 }
 
+// blockedChange is the status event of a program that stops working to
+// ask: the turn event that moves its turn on comes after it.
 func blockedChange(addr, msg string) core.Change {
-	n := term(addr, "blocked", 1, "")
+	n := term(addr, "blocked", 0, "")
 	n.Status.Msg = msg
 	return core.Change{Address: addr, Old: term(addr, "working", 0, ""), New: n, Event: event("status", `{}`)}
 }
@@ -180,14 +183,30 @@ func TestNotifierSendsPayload(t *testing.T) {
 	if !slices.Equal(endpoints(got), []string{"https://push.example.com/a", "https://push.example.com/b"}) {
 		t.Fatalf("sent to %v", endpoints(got))
 	}
-	want := push.Payload{Title: "macmini · 승인 대기", Body: "claude — Allow Bash?", Tag: "t1", URL: "/#/t/t1", Kind: "blocked"}
+	// The question is named with the turn the turn event will give it.
+	ask := core.AskID(hc.Terminal{State: "live", Turn: 1, Status: &hc.Status{State: "blocked", Msg: "Allow Bash?"}})
+	want := push.Payload{Title: "macmini · 승인 대기", Body: "claude — Allow Bash?", Tag: "t1", URL: "/#/t/t1", Kind: "blocked", Ask: ask}
 	if got[0].Payload != want {
 		t.Errorf("payload %+v, want %+v", got[0].Payload, want)
+	}
+	// A program that asks without having worked keeps its turn, and so
+	// does a record that a snapshot brought.
+	b := term("t3", "blocked", 4, "")
+	b.Status.Msg = "Allow Bash?"
+	for _, c := range []core.Change{
+		{Address: "t3", Old: term("t3", "idle", 4, ""), New: b, Event: event("status", `{}`)},
+		{Address: "t4", Old: term("t4", "working", 3, ""), New: func() *hc.Terminal { c := *b; c.Address = "t4"; return &c }()},
+	} {
+		got = e.change(c)
+		want := core.AskID(hc.Terminal{State: "live", Turn: 4, Status: &hc.Status{State: "blocked", Msg: "Allow Bash?"}})
+		if len(got) != 2 || got[0].Payload.Ask != want {
+			t.Errorf("%s: %+v, want ask %q", c.Address, got, want)
+		}
 	}
 	// Without a message the body is the terminal's title alone.
 	w := core.Change{Address: "t2", Old: term("t2", "working", 0, ""), New: term("t2", "done", 1, ""), Event: event("turn", `{"state":"done","turn":1}`)}
 	got = e.change(w)
-	if len(got) != 2 || got[0].Payload.Title != "macmini · 입력 대기" || got[0].Payload.Body != "claude" {
+	if len(got) != 2 || got[0].Payload.Title != "macmini · 입력 대기" || got[0].Payload.Body != "claude" || got[0].Payload.Ask != "" {
 		t.Errorf("waiting: %+v", got)
 	}
 }

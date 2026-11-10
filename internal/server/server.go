@@ -67,6 +67,8 @@ type Server struct {
 	viewers atomic.Int64           // numbers attach sockets for Presence
 	hosts   *hostCheck
 	slow    time.Duration // a request this slow is logged; tests lower it
+	answers answers       // the questions being answered (spec §3 #194)
+	unblock time.Duration // how long a reject waits for the question to go; tests lower it
 }
 
 func New(d Deps) *Server {
@@ -92,7 +94,7 @@ func New(d Deps) *Server {
 		d.Names = func() []string { return []string{d.PublicURL()} }
 	}
 	s := &Server{d: d, log: d.Logger, mux: http.NewServeMux(), hub: newHub(),
-		hosts: &hostCheck{names: d.Names}, slow: slowRequest}
+		hosts: &hostCheck{names: d.Names}, slow: slowRequest, unblock: rejectWait}
 	if d.Links != nil {
 		s.proxy = s.newProxy()
 	}
@@ -138,6 +140,7 @@ func (s *Server) routes() {
 	api.HandleFunc("DELETE /api/terminals/{t}", s.handleRemoveTerminal)
 	api.HandleFunc("POST /api/terminals/{t}/send", s.handleSend)
 	api.HandleFunc("POST /api/terminals/{t}/keys", s.handleKeys)
+	api.HandleFunc("POST /api/terminals/{t}/reject", s.handleReject)
 	api.HandleFunc("POST /api/terminals/{t}/interrupt", s.handleInterrupt)
 	api.HandleFunc("POST /api/terminals/{t}/kill", s.handleKill)
 	api.HandleFunc("POST /api/terminals/{t}/files", s.handleUpload)

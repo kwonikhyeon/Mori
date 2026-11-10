@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"time"
 
 	"github.com/kwonikhyeon/mori/internal/hc"
 )
@@ -134,7 +135,15 @@ func applyPartial(old *hc.Terminal, ev hc.Event) (*hc.Terminal, error) {
 		if err := decode(ev, &d); err != nil {
 			return nil, err
 		}
-		return edit(old, func(t *hc.Terminal) { t.Status, t.Records, t.Reported = d.Status, d.Records, d.Reported }), nil
+		return edit(old, func(t *hc.Terminal) {
+			// The event has no status_ms: a word that changes is stamped
+			// with the time it came (spec §3 #189). A snapshot has the core's.
+			if d.Status != nil && (old.Status == nil || old.Status.State != d.Status.State) {
+				ms := time.Now().UnixMilli()
+				t.StatusMs = &ms
+			}
+			t.Status, t.Records, t.Reported = d.Status, d.Records, d.Reported
+		}), nil
 	case "turn":
 		var d struct {
 			Turn int64 `json:"turn"`

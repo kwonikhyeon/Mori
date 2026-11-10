@@ -205,7 +205,12 @@ export function apiFor(prefix: string, onHostError?: (kind: HostError) => void) 
       remove: (addr: string) => req<void>('DELETE', termPath(addr)),
       send: (addr: string, text: string, force = false) =>
         req<SendResult>('POST', termPath(addr) + '/send', force ? { text, force } : { text }),
-      keys: (addr: string, keys: string[]) => req<unknown>('POST', termPath(addr) + '/keys', { keys }),
+      /** With expect the keys answer that question only (spec §3 #194). */
+      keys: (addr: string, keys: string[], expect?: string) =>
+        req<unknown>('POST', termPath(addr) + '/keys', expect ? { keys, expect } : { keys }),
+      /** Esc to the question expect names, then text as what to do instead (spec §3 #195). */
+      reject: (addr: string, text: string, expect: string) =>
+        req<SendResult>('POST', termPath(addr) + '/reject', { text, expect }),
       interrupt: (addr: string) => req<unknown>('POST', termPath(addr) + '/interrupt', {}),
       kill: (addr: string) => req<TerminalView>('POST', termPath(addr) + '/kill'),
       upload: (addr: string, file: File) => {

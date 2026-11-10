@@ -4,7 +4,8 @@
 // phone and a box that sends several lines at once. A screen scrolled back
 // offers its end (#183); on a PC a key pressed outside it still types (#188).
 // Open while a person looks, its finish is seen here and its notifications
-// close (#190, #191).
+// close (#190, #191). An answer names the question it is for (#194), and a
+// question can be turned down with what to do instead (#195).
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Chip } from '../components/Chip'
 import { Confirm } from '../components/Confirm'
@@ -86,6 +87,9 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const [fresh, setFresh] = useState(false)
   // The page is seen and has the focus.
   const [looking, setLooking] = useState(false)
+  // An answer is on its way, and the question the box below rejects.
+  const [answering, setAnswering] = useState(false)
+  const [rejecting, setRejecting] = useState<string | null>(null)
   const layout: Layout = phone ? 'phone' : 'pc'
   const fontPx = fontFor(layout)
 
@@ -228,6 +232,8 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const active = !finished && st !== 'gone'
   const canType = active && !observing
   const blocked = canType && t?.status?.state === 'blocked'
+  // What the program asks, as the server names it; "" from a Mori without it.
+  const ask = blocked ? (t?.ask ?? '') : ''
   const open = st === 'open'
   const differs = open && canType && !!fit && !!size && (fit.cols !== size.cols || fit.rows !== size.rows)
   const showFit = useLater(differs, FIT_LATE)
@@ -238,6 +244,11 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const sub = t ? `${appName(t, h.presets.value)} · ${place(t, h.folders.value)}` : ''
   // With other hosts about, the header says which one the session runs on.
   const hostTag = others.value.length > 0 ? nameOf(h) : ''
+
+  // A question that went or changed takes its rejection with it.
+  useEffect(() => {
+    if (rejecting !== null && rejecting !== ask) setRejecting(null)
+  }, [ask, rejecting])
 
   // On a PC a key pressed while the focus is on the page, or on one of the
   // terminal's own buttons, types into the terminal and gives it the focus
@@ -262,12 +273,32 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   }, [phone, link, canType])
 
   const fail = (what: string) => (e: unknown) => toastError(e, what)
+  // What is sent another way than the stream shows the screen's end too.
+  const toEnd = () => screen.current?.scrollToBottom()
   const answer = (k: AnswerKey) => {
+    // The server presses it only while the program still asks what this
+    // device saw, so it does not land on the next question (spec §3 #194).
+    if (ask) {
+      if (answering) return
+      setAnswering(true)
+      h.api.terminals
+        .keys(addr, [k.name], ask)
+        .then(toEnd, fail('키를 보내지 못했습니다'))
+        .finally(() => setAnswering(false))
+      return
+    }
     if (link?.send(k.bytes)) return
     h.api.terminals.keys(addr, [k.name]).catch(fail('키를 보내지 못했습니다'))
   }
-  // What is sent another way than the stream shows the screen's end too.
-  const toEnd = () => screen.current?.scrollToBottom()
+  const reject = () => {
+    if (rejecting !== null) {
+      setRejecting(null)
+      return
+    }
+    // in the press itself, or a phone does not open its keyboard
+    document.getElementById(id + '-send')?.focus()
+    setRejecting(ask)
+  }
   const interrupt = () => {
     h.api.terminals.interrupt(addr).then(toEnd, fail('중단하지 못했습니다'))
   }
@@ -434,10 +465,14 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     />
   )
 
-  const askBar = blocked && t && <AskBar t={t} phone={phone} id={id} onKey={answer} />
+  const askBar = blocked && t && (
+    <AskBar t={t} phone={phone} id={id} busy={answering} onKey={answer} rejecting={rejecting !== null} onReject={ask ? reject : undefined} />
+  )
   const observeBar = observing && active && <ObserveBar onOff={() => observe(false)} />
   const endBar = finished && <EndBar t={t} ended={ended} onRemove={() => void remove()} />
-  const composer = canType && <Composer key={draftKey(h.id, addr)} addr={addr} phone={phone} id={id} onSent={toEnd} />
+  const composer = canType && (
+    <Composer key={draftKey(h.id, addr)} addr={addr} phone={phone} id={id} onSent={toEnd} ask={ask} rejecting={rejecting} onReject={setRejecting} />
+  )
 
   if (!phone) {
     return (
@@ -619,11 +654,17 @@ interface AskBarProps {
   t: TerminalView
   phone: boolean
   id: string
+  /** An answer is on its way: the keys wait for it. */
+  busy: boolean
   onKey: (k: AnswerKey) => void
+  /** The box below writes what to do instead of this question. */
+  rejecting: boolean
+  /** Starts or stops that; without it the question cannot be named (spec §3 #195). */
+  onReject?: () => void
 }
 
 /** What a blocked program asks, and the keys that answer it. */
-function AskBar({ t, phone, id, onKey }: AskBarProps) {
+function AskBar({ t, phone, id, busy, onKey, rejecting, onReject }: AskBarProps) {
   const head = id + '-ask'
   const msg = askText(t, 'blocked')
   const more = useMore(msg)
@@ -632,6 +673,7 @@ function AskBar({ t, phone, id, onKey }: AskBarProps) {
       key={k.name}
       type="button"
       class={'term-ask-key' + (k.label.length > 1 ? ' is-word' : '')}
+      disabled={busy}
       onPointerDown={keep}
       onMouseDown={keep}
       onClick={() => onKey(k)}
@@ -639,6 +681,14 @@ function AskBar({ t, phone, id, onKey }: AskBarProps) {
       {k.label}
     </button>
   ))
+  if (onReject) {
+    keys.push(
+      <button key="reject" type="button" class="term-ask-reject" aria-pressed={rejecting} disabled={busy} onClick={onReject}>
+        <Icon name="pencil" size={phone ? 17 : 15} />
+        거절하고 지시
+      </button>,
+    )
+  }
   if (phone) {
     const text = id + '-ask-msg'
     return (
@@ -758,11 +808,24 @@ function QuickKeys({ link, open }: { link: TermLink | null; open: boolean }) {
   )
 }
 
+interface ComposerProps {
+  addr: string
+  phone: boolean
+  id: string
+  onSent: () => void
+  /** What the program asks, "" for nothing or a Mori that does not name it. */
+  ask: string
+  /** The question this box rejects: what it sends goes instead (spec §3 #195). */
+  rejecting: string | null
+  onReject: (ask: string | null) => void
+}
+
 /**
  * Several lines sent at once with POST send (spec §3 #124). What is typed
- * stays as this device's draft until it is sent (spec §3 #181).
+ * stays as this device's draft until it is sent (spec §3 #181). Rejecting a
+ * question, it presses Esc first and sends once the question is gone.
  */
-function Composer({ addr, phone, id, onSent }: { addr: string; phone: boolean; id: string; onSent: () => void }) {
+function Composer({ addr, phone, id, onSent, ask, rejecting, onReject }: ComposerProps) {
   const h = useHost()
   const draft = draftKey(h.id, addr)
   const [text, setText] = useState(() => loadDraft(draft))
@@ -774,38 +837,55 @@ function Composer({ addr, phone, id, onSent }: { addr: string; phone: boolean; i
     setText(v)
     saveDraft(draft, v)
   }
-  const submit = async (value: string) => {
+  const submit = async (value: string, against: string | null) => {
     if (busy || value.trim() === '') return
     setBusy(true)
     setHeld(false)
     try {
-      await h.api.terminals.send(addr, value)
+      if (against) await h.api.terminals.reject(addr, value, against)
+      else await h.api.terminals.send(addr, value)
       edit('')
+      onReject(null)
       onSent()
     } catch (e) {
-      if (e instanceof ApiError && e.kind === 'blocked') setHeld(true)
-      else toastError(e, '보내지 못했습니다')
+      if (!against && e instanceof ApiError && e.kind === 'blocked') setHeld(true)
+      else toastError(e, against ? '거절하고 보내지 못했습니다' : '보내지 못했습니다')
     } finally {
       setBusy(false)
     }
   }
-  const chord = useChordSubmit((f) => void submit(f.value))
+  const chord = useChordSubmit((f) => void submit(f.value, rejecting))
+  const sendLabel = rejecting ? '거절하고 보내기' : '보내기'
   return (
     <div class="term-compose">
+      {rejecting && (
+        <div class="term-reject" role="status" aria-labelledby={field + '-reject'}>
+          <Icon name="pencil" size={15} />
+          <span id={field + '-reject'}>거절하고 지시 — Esc를 누른 뒤 이 글을 보냅니다</span>
+          <button type="button" class="btn btn-xs" onClick={() => onReject(null)}>
+            취소
+          </button>
+        </div>
+      )}
       {held && (
-        <p class="term-held" role="alert">
-          승인 대기 중 — 키로 응답
-        </p>
+        <div class="term-held" role="alert">
+          <span>승인 대기 중 — 키로 응답</span>
+          {ask && (
+            <button type="button" class="btn btn-xs" disabled={busy} onClick={() => void submit(text, ask)}>
+              거절하고 이 글 보내기
+            </button>
+          )}
+        </div>
       )}
       <form
         class="term-send"
         onSubmit={(e) => {
           e.preventDefault()
-          void submit(text)
+          void submit(text, rejecting)
         }}
       >
         <label class="sr-only" for={field}>
-          터미널에 여러 줄 보내기
+          {rejecting ? '거절하고 대신 보낼 글' : '터미널에 여러 줄 보내기'}
         </label>
         <textarea
           id={field}
@@ -814,18 +894,32 @@ function Composer({ addr, phone, id, onSent }: { addr: string; phone: boolean; i
           rows={phone ? 1 : 2}
           value={text}
           readOnly={busy}
-          placeholder={phone ? '여러 줄로 보내기' : `여러 줄로 보내기 · ${apple ? '⌘Enter' : 'Ctrl+Enter'}`}
+          placeholder={
+            rejecting ? '대신 할 일을 적으세요' : phone ? '여러 줄로 보내기' : `여러 줄로 보내기 · ${apple ? '⌘Enter' : 'Ctrl+Enter'}`
+          }
           aria-keyshortcuts={apple ? 'Meta+Enter' : 'Control+Enter'}
           onInput={(e) => {
             edit(e.currentTarget.value)
             setHeld(false)
           }}
-          onKeyDown={chord.onKeyDown}
+          onKeyDown={(e) => {
+            if (rejecting && e.key === 'Escape' && !e.isComposing) {
+              e.preventDefault()
+              onReject(null)
+              return
+            }
+            chord.onKeyDown(e)
+          }}
           onCompositionEnd={chord.onCompositionEnd}
         />
-        <button type="submit" class="btn btn-primary term-send-btn" aria-label={phone ? '보내기' : undefined} disabled={busy || text.trim() === ''}>
+        <button
+          type="submit"
+          class="btn btn-primary term-send-btn"
+          aria-label={phone ? sendLabel : undefined}
+          disabled={busy || text.trim() === ''}
+        >
           <Icon name="send" size={phone ? 20 : 16} stroke={2} />
-          {!phone && '보내기'}
+          {!phone && sendLabel}
         </button>
       </form>
     </div>

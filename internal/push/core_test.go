@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,8 +35,22 @@ func TestNotifierWithCore(t *testing.T) {
 	hcc := hctest.Start(t)
 	e := newEnv(t)
 	e.subscribe(t, "d1", "https://push.example.com/a")
+	// asks are the questions as a device sees them, once the turn event
+	// has come after the status event.
+	var mu sync.Mutex
+	var asks []string
+	onChange := func(c core.Change) {
+		if c.Event != nil && c.Event.Type == "turn" && c.New != nil {
+			if a := core.AskID(*c.New); a != "" {
+				mu.Lock()
+				asks = append(asks, a)
+				mu.Unlock()
+			}
+		}
+		e.n.OnChange(c)
+	}
 	m := core.New(core.Options{HC: hcc.HC, Env: hcc.Env, MinBackoff: 100 * time.Millisecond, MaxBackoff: 500 * time.Millisecond,
-		Logger: slog.New(slog.DiscardHandler), OnChange: e.n.OnChange})
+		Logger: slog.New(slog.DiscardHandler), OnChange: onChange})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { m.Run(ctx); close(done) }()
@@ -63,5 +78,10 @@ func TestNotifierWithCore(t *testing.T) {
 	}
 	if p := got[1].Payload; p.Title != "macmini · 입력 대기" || p.Tag != run.Address {
 		t.Errorf("second %+v; want 입력 대기", p)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(asks) != 1 || got[0].Payload.Ask != asks[0] {
+		t.Errorf("the notification names %q; devices saw %q", got[0].Payload.Ask, asks)
 	}
 }

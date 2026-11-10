@@ -8,14 +8,15 @@ import (
 )
 
 // TerminalView is a terminal as the API shows it: the core's record, the
-// folder it belongs to, and the name to show (spec §7.1). Title stays the
-// title the program set.
+// folder it belongs to, the name to show and the question it asks (spec
+// §7.1). Title stays the title the program set.
 type TerminalView struct {
 	hc.Terminal
 	FolderID     string `json:"folder_id"`
 	Worktree     string `json:"worktree"`
 	DisplayTitle string `json:"display_title"`
 	Preset       string `json:"preset,omitempty"`
+	Ask          string `json:"ask,omitempty"` // what a blocked program asks, for expect (spec §3 #194)
 }
 
 // view dresses t for the API. JSON shows {} and [] rather than null; the
@@ -34,6 +35,7 @@ func (s *Server) view(t hc.Terminal) TerminalView {
 		Worktree:     worktree,
 		DisplayTitle: core.DisplayTitle(t),
 		Preset:       t.Labels[core.LabelPreset],
+		Ask:          core.AskID(t),
 	}
 }
 

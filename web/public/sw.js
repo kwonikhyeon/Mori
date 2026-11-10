@@ -3,6 +3,47 @@
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()))
 
+// The keys a question's notification offers (spec §3 #196); with room for
+// two only, the first choice and Esc. A device that shows no buttons (iOS)
+// gets none, and the notification opens the session as before.
+function answers() {
+  const max = (self.Notification && self.Notification.maxActions) || 0
+  const all = [
+    { action: 'key:1', title: '1' },
+    { action: 'key:2', title: '2' },
+    { action: 'key:esc', title: 'Esc' },
+  ]
+  return max >= all.length ? all : [all[0], all[2]].slice(0, max)
+}
+
+// keysPath is where the keys for the session url opens go: a linked host's
+// session goes through this hub (spec §3 #161). The address is escaped.
+function keysPath(url) {
+  const m = /^\/#\/(?:h\/([^/?#]+)\/)?t\/([^/?#]+)$/.exec(url)
+  return m ? (m[1] ? '/h/' + m[1] : '') + '/api/terminals/' + m[2] + '/keys' : ''
+}
+
+// answer presses key as the answer to the question ask names. The server
+// refuses it once the program asks something else (spec §3 #194). It gives
+// up in time for the session to open in its place: a browser lets a
+// notification open a window only for a few seconds after the press.
+async function answer(url, key, ask) {
+  const path = keysPath(url)
+  if (!path || !ask) return false
+  try {
+    const r = await fetch(path, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keys: [key], expect: ask }),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined,
+    })
+    return r.ok
+  } catch (err) {
+    return false
+  }
+}
+
 self.addEventListener('push', (e) => {
   let msg = {}
   try {
@@ -11,6 +52,7 @@ self.addEventListener('push', (e) => {
     msg = { body: e.data ? e.data.text() : '' }
   }
   const tag = typeof msg.tag === 'string' ? msg.tag : undefined
+  const ask = msg.kind === 'blocked' && typeof msg.ask === 'string' ? msg.ask : ''
   e.waitUntil(
     self.registration.showNotification(msg.title || 'Mori', {
       body: msg.body || '',
@@ -18,20 +60,26 @@ self.addEventListener('push', (e) => {
       renotify: !!tag,
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      data: { url: typeof msg.url === 'string' ? msg.url : '/' },
+      actions: ask ? answers() : [],
+      data: { url: typeof msg.url === 'string' ? msg.url : '/', ask },
     }),
   )
 })
 
 self.addEventListener('notificationclick', (e) => {
   e.notification.close()
+  const data = e.notification.data || {}
   let url = '/'
   try {
-    const u = new URL(e.notification.data && e.notification.data.url, self.location.origin)
+    const u = new URL(data.url, self.location.origin)
     if (u.origin === self.location.origin) url = u.pathname + u.search + u.hash
   } catch (err) {}
+  const key = typeof e.action === 'string' && e.action.startsWith('key:') ? e.action.slice(4) : ''
   e.waitUntil(
     (async () => {
+      // A key that went in needs nothing more; one that did not opens the
+      // session, to see what it asks now.
+      if (key && (await answer(url, key, typeof data.ask === 'string' ? data.ask : ''))) return
       const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       for (const w of wins) {
         if (new URL(w.url).origin !== self.location.origin) continue

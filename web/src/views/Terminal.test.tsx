@@ -33,7 +33,7 @@ interface Call {
 }
 
 let calls: Call[] = []
-let reply: (c: Call) => Response | undefined = () => undefined
+let reply: (c: Call) => Response | Promise<Response> | undefined = () => undefined
 
 const HOUR = 3_600_000
 
@@ -76,7 +76,7 @@ beforeEach(() => {
       const body = raw instanceof FormData ? raw : typeof raw === 'string' ? JSON.parse(raw) : undefined
       const c = { method: init.method ?? 'GET', url: String(url), body }
       calls.push(c)
-      return reply(c) ?? (c.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json({}))
+      return (await reply(c)) ?? (c.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json({}))
     }),
   )
   now.value = 10 * HOUR
@@ -201,6 +201,112 @@ describe('Terminal on a PC', () => {
     fireEvent.click(within(ask).getByRole('button', { name: 'Enter' }))
     expect(ws.input()).toEqual(['1', '\r'])
     expect(sent('/api/terminals/t1/keys')).toHaveLength(1)
+  })
+
+  describe('a question the server names', () => {
+    const ASK = '3.0badc0de'
+    const asking = (ask = ASK) => term({ status: status('blocked', { kind: 'permission', msg: 'Bash(npm test)를 실행할까요?' }), ask })
+    const region = () => screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
+    const conflict = (kind: string, message: string) => Response.json({ error: { kind, message } }, { status: 409 })
+    const note = () => screen.queryByRole('status', { name: '거절하고 지시 — Esc를 누른 뒤 이 글을 보냅니다' })
+
+    it('answers only that question, one answer at a time', async () => {
+      let let_go = () => {}
+      reply = (c) => (c.url.endsWith('/keys') ? new Promise((ok) => (let_go = () => ok(Response.json({})))) : undefined)
+      const { ws } = await mount(asking())
+      await attach(ws)
+      const ask = region()
+      fireEvent.click(within(ask).getByRole('button', { name: '2' }))
+      await vi.waitFor(() => expect(sent('/api/terminals/t1/keys').map((c) => c.body)).toEqual([{ keys: ['2'], expect: ASK }]))
+      // not down the stream, where it could land on the next question
+      expect(ws.input()).toEqual([])
+      const keys = within(ask).getAllByRole('button')
+      expect(keys.every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
+      fireEvent.click(within(ask).getByRole('button', { name: '1' }))
+      expect(sent('/api/terminals/t1/keys')).toHaveLength(1)
+      const bottoms = FakeScreen.last().bottoms
+      await act(() => let_go())
+      await vi.waitFor(() => expect((within(ask).getByRole('button', { name: '1' }) as HTMLButtonElement).disabled).toBe(false))
+      expect(FakeScreen.last().bottoms).toBe(bottoms + 1)
+    })
+
+    it('says when the question changed before the answer came', async () => {
+      reply = (c) => (c.url.endsWith('/keys') ? conflict('changed', '질문이 바뀌었습니다. 화면을 보고 다시 고르세요') : undefined)
+      await mount(asking())
+      fireEvent.click(within(region()).getByRole('button', { name: 'Esc' }))
+      await vi.waitFor(() => expect(toasts.value.map((t) => t.text)).toEqual(['질문이 바뀌었습니다. 화면을 보고 다시 고르세요']))
+    })
+
+    it('turns it down and sends what to do instead', async () => {
+      await mount(asking())
+      const turn = within(region()).getByRole('button', { name: '거절하고 지시' })
+      expect(turn.getAttribute('aria-pressed')).toBe('false')
+      fireEvent.click(turn)
+      expect(turn.getAttribute('aria-pressed')).toBe('true')
+      expect(note()).toBeTruthy()
+      const box = screen.getByRole('textbox', { name: '거절하고 대신 보낼 글' }) as HTMLTextAreaElement
+      // focused in the press itself, so that a phone opens its keyboard
+      expect(document.activeElement).toBe(box)
+      expect(box.placeholder).toBe('대신 할 일을 적으세요')
+      fireEvent.input(box, { target: { value: '테스트부터 고쳐 줘' } })
+      fireEvent.click(screen.getByRole('button', { name: '거절하고 보내기' }))
+      await vi.waitFor(() =>
+        expect(sent('/api/terminals/t1/reject').map((c) => c.body)).toEqual([{ text: '테스트부터 고쳐 줘', expect: ASK }]),
+      )
+      await vi.waitFor(() => expect(box.value).toBe(''))
+      expect(note()).toBeNull()
+      expect(turn.getAttribute('aria-pressed')).toBe('false')
+      expect(sent('/api/terminals/t1/send')).toEqual([])
+    })
+
+    it('keeps the instruction when the question stays', async () => {
+      reply = (c) => (c.url.endsWith('/reject') ? conflict('blocked', 'Esc를 보냈지만 아직 승인 대기입니다') : undefined)
+      await mount(asking())
+      fireEvent.click(within(region()).getByRole('button', { name: '거절하고 지시' }))
+      const box = screen.getByRole('textbox', { name: '거절하고 대신 보낼 글' }) as HTMLTextAreaElement
+      fireEvent.input(box, { target: { value: 'stop' } })
+      fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true, metaKey: true })
+      await vi.waitFor(() => expect(toasts.value.map((t) => t.text)).toEqual(['Esc를 보냈지만 아직 승인 대기입니다']))
+      expect(box.value).toBe('stop')
+      expect(note()).toBeTruthy()
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('stops turning it down from 취소, Escape, a second press, or when the question changes', async () => {
+      await mount(asking())
+      const turn = () => within(region()).getByRole('button', { name: '거절하고 지시' })
+      fireEvent.click(turn())
+      fireEvent.click(within(note()!).getByRole('button', { name: '취소' }))
+      expect(note()).toBeNull()
+      expect(screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' })).toBeTruthy()
+
+      fireEvent.click(turn())
+      fireEvent.keyDown(screen.getByRole('textbox', { name: '거절하고 대신 보낼 글' }), { key: 'Escape' })
+      expect(note()).toBeNull()
+
+      fireEvent.click(turn())
+      fireEvent.click(turn())
+      expect(note()).toBeNull()
+
+      fireEvent.click(turn())
+      await act(() => load([asking('4.0badc0de')]))
+      expect(note()).toBeNull()
+      expect(turn().getAttribute('aria-pressed')).toBe('false')
+    })
+
+    it('offers to turn it down with the text a send could not deliver', async () => {
+      reply = (c) => (c.url.endsWith('/send') ? conflict('blocked', '승인을 기다립니다') : undefined)
+      await mount(asking())
+      const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+      fireEvent.input(box, { target: { value: 'go on' } })
+      fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+      const held = await screen.findByRole('alert')
+      expect(held.textContent).toContain('승인 대기 중 — 키로 응답')
+      fireEvent.click(within(held).getByRole('button', { name: '거절하고 이 글 보내기' }))
+      await vi.waitFor(() => expect(sent('/api/terminals/t1/reject').map((c) => c.body)).toEqual([{ text: 'go on', expect: ASK }]))
+      await vi.waitFor(() => expect(box.value).toBe(''))
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
   })
 
   it('asks before ending the session, then ends it', async () => {
@@ -651,6 +757,15 @@ describe('Terminal on a phone', () => {
     const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
     expect(within(ask).getByText('파일을 고칠까요?')).toBeTruthy()
     expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['1', '2', '3', 'Esc'])
+  })
+
+  it('turns a question down from a wide key under the four', async () => {
+    await phone(term({ status: status('blocked', { msg: '파일을 고칠까요?' }), ask: '2.0badc0de' }))
+    const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
+    expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['1', '2', '3', 'Esc', '거절하고 지시'])
+    fireEvent.click(within(ask).getByRole('button', { name: '거절하고 지시' }))
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: '거절하고 대신 보낼 글' }))
+    expect(screen.getByRole('button', { name: '거절하고 보내기' })).toBeTruthy()
   })
 
   it('keeps the other tools in its menu', async () => {

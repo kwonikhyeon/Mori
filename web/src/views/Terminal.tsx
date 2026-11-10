@@ -422,7 +422,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
           {titleEl}
           {t && !renaming && (
             <div class="term-sub-row">
-              {hostTag && <span class="term-host">{hostTag}</span>}
+              {hostTag && <span class="term-hosttag">{hostTag}</span>}
               <Chip info={chip(t)} />
               <span class="term-sub">{sub}</span>
             </div>

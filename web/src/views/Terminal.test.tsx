@@ -9,6 +9,7 @@ import { route } from '../lib/router'
 import { core, folders, ready, resetStore, terminals } from '../lib/store'
 import { toasts } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
+import { openScreen } from '../lib/xterm'
 import { Terminal, type TerminalProps } from './Terminal'
 
 // jsdom cannot lay out xterm's cells: the view draws on a FakeScreen.
@@ -280,6 +281,19 @@ describe('Terminal on a PC', () => {
     cleanup()
     render(inHost(s, <Terminal addr="t1" variant="phone" back="#/h/h_desk0001" />))
     expect(within(document.querySelector('.term-head') as HTMLElement).getByText('desk')).toBeTruthy()
+  })
+
+  it("keeps the host's name apart from the screen's box", async () => {
+    const s = withHost()
+    s.terminals.value = new Map([['t1', term()]])
+    s.folders.value = [folder()]
+    s.ready.value = true
+    render(inHost(s, <Terminal addr="t1" variant="phone" back="#/h/h_desk0001" />))
+    await vi.waitFor(() => expect(FakeScreen.all).toHaveLength(1))
+    const box = vi.mocked(openScreen).mock.lastCall![0]
+    const tag = within(document.querySelector('.term-head') as HTMLElement).getByText('desk')
+    // A class the two share gives the screen's box the name's pill: it clips the screen.
+    expect([...tag.classList].filter((c) => box.classList.contains(c))).toEqual([])
   })
 })
 

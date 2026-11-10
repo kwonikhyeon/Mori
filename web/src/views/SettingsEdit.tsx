@@ -1,24 +1,21 @@
 // What Settings edits for the whole host shown: the folders of the list
-// (spec §3 #37) and the presets a session starts (#42). It also shows the
-// hosts linked to this hub (#168).
+// (spec §3 #37) and the presets a session starts (#42).
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import type { RefObject } from 'preact'
 import { Confirm } from '../components/Confirm'
 import { Icon } from '../components/Icon'
 import { formatArgv, parseArgv } from '../lib/argv'
 import { shortPath } from '../lib/format'
-import { isHere } from '../lib/hosts'
 import { useHost } from '../lib/scope'
-import { hosts } from '../lib/store'
 import { errorText, toast, toastError } from '../lib/toast'
 import type { FolderView, Preset } from '../lib/types'
 import { FolderPicker } from './FolderPicker'
 
 /** Characters in a name people give (the server's maxTitle). */
-const MAX_NAME = 100
+export const MAX_NAME = 100
 
 /** Moves the focus, once the next render is in, to what sel finds in the card. */
-function useFocusAfter(card: RefObject<HTMLElement>) {
+export function useFocusAfter(card: RefObject<HTMLElement>) {
   const [sel, setSel] = useState<string | null>(null)
   useEffect(() => {
     if (!sel) return
@@ -244,48 +241,9 @@ function EditFoot({ add, error, saving, onAdd, onCancel }: EditFootProps) {
   )
 }
 
-/* ---------- 다른 호스트 ---------- */
+/* ---------- 프리셋 ---------- */
 
 const EDIT_BTN = '.st-card-head .btn'
-
-/** The hosts linked to this hub. They are linked with `mori hosts link` for now. */
-export function HostsCard() {
-  const id = useId()
-  const list = hosts.value
-  return (
-    <section class="st-card st-list" aria-labelledby={id}>
-      <div class="st-card-head">
-        <h2 id={id} class="st-h2">
-          다른 호스트
-        </h2>
-      </div>
-      {list.length === 0 && <p class="st-none">이은 호스트가 없습니다.</p>}
-      {list.map((h, i) => (
-        <div key={h.id}>
-          {i > 0 && <div class="st-div is-tight" />}
-          <div class="st-row">
-            <span class="st-row-icon">
-              <Icon name="monitor" size={20} />
-            </span>
-            <span class="st-row-main">
-              <span class="st-row-name">
-                <span class="st-name">{h.name}</span>
-                {isHere(h.url) && <span class="st-pill">이 호스트</span>}
-                {!h.linked && <span class="st-pill">끊김</span>}
-              </span>
-              <span class="st-row-sub mono">{[h.url, h.version].filter(Boolean).join(' · ')}</span>
-            </span>
-          </div>
-        </div>
-      ))}
-      <p class="st-hint">
-        다른 컴퓨터의 Mori를 이 허브에 이으려면 이 컴퓨터에서 <code>mori hosts link 주소 코드</code>를 실행하세요. 코드는 그 컴퓨터에서 <code>mori pair</code>로 받습니다.
-      </p>
-    </section>
-  )
-}
-
-/* ---------- 프리셋 ---------- */
 
 interface PresetDraft {
   k: number

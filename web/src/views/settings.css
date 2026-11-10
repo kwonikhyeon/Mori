@@ -401,7 +401,7 @@ label.st-row:has(input:disabled) {
   max-width: 360px;
 }
 
-/* ---------- 폴더, 다른 호스트, 프리셋 ---------- */
+/* ---------- 폴더, 연결한 호스트, 프리셋 ---------- */
 .st-rename {
   flex-wrap: wrap;
   gap: 8px;
@@ -494,6 +494,68 @@ label.st-row:has(input:disabled) {
   gap: 8px;
 }
 
+/* ---------- 연결한 호스트, 호스트 연결 ---------- */
+.st-hosts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Under the name, past the row's icon. */
+.st-host-warn,
+.st-host-acts {
+  margin: 0 8px 0 40px;
+}
+
+.st-host-warn {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--error-box);
+  color: var(--error-box-text);
+  font-size: 12px;
+}
+
+.st-host-warn svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.st-host-warn-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.st-host-why {
+  overflow-wrap: anywhere;
+}
+
+.st-host-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 10px;
+}
+
+.st-link {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.st-link .btn-primary {
+  align-self: flex-start;
+}
+
+.st-hub-link {
+  align-self: flex-start;
+  margin: 8px 8px 0;
+}
+
 /* ---------- 정보 ---------- */
 .st-facts {
   display: flex;
@@ -534,5 +596,11 @@ label.st-row:has(input:disabled) {
 
   .st-task {
     min-height: 44px;
+  }
+
+  /* Three buttons fit on a line from the card's edge. */
+  .st-host-warn,
+  .st-host-acts {
+    margin-left: 8px;
   }
 }

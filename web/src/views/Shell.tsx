@@ -24,6 +24,7 @@ import { NewSession } from './NewSession'
 import { QueueList } from './Queue'
 import { Loading } from './rows'
 import { Settings } from './Settings'
+import { settingsSub } from './SettingsHosts'
 import { Terminal } from './Terminal'
 import './shell.css'
 
@@ -316,7 +317,7 @@ function PhoneShell() {
           title="설정"
           sub={
             <>
-              <b>{nameOf(h)}</b> · 이 호스트의 알림과 기기
+              <b>{nameOf(h)}</b> · {settingsSub(h)}
             </>
           }
         >

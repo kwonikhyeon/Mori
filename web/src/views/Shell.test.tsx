@@ -60,22 +60,29 @@ function withHistory() {
   )
 }
 
+/** What settingsServer was asked. */
+let calls: { method: string; url: string }[] = []
+
 /** A server for 설정: this device alone, and no notifications set. */
 function settingsServer() {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (u: string) => {
+    vi.fn(async (u: string, init: RequestInit = {}) => {
+      calls.push({ method: init.method ?? 'GET', url: u })
       const path = new URL(u, 'http://mori.test').pathname
       if (path === '/api/devices') return Response.json([{ id: 'me', name: 'Mac · Chrome', user_agent: '', created_ms: 1, last_seen_ms: 1, current: true }])
       if (path === '/api/push/subscriptions') return Response.json([])
       if (path === '/api/push/key') return Response.json({ key: 'K' })
-      if (path === '/api/push/settings') return Response.json({ children: false })
+      if (path === '/api/push/settings' || path === '/h/h_desk0001/api/push/settings') {
+        return Response.json(init.method === 'PUT' ? JSON.parse(String(init.body)) : { children: false })
+      }
       return Response.json({})
     }),
   )
 }
 
 beforeEach(() => {
+  calls = []
   FakeWebSocket.reset()
   vi.stubGlobal('WebSocket', FakeWebSocket)
   localStorage.clear()
@@ -238,10 +245,29 @@ describe('PC', () => {
       '새 기기 페어링',
       '화면',
       '폴더 1',
-      '다른 호스트',
+      '연결한 호스트 1곳',
+      '호스트 연결',
       '프리셋 0',
       '정보',
     ])
+  })
+
+  it("opens a linked host's own settings", async () => {
+    settingsServer()
+    const s = withHost()
+    s.ready.value = true
+    at(1440, { name: 'settings' })
+    const { unmount } = render(<Shell />)
+    expect(document.querySelector('.st-sub')!.textContent).toBe('macmini · 이 기기가 페어링한 허브')
+    unmount()
+    at(1440, { name: 'settings', host: 'h_desk0001' })
+    render(<Shell />)
+    expect(document.querySelector('.st-sub')!.textContent).toBe('desk · 허브 macmini에 이은 호스트')
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['알림과 기기', '화면', '폴더 0', '프리셋 0', '정보'])
+    fireEvent.click(await screen.findByRole('switch', { name: '하위 터미널도 알림' }))
+    await vi.waitFor(() =>
+      expect(calls.some((c) => c.method === 'PUT' && c.url === '/h/h_desk0001/api/push/settings')).toBe(true),
+    )
   })
 
   it('cycles the theme from the header', () => {

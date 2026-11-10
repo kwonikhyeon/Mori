@@ -45,7 +45,7 @@ const toastTexts = () => toasts.value.map((t) => [t.text, t.kind])
 const toggle = () => screen.getByRole('checkbox', { name: '이 기기에서 알림 받기' }) as HTMLInputElement
 const kind = (name: string) => screen.getByRole('checkbox', { name }) as HTMLInputElement
 const kindsShown = () => ['승인 대기', '입력 대기', '오류', '종료'].filter((n) => kind(n).checked)
-const childrenBox = () => screen.getByRole('checkbox', { name: '하위 터미널도 알림' }) as HTMLInputElement
+const childrenBox = () => screen.getByRole('switch', { name: '하위 터미널도 알림' }) as HTMLInputElement
 const testBtn = () => screen.getByRole('button', { name: '시험 알림 보내기' }) as HTMLButtonElement
 const described = (el: Element) => document.getElementById(el.getAttribute('aria-describedby') ?? '')?.textContent
 
@@ -100,8 +100,9 @@ describe('PushCards', () => {
     expect(described(toggle())).toBe('Mac · Chrome')
     expect(kindsShown()).toEqual(['승인 대기', '오류'])
     expect(testBtn().disabled).toBe(false)
+    // The host's setting is read on its own.
+    await vi.waitFor(() => expect(childrenBox().disabled).toBe(false))
     expect(childrenBox().checked).toBe(false)
-    expect(childrenBox().disabled).toBe(false)
   })
 
   it('shows the server defaults for a subscription that names no kinds', async () => {
@@ -201,7 +202,7 @@ describe('PushCards', () => {
 
   it('sends the children of sessions too, for the whole host', async () => {
     await shown()
-    fireEvent.click(childrenBox())
+    fireEvent.click(await screen.findByRole('switch', { name: '하위 터미널도 알림' }))
     await vi.waitFor(() => expect(calls.find((c) => c.method === 'PUT')).toEqual({ method: 'PUT', path: '/api/push/settings', body: { children: true } }))
     await vi.waitFor(() => expect(childrenBox().checked).toBe(true))
     expect(toastTexts()).toEqual([])
@@ -236,7 +237,7 @@ describe('PushCards', () => {
     expect(await screen.findByText('이 서버는 알림을 보내지 않습니다')).toBeTruthy()
     expect(toggle().disabled).toBe(true)
     expect(kind('승인 대기').matches(':disabled')).toBe(true)
-    expect(childrenBox().disabled).toBe(true)
+    await vi.waitFor(() => expect(childrenBox().disabled).toBe(true))
     expect(testBtn().disabled).toBe(true)
     expect(vi.mocked(readPush)).not.toHaveBeenCalled()
   })
@@ -249,7 +250,7 @@ describe('PushCards', () => {
     expect(toggle().disabled).toBe(true)
     expect(kind('오류').matches(':disabled')).toBe(true)
     // The host's setting is not this browser's.
-    expect(childrenBox().disabled).toBe(false)
+    await vi.waitFor(() => expect(childrenBox().disabled).toBe(false))
   })
 
   it('needs https', async () => {

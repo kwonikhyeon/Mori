@@ -1,6 +1,7 @@
 // The notification cards of Settings (spec §3 #129, #78, #82): what a
 // notification looks like and a test one, this device on or off, the states
-// it is told about and, for the whole host, the terminals sessions open.
+// it is told about and, for the whole host, the terminals sessions open. That
+// last one is a linked host's own too (#168), so it is a piece of its own.
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Icon } from '../components/Icon'
 import { api } from '../lib/api'
@@ -10,13 +11,14 @@ import {
   DEFAULT_KINDS, disablePush, enablePush, isIOS, isStandalone, KIND_LABEL, KINDS, loadKinds, pushSupport, readPush, saveKinds, setKinds,
   type Support,
 } from '../lib/push'
+import { useHost } from '../lib/scope'
 import { conn } from '../lib/store'
 import { errorText, toast, toastError } from '../lib/toast'
 import type { PushKind, PushSubscriptionView } from '../lib/types'
 import { onWake } from '../lib/wake'
 
 type Server = { state: 'loading' } | { state: 'error'; message: string } | { state: 'ok'; key: string }
-type Busy = '' | 'toggle' | 'kinds' | 'children' | 'test'
+type Busy = '' | 'toggle' | 'kinds' | 'test'
 
 const SUPPORT_TEXT: Record<Exclude<Support, 'ok'>, string> = {
   insecure: 'https 주소에서만 알림을 켤 수 있습니다',
@@ -47,7 +49,6 @@ export function PushCards() {
   const id = useId()
   const [support] = useState(pushSupport)
   const [server, setServer] = useState<Server>({ state: 'loading' })
-  const [children, setChildren] = useState<boolean | null>(null)
   const [on, setOn] = useState<PushSubscriptionView | null>(null)
   const [permission, setPermission] = useState<NotificationPermission>(() => (support === 'ok' ? Notification.permission : 'default'))
   const [local, setLocal] = useState(loadKinds)
@@ -55,7 +56,6 @@ export function PushCards() {
   // What a change asks for, shown while it is on its way.
   const [want, setWant] = useState<boolean | null>(null)
   const [wantKinds, setWantKinds] = useState<PushKind[] | null>(null)
-  const [wantChildren, setWantChildren] = useState<boolean | null>(null)
   const busyRef = useRef<Busy>('')
   const seq = useRef(0)
 
@@ -69,11 +69,10 @@ export function PushCards() {
     if (busyRef.current) return
     const n = ++seq.current
     try {
-      const [{ key }, s] = await Promise.all([api.push.key(), api.push.settings()])
+      const { key } = await api.push.key()
       const st = support === 'ok' ? await readPush(key) : null
       if (n !== seq.current || busyRef.current) return
       setServer({ state: 'ok', key })
-      setChildren(s.children)
       if (st) {
         setOn(st.on)
         setPermission(st.permission)
@@ -102,7 +101,6 @@ export function PushCards() {
 
   const isOn = want ?? !!on
   const kinds = wantKinds ?? (on ? (on.kinds.length ? on.kinds : DEFAULT_KINDS) : local)
-  const shownChildren = wantChildren ?? children
   const ready = server.state === 'ok'
   const canPush = support === 'ok' && ready && permission !== 'denied'
 
@@ -166,24 +164,6 @@ export function PushCards() {
         setWantKinds(null)
         setBusy('')
         if (failed === true) void load()
-      })
-  }
-
-  const pickChildren = (el: HTMLInputElement) => {
-    const v = el.checked
-    if (busyRef.current) {
-      el.checked = !v
-      return
-    }
-    begin('children')
-    setWantChildren(v)
-    api.push
-      .putSettings({ children: v })
-      .then((s) => setChildren(s.children))
-      .catch((e) => toastError(e, '설정을 바꾸지 못했습니다'))
-      .finally(() => {
-        setWantChildren(null)
-        setBusy('')
       })
   }
 
@@ -290,27 +270,95 @@ export function PushCards() {
           ))}
         </fieldset>
         <div class="st-div" />
-        <label class="st-row">
-          <span class="st-row-main">
-            <span id={id + '-ch'} class="st-row-name">
-              하위 터미널도 알림
-            </span>
-            <span id={id + '-ch-sub'} class="st-row-sub is-wrap">
-              세션 안에서 따로 연 터미널까지 알립니다. 이 호스트의 모든 기기에 적용됩니다.
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            class="st-check"
-            checked={!!shownChildren}
-            disabled={!ready || shownChildren === null}
-            aria-labelledby={id + '-ch'}
-            aria-describedby={id + '-ch-sub'}
-            onChange={(e) => pickChildren(e.currentTarget)}
-          />
-        </label>
+        <ChildrenSwitch />
         {note && <p class="st-note">{note}</p>}
       </section>
     </>
+  )
+}
+
+/**
+ * 하위 터미널도 알림: a setting of the whole host the screen is on, for every
+ * device. Read from that host, again when its stream comes back; the switch
+ * is there once the host has said how it is.
+ */
+export function ChildrenSwitch() {
+  const h = useHost()
+  const id = useId()
+  // What the host said, null until it has; and whether the last read failed.
+  const [children, setChildren] = useState<boolean | null>(null)
+  const [failed, setFailed] = useState(false)
+  // What a change asks for, shown while it is on its way.
+  const [want, setWant] = useState<boolean | null>(null)
+  const busy = useRef(false)
+  const seq = useRef(0)
+
+  const load = async () => {
+    // A change on its way says how things are once it is done.
+    if (busy.current) return
+    const n = ++seq.current
+    try {
+      const s = await h.api.push.settings()
+      if (n !== seq.current || busy.current) return
+      setChildren(s.children)
+      setFailed(false)
+    } catch {
+      if (n !== seq.current || busy.current) return
+      setFailed(true)
+    }
+  }
+
+  const open = h.conn.value === 'open'
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current || open) void load()
+    first.current = false
+  }, [open])
+  useEffect(() => onWake(() => void load()), [])
+
+  const pick = (el: HTMLInputElement) => {
+    const v = el.checked
+    if (busy.current || failed || children === null) {
+      el.checked = !v
+      return
+    }
+    busy.current = true
+    seq.current++
+    setWant(v)
+    h.api.push
+      .putSettings({ children: v })
+      .then((s) => setChildren(s.children))
+      .catch((e) => toastError(e, '설정을 바꾸지 못했습니다'))
+      .finally(() => {
+        busy.current = false
+        setWant(null)
+      })
+  }
+
+  return (
+    <label class="st-row">
+      <span class="st-row-main">
+        <span id={id + '-name'} class="st-row-name">
+          하위 터미널도 알림
+        </span>
+        <span id={id + '-sub'} class="st-row-sub is-wrap">
+          세션 안에서 따로 연 터미널까지 알립니다. 이 호스트의 모든 기기에 적용됩니다.
+        </span>
+      </span>
+      {children === null && !failed ? (
+        <span class="st-check" aria-hidden="true" />
+      ) : (
+        <input
+          type="checkbox"
+          role="switch"
+          class="st-check"
+          checked={want ?? !!children}
+          disabled={failed}
+          aria-labelledby={id + '-name'}
+          aria-describedby={id + '-sub'}
+          onChange={(e) => pick(e.currentTarget)}
+        />
+      )}
+    </label>
   )
 }

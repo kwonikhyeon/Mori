@@ -209,6 +209,12 @@ export const api = {
 
   hosts: {
     get: () => get<Host[]>('/api/hosts'),
+    /** Links the host at url, an origin or a pairing link; 201 is a new one, 200 one linked again. */
+    link: (url: string, code = '', name = '') => request<Host>('POST', '/api/hosts', { url, code, name }),
+    rename: (id: string, name: string) => request<Host>('PATCH', '/api/hosts/' + seg(id), { name }),
+    unlink: (id: string) => request<void>('DELETE', '/api/hosts/' + seg(id)),
+    /** Sets up the notifications the host relays to the hub again. */
+    relay: (id: string) => request<Host>('POST', '/api/hosts/' + seg(id) + '/relay'),
   },
 
   push: {

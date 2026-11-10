@@ -1,6 +1,7 @@
 // 설정 (spec §3 #113, the B-Pair board): one column of cards on a phone and
-// a PC alike. This device's notifications and theme, the devices that may
-// use this host, and what the host keeps for all of them.
+// a PC alike. On the hub: this device's notifications and theme, the devices
+// that may use it, the hosts linked to it, and what it keeps for all of them.
+// On a linked host (#168): what that host keeps, and this device's theme.
 import { useId } from 'preact/hooks'
 import { Segmented } from '../components/Segmented'
 import { hello } from '../lib/boot'
@@ -9,7 +10,9 @@ import { useHost } from '../lib/scope'
 import { setTheme, theme, THEME_LABEL, type ThemePref } from '../lib/theme'
 import type { CoreStatus } from '../lib/types'
 import { DeviceCards } from './SettingsDevices'
-import { FoldersCard, HostsCard, PresetsCard } from './SettingsEdit'
+import { nameOf } from './HostSwitch'
+import { FoldersCard, PresetsCard } from './SettingsEdit'
+import { HostNoticesCard, HostsCard, LinkHostCard, settingsSub } from './SettingsHosts'
 import { PushCards } from './SettingsPush'
 import './settings.css'
 
@@ -21,13 +24,25 @@ export interface SettingsProps {
 
 export function Settings({ variant }: SettingsProps) {
   const h = useHost()
+  const isHub = h.id === ''
   const col = (
     <div class="st-col">
-      <PushCards />
-      <DeviceCards variant={variant} />
+      {isHub ? (
+        <>
+          <PushCards />
+          <DeviceCards variant={variant} />
+        </>
+      ) : (
+        <HostNoticesCard />
+      )}
       <ThemeCard />
       <FoldersCard />
-      <HostsCard />
+      {isHub && (
+        <>
+          <HostsCard />
+          <LinkHostCard />
+        </>
+      )}
       <PresetsCard />
       <AboutCard />
     </div>
@@ -39,7 +54,7 @@ export function Settings({ variant }: SettingsProps) {
       <header class="st-head">
         <h1>설정</h1>
         <span class="st-sub">
-          <b>{h.name.value || '이 호스트'}</b> · 이 호스트의 알림과 기기
+          <b>{nameOf(h)}</b> · {settingsSub(h)}
         </span>
       </header>
       <div class="st-scroll">{col}</div>

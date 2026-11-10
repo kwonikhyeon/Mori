@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { folder, linkedHost } from '../../test/fixtures'
-import { folders, hosts, presets, resetStore } from '../lib/store'
+import { folder } from '../../test/fixtures'
+import { folders, presets, resetStore } from '../lib/store'
 import { toasts } from '../lib/toast'
 import type { FolderView, Preset } from '../lib/types'
-import { FoldersCard, HostsCard, PresetsCard } from './SettingsEdit'
+import { FoldersCard, PresetsCard } from './SettingsEdit'
 
 interface Call {
   method: string
@@ -156,32 +156,6 @@ describe('FoldersCard', () => {
     render(<FoldersCard />)
     expect(screen.getByRole('heading', { name: '폴더 0' })).toBeTruthy()
     expect(screen.getByText('등록된 폴더가 없습니다.')).toBeTruthy()
-  })
-})
-
-describe('HostsCard', () => {
-  it('lists the linked hosts and how they are', () => {
-    hosts.value = [
-      linkedHost(),
-      linkedHost({ id: 'h_lab00001', name: 'lab', url: 'https://lab.example.ts.net', linked: false, version: '' }),
-      linkedHost({ id: 'h_self0001', name: 'macmini', url: location.origin }),
-    ]
-    render(<HostsCard />)
-    const row = (name: string) => screen.getByText(name, { selector: '.st-name' }).closest('.st-row') as HTMLElement
-    expect(within(row('desk')).getByText('https://desk.example.ts.net · 0.1.0')).toBeTruthy()
-    expect(within(row('desk')).queryByText('끊김')).toBeNull()
-    expect(within(row('lab')).getByText('끊김')).toBeTruthy()
-    expect(within(row('lab')).getByText('https://lab.example.ts.net')).toBeTruthy()
-    expect(within(row('macmini')).getByText('이 호스트')).toBeTruthy()
-    expect(screen.queryByRole('button')).toBeNull()
-  })
-
-  it('says how to link one', () => {
-    render(<HostsCard />)
-    expect(screen.getByText('이은 호스트가 없습니다.')).toBeTruthy()
-    expect(document.querySelector('.st-hint')!.textContent).toBe(
-      '다른 컴퓨터의 Mori를 이 허브에 이으려면 이 컴퓨터에서 mori hosts link 주소 코드를 실행하세요. 코드는 그 컴퓨터에서 mori pair로 받습니다.',
-    )
   })
 })
 

@@ -144,6 +144,19 @@ describe('another host', () => {
     expect(hostPrefix('h 1')).toBe('/h/h%201')
   })
 
+  it('links, renames, relays and unlinks a host', async () => {
+    await api.hosts.link('https://desk.example.ts.net', 'ABCD-EFGH', '책상')
+    await api.hosts.rename('h_desk0001', 'desk')
+    await api.hosts.relay('h_desk0001')
+    await api.hosts.unlink('h_desk0001')
+    expect(calls.map((c) => [c.init.method, c.url, c.init.body])).toEqual([
+      ['POST', '/api/hosts', JSON.stringify({ url: 'https://desk.example.ts.net', code: 'ABCD-EFGH', name: '책상' })],
+      ['PATCH', '/api/hosts/h_desk0001', JSON.stringify({ name: 'desk' })],
+      ['POST', '/api/hosts/h_desk0001/relay', undefined],
+      ['DELETE', '/api/hosts/h_desk0001', undefined],
+    ])
+  })
+
   it('has only what the hub relays', () => {
     expect(Object.keys(desk).sort()).toEqual(['folders', 'fs', 'git', 'hello', 'overview', 'presets', 'push', 'terminals'])
     expect(Object.keys(desk.push).sort()).toEqual(['putSettings', 'settings'])

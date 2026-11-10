@@ -329,14 +329,22 @@ a.btn-danger:hover {
   font-weight: 700;
 }
 
-/* A banner with a button at its end. */
-.banner-act .banner-text {
+/* A banner with a button at its end: the words meet the button at its middle
+   on one line or two, and the icon stays with the first line. */
+.banner-act {
+  align-items: center;
+}
+
+.banner-main {
+  display: flex;
   flex: 1;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .banner-act .btn {
   flex: none;
-  align-self: center;
 }
 
 .spin {

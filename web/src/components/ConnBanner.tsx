@@ -32,10 +32,12 @@ export function ConnBanner({ class: cls = '', list = false }: Props) {
     <div ref={box} class={`banner-slot ${cls}`} role="status" aria-live="polite" tabIndex={-1}>
       {problem === 'unreachable' && (
         <div class="banner banner-error banner-act">
-          <Icon name="warning" size={16} class="banner-icon" />
-          <span class="banner-text">
-            <b>{h.name.value}에 닿지 못했습니다</b> ·{' '}
-            <span>{why}</span>
+          <span class="banner-main">
+            <Icon name="warning" size={16} class="banner-icon" />
+            <span class="banner-text">
+              <b>{h.name.value}에 닿지 못했습니다</b> ·{' '}
+              <span>{why}</span>
+            </span>
           </span>
           <button ref={btn} type="button" class="btn btn-sm" onClick={() => h.retry()}>
             다시 시도

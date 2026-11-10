@@ -23,6 +23,8 @@ export interface Screen {
   /** Whether keys typed into the screen reach the program. */
   setInput(on: boolean): void
   focus(): void
+  /** Shows the end of the output, where the cursor is. */
+  scrollToBottom(): void
   onData(fn: (s: string) => void): () => void
   onBinary(fn: (s: string) => void): () => void
   dispose(): void
@@ -127,6 +129,7 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
       term.options.disableStdin = !on
     },
     focus: () => term.focus(),
+    scrollToBottom: () => term.scrollToBottom(),
     onData: (fn) => off(term.onData(fn)),
     onBinary: (fn) => off(term.onBinary(fn)),
     dispose: () => {

@@ -179,8 +179,10 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     if (link?.send(k.bytes)) return
     h.api.terminals.keys(addr, [k.name]).catch(fail('키를 보내지 못했습니다'))
   }
+  // What is sent another way than the stream shows the screen's end too.
+  const toEnd = () => screen.current?.scrollToBottom()
   const interrupt = () => {
-    h.api.terminals.interrupt(addr).catch(fail('중단하지 못했습니다'))
+    h.api.terminals.interrupt(addr).then(toEnd, fail('중단하지 못했습니다'))
   }
   const kill = async () => {
     setKillBusy(true)
@@ -331,7 +333,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const askBar = blocked && t && <AskBar t={t} phone={phone} id={id} onKey={answer} />
   const observeBar = observing && active && <ObserveBar onOff={() => observe(false)} />
   const endBar = finished && <EndBar t={t} ended={ended} onRemove={() => void remove()} />
-  const composer = canType && <Composer addr={addr} phone={phone} id={id} />
+  const composer = canType && <Composer addr={addr} phone={phone} id={id} onSent={toEnd} />
 
   if (!phone) {
     return (
@@ -582,7 +584,7 @@ function QuickKeys({ link, open }: { link: TermLink | null; open: boolean }) {
 }
 
 /** Several lines sent at once with POST send (spec §3 #124). */
-function Composer({ addr, phone, id }: { addr: string; phone: boolean; id: string }) {
+function Composer({ addr, phone, id, onSent }: { addr: string; phone: boolean; id: string; onSent: () => void }) {
   const h = useHost()
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -596,6 +598,7 @@ function Composer({ addr, phone, id }: { addr: string; phone: boolean; id: strin
     try {
       await h.api.terminals.send(addr, text)
       setText('')
+      onSent()
     } catch (e) {
       if (e instanceof ApiError && e.kind === 'blocked') setHeld(true)
       else toastError(e, '보내지 못했습니다')

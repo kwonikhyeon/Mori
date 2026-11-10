@@ -96,12 +96,12 @@ export class TermLink {
 
   /** Types s into the terminal; false when only watching or not attached. */
   send(s: string): boolean {
-    return this.session.send(s)
+    return this.sent(this.session.send(s))
   }
 
   /** A quick key, written the way the program reads it now. */
   key(k: QuickKey): boolean {
-    return this.session.send(keyBytes(k, this.o.screen.appCursor()))
+    return this.sent(this.session.send(keyBytes(k, this.o.screen.appCursor())))
   }
 
   /** The screen's box changed: the terminal follows when the fit did. */
@@ -131,6 +131,12 @@ export class TermLink {
     this.disposed = true
     this.close()
     for (const stop of this.stops.splice(0)) stop()
+  }
+
+  /** What went shows the screen's end, as xterm does for what is typed into it. */
+  private sent(ok: boolean): boolean {
+    if (ok) this.o.screen.scrollToBottom()
+    return ok
   }
 
   private open(): void {

@@ -87,6 +87,18 @@ describe('TermLink', () => {
     expect([...(ws.sent.at(-1) as Uint8Array)]).toEqual([0x80])
   })
 
+  it("shows the screen's end for the keys and the text it sends, as typing does", () => {
+    const { l, screen, ws } = link()
+    // nothing goes before it is attached: the screen stays where it is
+    expect(l.key('up')).toBe(false)
+    expect(l.send('y')).toBe(false)
+    expect(screen.bottoms).toBe(0)
+    attach(ws)
+    l.key('esc')
+    l.send('y')
+    expect(screen.bottoms).toBe(2)
+  })
+
   it('follows the size another screen sets and asks for its own on a change or a fit', () => {
     const { l, screen, ws } = link()
     attach(ws)

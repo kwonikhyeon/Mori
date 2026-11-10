@@ -126,6 +126,17 @@ describe('Terminal on a PC', () => {
     expect(sent('/api/terminals/t1/send').map((c) => c.body)).toEqual([{ text: 'fix the test\nthen run it' }])
   })
 
+  it("shows the screen's end once several lines are sent or the program is interrupted", async () => {
+    await mount()
+    const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+    fireEvent.input(box, { target: { value: 'go on' } })
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+    await vi.waitFor(() => expect(box.value).toBe(''))
+    expect(FakeScreen.last().bottoms).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: '중단' }))
+    await vi.waitFor(() => expect(FakeScreen.last().bottoms).toBe(2))
+  })
+
   it('keeps the text when the program waits for an answer', async () => {
     reply = (c) =>
       c.url.endsWith('/send') ? Response.json({ error: { kind: 'blocked', message: '승인을 기다립니다' } }, { status: 409 }) : undefined
@@ -136,6 +147,8 @@ describe('Terminal on a PC', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('승인 대기 중 — 키로 응답')
     expect(box.value).toBe('go on')
     expect(toasts.value).toEqual([])
+    // nothing went: the screen stays where it is
+    expect(FakeScreen.last().bottoms).toBe(0)
     fireEvent.input(box, { target: { value: 'go on!' } })
     expect(screen.queryByRole('alert')).toBeNull()
   })

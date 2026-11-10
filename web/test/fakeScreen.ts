@@ -18,6 +18,8 @@ export class FakeScreen implements Screen {
   app = false
   theme: ITheme | null = null
   focused = 0
+  /** How often the screen was moved to its end. */
+  bottoms = 0
   disposed = false
   cellSize: [number, number] = [8, 17]
   private readonly data = new Set<(s: string) => void>()
@@ -69,6 +71,10 @@ export class FakeScreen implements Screen {
 
   focus(): void {
     this.focused++
+  }
+
+  scrollToBottom(): void {
+    this.bottoms++
   }
 
   onData(fn: (s: string) => void): () => void {

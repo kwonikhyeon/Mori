@@ -7,6 +7,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal, type ITheme } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { isApple } from './platform'
+import { LINE_HEIGHT, POWERLINE, followPixelRatio, loadPowerline } from './powerline'
 import { touchScroll } from './touchscroll'
 
 export interface Screen {
@@ -39,10 +40,13 @@ export interface ScreenOptions {
 
 // The stack of --font-mono: JetBrains Mono for Latin, the system's
 // monospace and Hangul fonts for the rest (spec §3 #117). Between them, the
-// Nerd Fonts that shell prompts draw their arrows and icons with: one the
-// device has fills those in, else they stay boxes.
+// Powerline font made for the terminal's rows, which draws a prompt's arrows
+// and branch on every device (spec §3 #176), and the Nerd Fonts for the
+// other icons a prompt may use: one the device has fills those in, else they
+// stay boxes.
 const FONT = [
   "'JetBrains Mono'",
+  `'${POWERLINE}'`,
   "'Symbols Nerd Font Mono'",
   "'Symbols Nerd Font'",
   "'MesloLGS NF'",
@@ -76,12 +80,14 @@ function openLink(_e: MouseEvent, uri: string): void {
 
 export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Screen> {
   await fontsReady(o.fontSize)
+  // before the terminal measures its glyphs' widths
+  await loadPowerline(FONT, o.fontSize)
   const term = new Terminal({
     cols: o.cols,
     rows: o.rows,
     fontFamily: FONT,
     fontSize: o.fontSize,
-    lineHeight: 1.15,
+    lineHeight: LINE_HEIGHT,
     theme: o.theme,
     scrollback: 5000,
     cursorBlink: false,
@@ -111,6 +117,8 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     return [s.width / term.cols, s.height / term.rows]
   }
   const untouch = touchScroll(el, term, { rowHeight: () => cell()[1] })
+  // a zoom or another screen changes the rows' height in device pixels
+  const unfollow = followPixelRatio(() => void loadPowerline(FONT, o.fontSize))
   const off = (d: { dispose(): void }) => () => d.dispose()
   return {
     get cols() { return term.cols },
@@ -133,6 +141,7 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     onData: (fn) => off(term.onData(fn)),
     onBinary: (fn) => off(term.onBinary(fn)),
     dispose: () => {
+      unfollow()
       untouch()
       term.dispose()
     },

@@ -163,6 +163,7 @@ Reuse these classes before writing new ones. A new control maps to an astryx com
   | 20 | the slash-command list |
   | 10 | the commit sheet over the Git graph on a phone |
   | 5–6 | the side panel laid over the main area |
+  | 4 | the panel of a Claude Code window, laid over the terminal |
   | 2–3 | terminal internals |
 
 - Known gap: a toast shown while a modal is open sits under the modal's backdrop. astryx puts its toast viewport in the top layer with `popover="manual"`.

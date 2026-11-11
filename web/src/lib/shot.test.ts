@@ -24,6 +24,27 @@ describe('shotOf', () => {
     expect(s.cols).toBe(20)
   })
 
+  // The input box's hint is grey, typed text the default colour (claude-input design §2.1).
+  it("carries each cell's colour", async () => {
+    const t = term(20, 3)
+    await write(t, '\x1b[38;2;153;153;153mhint\x1b[0m ab\r\n\x1b[90mx\x1b[0m 한')
+    const s = shotOf(t, 3)
+    expect(s.ink[0].slice(0, 4)).toEqual(Array(4).fill('rgb:153,153,153'))
+    expect(s.ink[0][5]).toBe('')
+    expect(s.ink[1][0]).toBe('p:8')
+    // a wide letter's second cell takes its first cell's colour
+    expect(s.ink[1][3]).toBe(s.ink[1][2])
+    for (const l of s.ink) expect(l).toHaveLength(20)
+  })
+
+  it('gives the line the view starts at', async () => {
+    const t = term(20, 4)
+    await write(t, Array.from({ length: 30 }, (_, i) => `line ${i}`).join('\r\n'))
+    expect(shotOf(t, 4).view).toBe(26)
+    t.scrollLines(-10)
+    expect(shotOf(t, 4).view).toBe(16)
+  })
+
   it('tells the alternate buffer', async () => {
     const t = term(20, 4)
     await write(t, 'x')

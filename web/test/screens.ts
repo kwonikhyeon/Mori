@@ -19,9 +19,13 @@ export const CHAT = SCREENS['ask-preview'].replace('❯ 1. 파란 하늘색', ' 
 
 const rows = (text: string) => text.replace(/\n$/, '').split('\n')
 
+/** A cell's colour by its row and column, as Shot.ink says it; the default colour without one. */
+export type Ink = (row: number, col: number) => string
+
 /** A sample as the shot of a screen that shows just it. */
-export function toShot(text: string, cols = 80, kind: Shot['kind'] = 'alternate'): Shot {
-  return { kind, top: 0, cols, lines: rows(text).map((l) => toCells(l, cols)) }
+export function toShot(text: string, cols = 80, kind: Shot['kind'] = 'alternate', ink?: Ink): Shot {
+  const lines = rows(text).map((l) => toCells(l, cols))
+  return { kind, top: 0, cols, lines, ink: lines.map((l, y) => l.map((_, x) => ink?.(y, x) ?? '')), view: 0 }
 }
 
 const CURSOR = /^\s*❯\s+\d{1,2}\.\s/

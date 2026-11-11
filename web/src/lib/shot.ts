@@ -14,6 +14,20 @@ export interface Shot {
   cols: number
   /** Each line's cells, cols of them. */
   lines: string[][]
+  /**
+   * Each cell's letter colour, as lines: '' the default, 'rgb:R,G,B', or
+   * 'p:N' from the palette. A wide letter's second cell takes the first's.
+   */
+  ink: string[][]
+  /** The buffer line the view starts at, wherever it is scrolled to. */
+  view: number
+}
+
+/** A cell's letter colour, as Shot.ink says it. */
+export function inkOf(c: IBufferCell): string {
+  if (c.isFgDefault()) return ''
+  const v = c.getFgColor()
+  return c.isFgRGB() ? `rgb:${(v >> 16) & 255},${(v >> 8) & 255},${v & 255}` : `p:${v}`
 }
 
 /**
@@ -27,16 +41,27 @@ export function shotOf(term: Pick<Terminal, 'buffer' | 'rows' | 'cols'>, n: numb
   while (end > b.baseY + 1 && !b.getLine(end - 1)?.translateToString(true).trim()) end--
   const top = Math.max(b.baseY, end - n)
   const lines: string[][] = []
+  const ink: string[][] = []
   let cell: IBufferCell | undefined
   for (let y = top; y < end; y++) {
     const line = b.getLine(y)
     const cells: string[] = []
+    const inks: string[] = []
     for (let x = 0; x < term.cols; x++) {
       cell = line?.getCell(x, cell)
-      if (!cell) cells.push(' ')
-      else cells.push(cell.getWidth() === 0 ? '' : cell.getChars() || ' ')
+      if (!cell) {
+        cells.push(' ')
+        inks.push('')
+      } else if (cell.getWidth() === 0) {
+        cells.push('')
+        inks.push(inks[x - 1] ?? '')
+      } else {
+        cells.push(cell.getChars() || ' ')
+        inks.push(inkOf(cell))
+      }
     }
     lines.push(cells)
+    ink.push(inks)
   }
-  return { kind: b.type, top, cols: term.cols, lines }
+  return { kind: b.type, top, cols: term.cols, lines, ink, view: b.viewportY }
 }

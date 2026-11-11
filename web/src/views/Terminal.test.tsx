@@ -2302,6 +2302,21 @@ describe('pickers', () => {
       expect(textbox().placeholder).toBe(plain)
     })
 
+    // a phone has no Tab for the box: the hint shows alone, and the quick key Tab takes it
+    it('takes the hint with the quick key Tab on a phone', async () => {
+      const { ws } = await mount(undefined, { variant: 'phone', back: '#/folders' })
+      await attach(ws)
+      await hinted()
+      const box = textbox()
+      expect(box.placeholder).toBe(HINT)
+      fireEvent.click(within(screen.getByRole('region', { name: '빠른 키' })).getByRole('button', { name: 'Tab' }))
+      expect(box.value).toBe(HINT)
+      expect(ws.input()).toEqual([])
+      // with text in the box the quick key Tab goes to the terminal, as ever
+      fireEvent.click(within(screen.getByRole('region', { name: '빠른 키' })).getByRole('button', { name: 'Tab' }))
+      expect(ws.input()).toEqual(['\t'])
+    })
+
     it('shows the hint while the terminal shows its own box', async () => {
       const { ws } = await mount()
       await attach(ws)

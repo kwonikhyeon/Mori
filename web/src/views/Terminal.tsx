@@ -348,6 +348,8 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const focusRef = useRef(() => {})
   // the box's own insertion, for a path uploaded while the cover is up
   const pathTo = useRef<((text: string, word?: boolean) => void) | null>(null)
+  // the box takes the terminal's hint for the quick key Tab, while it is empty: true when it did
+  const takeTab = useRef<(() => boolean) | null>(null)
   // text in the terminal's box: what the next send would follow
   const boxNote = boxable && rb.text !== '' && !holding
   useEffect(() => {
@@ -795,6 +797,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       bind={pathTo}
       hint={claudeOn && rb && rb.text === '' ? rb.hint : ''}
       sentKey={`${h.id}.${addr}.${t?.created_ms ?? 0}`}
+      takeTab={takeTab}
     />
   )
 
@@ -933,7 +936,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
           {askBar}
           {observeBar}
           {endBar}
-          {canType && <QuickKeys link={link} open={open} />}
+          {canType && <QuickKeys link={link} open={open} take={(k) => k === 'tab' && covered && !!takeTab.current?.()} />}
           {composer}
         </div>
       </div>
@@ -1119,7 +1122,7 @@ function useMore(msg: string) {
  * The keys a phone keyboard does not have, typed down the stream. Ctrl and
  * Alt hold for the next key, or stay on when tapped twice (spec §3 #186).
  */
-function QuickKeys({ link, open }: { link: TermLink | null; open: boolean }) {
+function QuickKeys({ link, open, take }: { link: TermLink | null; open: boolean; take?: (k: string) => boolean }) {
   const mods = link?.mods.value ?? NO_MODS
   return (
     <section class="term-keys" aria-label="빠른 키">
@@ -1153,7 +1156,11 @@ function QuickKeys({ link, open }: { link: TermLink | null; open: boolean }) {
             disabled={!open}
             onPointerDown={keep}
             onMouseDown={keep}
-            onClick={() => link?.key(k)}
+            onClick={() => {
+              // a key the page takes for itself goes no further (the cover's Tab, spec §3 #225)
+              if (take?.(k)) return
+              link?.key(k)
+            }}
           >
             {q.text}
           </button>
@@ -1200,6 +1207,8 @@ interface ComposerProps {
   hint?: string
   /** Where this device keeps what it sends to this terminal: host, address and start. */
   sentKey: string
+  /** Takes the box's fill of the hint, for a phone's quick key Tab; true when it filled the box. */
+  takeTab?: { current: (() => boolean) | null }
 }
 
 /** How long the cover stays as it was after a send ends (claude-input design §3.2). */
@@ -1243,6 +1252,7 @@ function Composer({
   bind,
   hint,
   sentKey,
+  takeTab,
 }: ComposerProps) {
   const h = useHost()
   const draft = draftKey(h.id, addr)
@@ -1352,6 +1362,13 @@ function Composer({
       setCaret(at + text.length)
     }
   }
+  if (takeTab) {
+    takeTab.current = () => {
+      if (!hint || latest.current !== '' || busy) return false
+      recalled(hint)
+      return true
+    }
+  }
   // An image pasted into the box goes up beside the terminal, and its path
   // goes where the caret was, for Claude Code to read (spec §3 #220). A paste
   // with text is the text's: a spreadsheet's cells come with a picture too.
@@ -1458,7 +1475,10 @@ function Composer({
             rejecting
               ? '대신 할 일을 적으세요'
               : hint
-                ? `${hint} · Tab`
+                ? // a phone has no Tab for the box: its quick key Tab takes the hint
+                  phone
+                  ? hint
+                  : `${hint} · Tab`
                 : phone
                   ? '여러 줄로 보내기'
                   : `여러 줄로 보내기 · ${apple ? '⌘Enter' : 'Ctrl+Enter'}`

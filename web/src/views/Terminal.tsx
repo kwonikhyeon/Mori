@@ -580,6 +580,8 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const pickPanel = seen && (
     <PickPanel id={id} seen={seen} cap={pick.cap} disabled={observing || pick.stale || answering} onChoose={choose} onHint={hint} />
   )
+  // the window a send closes first: the panel's, or one its own cut keeps out of it
+  const toClose = seen ?? pick.held
   const observeBar = observing && active && <ObserveBar onOff={() => observe(false)} />
   const endBar = finished && <EndBar t={t} ended={ended} onRemove={() => void remove()} />
   const composer = canType && (
@@ -593,7 +595,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       rejecting={rejecting}
       onReject={setRejecting}
       claude={!!t && isClaude(t)}
-      closeFirst={seen && !blocked ? () => closeFor(press, seen) : undefined}
+      closeFirst={toClose && !blocked ? () => closeFor(press, toClose) : undefined}
     />
   )
 

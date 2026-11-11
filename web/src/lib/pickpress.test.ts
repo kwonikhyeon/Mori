@@ -173,9 +173,18 @@ describe('closeFor', () => {
   })
 
   it('sends nothing when the window changed', async () => {
-    const f = fake(model2)
+    const f = fake(perm)
     expect(await closeFor(f.p, model.seen!)).toBe(false)
     expect(f.sent).toEqual([])
+  })
+
+  it('closes the window it knows, though its cursor moved or a redraw cut its title', async () => {
+    const f = fake(model2, idle)
+    expect(await closeFor(f.p, model.seen!)).toBe(true)
+    expect(f.sent).toEqual(['answer esc'])
+    const g = fake(cut, idle)
+    expect(await closeFor(g.p, model.seen!)).toBe(true)
+    expect(g.sent).toEqual(['answer esc'])
   })
 })
 

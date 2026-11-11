@@ -38,6 +38,8 @@ export interface PickState {
   seen: Seen | null
   /** The window went a moment ago: its panel stays, with its buttons off. */
   stale: boolean
+  /** A window held out of the panel until the input box shows; the terminal may still show it. */
+  held: Seen | null
   /** The height the list may take, in px; 0 leaves the list out, as the terminal cannot spare its room. */
   cap: number
   /** What the bottom of the screen shows now. */
@@ -140,7 +142,7 @@ export function usePick({ screen, ready, on, size, place, measure }: PickOptions
     setCap(capOf(m.total, m.cellH, seen.rows, m.viewH, m.chrome))
   }, [size])
 
-  return { seen: shown.seen, stale: shown.stale, cap, now, wait }
+  return { seen: shown.seen, stale: shown.stale, held: shown.held, cap, now, wait }
 }
 
 /** A checkbox's state or the item in use, in words beside its icon (design §6.4). */

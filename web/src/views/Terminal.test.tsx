@@ -1442,6 +1442,29 @@ describe('pickers', () => {
       expect(stuck()).toBeNull()
     })
 
+    // The panel's own cut keeps the window out of it, but the terminal still
+    // shows the window: a send closes it first (design §14 #10).
+    it('closes a window held out of the panel before it sends', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      await frame(2000)
+      await act(() => ws.json({ type: 'size', cols: 80, rows: 20 }))
+      await show(half)
+      await frame(1000) // SETTLE_MS
+      await show(SCREENS.model)
+      expect(panel()).toBeNull()
+      const box = textbox()
+      fireEvent.input(box, { target: { value: '테스트 돌려줘' } })
+      fireEvent.click(screen.getByRole('button', { name: '닫고 보내기' }))
+      await vi.waitFor(() => expect(ws.input()).toEqual(['\x1b']))
+      await frame()
+      expect(sends()).toEqual([])
+      await show(SCREENS.idle)
+      await vi.waitFor(() => expect(sends()).toEqual([{ text: '테스트 돌려줘' }]))
+      expect(stuck()).toBeNull()
+    })
+
     it('keeps the text when the window stays', async () => {
       const { ws } = await mount()
       await attach(ws)

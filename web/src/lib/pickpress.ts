@@ -65,12 +65,13 @@ export async function tap(p: Press, seen: Seen, hint: Hint): Promise<boolean> {
 
 /**
  * Closes the window before a message goes: Esc, then the input box with no
- * window. True once the box shows; false when another window shows, or the
- * window stays.
+ * window. The window is known though its cursor moved or a redraw cut its
+ * title (alike). True once the box shows; false when another window shows,
+ * or the window stays.
  */
 export async function closeFor(p: Press, seen: Seen): Promise<boolean> {
   const l = p.now()
-  if (l.seen && l.seen.sig !== seen.sig) return false
+  if (l.seen && !alike(l.seen, seen)) return false
   if (l.seen) await p.answer('esc')
   return (await p.wait((x) => !x.seen && !!x.box, CLOSE_MS)) !== null
 }

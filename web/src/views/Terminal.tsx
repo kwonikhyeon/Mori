@@ -23,6 +23,7 @@ import { fitSize } from '../lib/fit'
 import { watchFocus } from '../lib/focus'
 import { appName, askText, chip, endText, place, type EndFacts } from '../lib/format'
 import type { Hint } from '../lib/hints'
+import { alike } from '../lib/pick'
 import { useChordSubmit } from '../lib/ime'
 import { isMod, namedBytes, NO_MODS, QUICK_KEYS, strayBytes } from '../lib/keys'
 import { choose as chooseItem, closeFor, tap, type Press } from '../lib/pickpress'
@@ -53,6 +54,24 @@ const FIT_DELAY = 120
 /** How long the sizes differ before 이 화면에 맞추기 is offered. */
 const FIT_LATE = 600
 const MAX_UPLOAD = 8 << 20
+
+/** A key that goes from the box or the panel to a window (pickers design §14 #45). */
+type PickKey = 'up' | 'down' | 'enter'
+const ENTER: Hint = { label: '', key: 'enter', move: false }
+const PICK_KEYS: Record<string, PickKey> = { ArrowUp: 'up', ArrowDown: 'down', Enter: 'enter' }
+
+const two = (n: number) => String(n).padStart(2, '0')
+/**
+ * The name a pasted image goes up under: a clipboard calls every image
+ * image.png, and the core would number them (image-2.png); the time says
+ * which paste it was.
+ */
+export function pasteName(f: File, at: Date, i: number): string {
+  if (!f.type.startsWith('image/')) return f.name
+  const ext = f.type === 'image/jpeg' ? 'jpg' : (f.type.slice(6).replace(/\W.*$/, '') || 'png')
+  const stamp = `${at.getFullYear()}${two(at.getMonth() + 1)}${two(at.getDate())}-${two(at.getHours())}${two(at.getMinutes())}${two(at.getSeconds())}`
+  return `paste-${stamp}${i ? `-${i + 1}` : ''}.${ext}`
+}
 const ARROWS = new Set(['up', 'down', 'left', 'right'])
 const NO_END: EndFacts = { reason: null, exit_code: null, signal: null }
 const BROKEN: AttachNote = { kind: 'error', title: '터미널을 열 수 없습니다', detail: '화면을 그리지 못했습니다.', spin: false, late: false }
@@ -569,6 +588,32 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       else toast('복사하지 못했습니다', 'error')
     })
   }
+  // ↑, ↓ and Enter from an empty box, or ↑ and ↓ from the panel, go to a
+  // window the program is not blocked on, as on the terminal; the panel
+  // follows its cursor (pickers design §14 #45). A blocked window is answered
+  // by the approval bar: an Enter in an empty box would approve it.
+  const moved = useRef(false)
+  const pickKey = (k: PickKey): boolean => {
+    if (!seen || blocked || observing || pick.stale) return false
+    // a press is on its way: the key waits for nothing, and goes nowhere else
+    if (answering) return true
+    const l = pick.now().seen
+    if (!l || !alike(l, seen)) return false
+    if (k === 'enter') {
+      run(() => tap(press, l, ENTER))
+      return true
+    }
+    moved.current = true
+    press.move([k]).catch(fail('키를 보내지 못했습니다'))
+    return true
+  }
+  // the item a key moved the cursor to is read out
+  useEffect(() => {
+    if (!moved.current || !seen?.cursor) return
+    moved.current = false
+    const o = seen.options.find((x) => x.n === seen.cursor)
+    if (o) announce(`${o.n}. ${o.label}`)
+  }, [seen?.cursor])
   const askBar = blocked && t && (
     <AskBar
       t={t}
@@ -600,7 +645,15 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     (pick.cap < 0 || seen.partial ? (
       <PickKept seen={seen} />
     ) : (
-      <PickPanel id={id} seen={seen} cap={pick.cap} disabled={observing || pick.stale || answering} onChoose={choose} onHint={hint} />
+      <PickPanel
+        id={id}
+        seen={seen}
+        cap={pick.cap}
+        disabled={observing || pick.stale || answering}
+        onChoose={choose}
+        onHint={hint}
+        onKey={pickKey}
+      />
     ))
   // the window a send closes first: the panel's, or one its own cut keeps out of it
   const toClose = seen ?? pick.held
@@ -618,6 +671,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       onReject={setRejecting}
       claude={!!t && isClaude(t)}
       closeFirst={toClose && !blocked ? () => closeFor(press, toClose) : undefined}
+      onPickKey={seen && !blocked ? pickKey : undefined}
     />
   )
 
@@ -987,6 +1041,8 @@ interface ComposerProps {
    * the window stays (pickers design §6.8, spec §3 #214).
    */
   closeFirst?: () => Promise<boolean>
+  /** A window shows: ↑, ↓ and Enter in an empty box go to it; true when one went (pickers design §14 #45). */
+  onPickKey?: (k: PickKey) => boolean
 }
 
 /** What the box says when the window would not close, and nothing went. */
@@ -998,7 +1054,7 @@ const STUCK = '창이 닫히지 않아 보내지 않았습니다'
  * question, it presses Esc first and sends once the question is gone; over a
  * window Mori knows, it closes the window first in the same way (design §6.8).
  */
-function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, closeFirst }: ComposerProps) {
+function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, closeFirst, onPickKey }: ComposerProps) {
   const h = useHost()
   const draft = draftKey(h.id, addr)
   const [text, setText] = useState(() => loadDraft(draft))
@@ -1006,7 +1062,10 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
   const [held, setHeld] = useState(false)
   const [stuck, setStuck] = useState(false)
   const [caret, setCaret] = useState<number | null>(null) // null: the box does not have the focus
+  const [pasting, setPasting] = useState(0)
   const box = useRef<HTMLTextAreaElement>(null)
+  const latest = useRef(text)
+  latest.current = text
   const moveTo = useRef<number | null>(null)
   const field = id + '-send'
   const apple = isApple()
@@ -1068,6 +1127,48 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
     }
   }
   const chord = useChordSubmit((f) => void submit(f.value, rejecting))
+  // An image pasted into the box goes up beside the terminal, and its path
+  // goes where the caret was, for Claude Code to read (spec §3 #220). A paste
+  // with text is the text's: a spreadsheet's cells come with a picture too.
+  const paste = (e: ClipboardEvent) => {
+    const cd = e.clipboardData
+    const files = Array.from(cd?.files ?? [])
+    if (!files.length || cd?.getData('text/plain')) return
+    e.preventDefault()
+    const el = e.currentTarget as HTMLTextAreaElement
+    const at = el.selectionStart
+    const end = el.selectionEnd
+    const when = new Date()
+    setPasting((n) => n + 1)
+    void (async () => {
+      const paths: string[] = []
+      for (const [i, f] of files.entries()) {
+        if (f.size > MAX_UPLOAD) {
+          toast(`${f.name}: 8 MB를 넘는 파일은 올릴 수 없습니다`, 'error')
+          continue
+        }
+        try {
+          const r = await h.api.terminals.upload(addr, new File([f], pasteName(f, when, i), { type: f.type }))
+          paths.push(quotePath(r.path))
+        } catch (err) {
+          toastError(err, '이미지를 올리지 못했습니다')
+        }
+      }
+      setPasting((n) => n - 1)
+      if (!paths.length) return
+      const cur = latest.current
+      const a = Math.min(at, cur.length)
+      const before = cur.slice(0, a)
+      const after = cur.slice(Math.min(end, cur.length))
+      const lead = before && !/\s$/.test(before) ? ' ' : ''
+      const put = lead + paths.join(' ') + ' '
+      edit(before + put + after.replace(/^ /, ''))
+      setHeld(false)
+      setStuck(false)
+      moveTo.current = a + put.length
+      setCaret(a + put.length)
+    })()
+  }
   const sendLabel = rejecting ? '거절하고 보내기' : closeFirst ? '닫고 보내기' : '보내기'
   return (
     <div class="term-compose">
@@ -1126,11 +1227,17 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
           onClick={track}
           onKeyUp={track}
           onSelect={track}
+          onPaste={paste}
           onKeyDown={(e) => {
             if (slash.onKeyDown(e)) return
             if (rejecting && e.key === 'Escape' && !e.isComposing) {
               e.preventDefault()
               onReject(null)
+              return
+            }
+            const k = PICK_KEYS[e.key]
+            if (k && onPickKey && text === '' && !e.isComposing && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && onPickKey(k)) {
+              e.preventDefault()
               return
             }
             chord.onKeyDown(e)
@@ -1141,7 +1248,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
           type="submit"
           class="btn btn-primary term-send-btn"
           aria-label={phone ? sendLabel : undefined}
-          disabled={busy || text.trim() === ''}
+          disabled={busy || pasting > 0 || text.trim() === ''}
         >
           <Icon name="send" size={phone ? 20 : 16} stroke={2} />
           {!phone && sendLabel}

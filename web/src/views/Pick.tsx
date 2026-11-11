@@ -292,6 +292,7 @@ export function PickPanel({
   disabled,
   onChoose,
   onHint,
+  onKey,
 }: {
   id: string
   seen: Seen
@@ -299,6 +300,8 @@ export function PickPanel({
   disabled: boolean
   onChoose: (n: number) => void
   onHint: (h: Hint) => void
+  /** ↑ or ↓ pressed in the panel; true when it went to the window (design §14 #45). */
+  onKey?: (k: 'up' | 'down') => boolean
 }): JSX.Element {
   const head = id + '-pick'
   const title = headOf(seen)
@@ -308,7 +311,15 @@ export function PickPanel({
   }, [seen.form, seen.title])
   return (
     // a press stays in the panel: the stage under it would give the terminal the focus, and a phone its keyboard
-    <section class="term-pick" aria-labelledby={head} onClick={(e) => e.stopPropagation()}>
+    <section
+      class="term-pick"
+      aria-labelledby={head}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        const k = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : null
+        if (k && onKey && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && onKey(k)) e.preventDefault()
+      }}
+    >
       <h2 id={head} class="term-pick-title">
         {title}
       </h2>

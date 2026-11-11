@@ -386,6 +386,51 @@ describe('Terminal on a PC', () => {
     expect(toasts.value.map((t) => [t.text, t.kind])).toEqual([['big.bin: 8 MB를 넘는 파일은 올릴 수 없습니다', 'error']])
   })
 
+  // An image copied to the clipboard, pasted into the box: it is uploaded, and
+  // its path goes where the caret is, for Claude Code to read (spec §3 #220).
+  it('pastes an image into the box as the path it is uploaded to', async () => {
+    let n = 0
+    reply = (c) => (c.url.endsWith('/files') ? Response.json({ path: `/Users/me/dev/Mori/.mori/up/p${++n}.png`, bytes: 3 }) : undefined)
+    const { ws } = await mount()
+    await attach(ws)
+    const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+    fireEvent.input(box, { target: { value: '이 둘을 봐' } })
+    box.setSelectionRange(5, 5)
+    const shot = (name: string) => new File(['png'], name, { type: 'image/png' })
+    const files = [shot('image.png'), shot('image.png')]
+    expect(fireEvent.paste(box, { clipboardData: { files, types: ['Files'], getData: () => '' } })).toBe(false)
+    await vi.waitFor(() => expect(box.value).toBe('이 둘을 /Users/me/dev/Mori/.mori/up/p1.png /Users/me/dev/Mori/.mori/up/p2.png 봐'))
+    // named by the time, as a clipboard calls every image image.png
+    const names = sent('/api/terminals/t1/files').map((c) => ((c.body as FormData).get('file') as File).name)
+    expect(names[0]).toMatch(/^paste-\d{8}-\d{6}\.png$/)
+    expect(names[1]).toBe(names[0].replace('.png', '-2.png'))
+    // nothing typed into the terminal, and the text stays this device's draft
+    expect(ws.input()).toEqual([])
+    expect(sent('/api/terminals/t1/send')).toEqual([])
+  })
+
+  // A spreadsheet's cells come as text and as a picture of them: the text goes in.
+  it('leaves a paste with text to the box', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' })
+    const files = [new File(['png'], 'image.png', { type: 'image/png' })]
+    const getData = (t: string) => (t === 'text/plain' ? 'A1\tB1' : '')
+    expect(fireEvent.paste(box, { clipboardData: { files, types: ['text/plain', 'Files'], getData } })).toBe(true)
+    expect(sent('/api/terminals/t1/files')).toEqual([])
+  })
+
+  it('refuses a pasted image over 8 MB', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' })
+    const big = new File(['x'], 'image.png', { type: 'image/png' })
+    Object.defineProperty(big, 'size', { value: 9 << 20 })
+    fireEvent.paste(box, { clipboardData: { files: [big], types: ['Files'], getData: () => '' } })
+    await vi.waitFor(() => expect(toasts.value.map((t) => [t.text, t.kind])).toEqual([['image.png: 8 MB를 넘는 파일은 올릴 수 없습니다', 'error']]))
+    expect(sent('/api/terminals/t1/files')).toEqual([])
+  })
+
   it('only watches: attaches again as an observer and stops typing', async () => {
     const { ws } = await mount()
     await attach(ws)
@@ -1618,6 +1663,97 @@ describe('pickers', () => {
       expect(sent('/api/terminals/t1/keys')).toEqual([])
       expect(box.value).toBe('go on')
       expect(stuck()).toBeNull()
+    })
+  })
+
+  // ↑, ↓ and Enter in an empty box go to the window, as on the terminal; the
+  // panel follows the terminal's cursor (pickers design §14 #45).
+  describe('keys from the box', () => {
+    const UP = '\x1b[A'
+    const DOWN = '\x1b[B'
+    // the box has the focus, as when one types in it
+    const textbox = () => {
+      const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+      box.focus()
+      return box
+    }
+
+    it('moves the cursor with the arrows and chooses with Enter', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      const box = textbox()
+      // handled: the box does not move its own caret
+      expect(fireEvent.keyDown(box, { key: 'ArrowDown' })).toBe(false)
+      expect(fireEvent.keyDown(box, { key: 'ArrowUp' })).toBe(false)
+      expect(ws.input()).toEqual([DOWN, UP])
+      expect(fireEvent.keyDown(box, { key: 'Enter' })).toBe(false)
+      await vi.waitFor(() => expect(ws.input()).toEqual([DOWN, UP, '\r']))
+    })
+
+    it('reads out the item the cursor goes to', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      await frame()
+      fireEvent.keyDown(textbox(), { key: 'ArrowDown' })
+      await show(cursorAt(SCREENS.model, 2))
+      await frame()
+      expect(said()).toBe('2. Sonnet')
+    })
+
+    it('moves the cursor with the arrows from a row of the panel', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      const row = rowsOf(panel()!)[0]
+      row.focus()
+      expect(fireEvent.keyDown(row, { key: 'ArrowDown' })).toBe(false)
+      expect(ws.input()).toEqual([DOWN])
+    })
+
+    // The terminal shows the window, as the panel cannot: the keys still go to it.
+    it('moves the cursor of a window the terminal kept', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS['model-cc-short'])
+      expect(panel()).toBeNull()
+      fireEvent.keyDown(textbox(), { key: 'ArrowDown' })
+      expect(ws.input()).toEqual([DOWN])
+    })
+
+    it('leaves the keys to the box with text, a modifier or a word being composed', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      const box = textbox()
+      expect(fireEvent.keyDown(box, { key: 'ArrowDown', shiftKey: true })).toBe(true)
+      expect(fireEvent.keyDown(box, { key: 'Enter', isComposing: true })).toBe(true)
+      fireEvent.input(box, { target: { value: 'go' } })
+      expect(fireEvent.keyDown(box, { key: 'ArrowDown' })).toBe(true)
+      expect(fireEvent.keyDown(box, { key: 'Enter' })).toBe(true)
+      expect(ws.input()).toEqual([])
+    })
+
+    it('leaves the keys to the box with no window', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.idle)
+      expect(fireEvent.keyDown(textbox(), { key: 'ArrowDown' })).toBe(true)
+      expect(fireEvent.keyDown(textbox(), { key: 'Enter' })).toBe(true)
+      expect(ws.input()).toEqual([])
+    })
+
+    // An Enter in an empty box would approve what the program asks: a
+    // question is answered by the approval bar's own keys.
+    it('leaves the keys to the box while the program is blocked', async () => {
+      const { ws } = await mount(blockedTerm())
+      await attach(ws)
+      await show(SCREENS.permission)
+      expect(fireEvent.keyDown(textbox(), { key: 'ArrowDown' })).toBe(true)
+      expect(fireEvent.keyDown(textbox(), { key: 'Enter' })).toBe(true)
+      expect(ws.input()).toEqual([])
+      expect(sent('/api/terminals/t1/keys')).toEqual([])
     })
   })
 })

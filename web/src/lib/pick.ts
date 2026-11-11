@@ -113,7 +113,10 @@ export function isRule(t: string, cols: number): boolean {
   const s = t.trim()
   if (!s || !ENDS.includes(s[0]) || !ENDS.includes(s[s.length - 1])) return false
   const dashes = [...s].filter((c) => c === '─').length
-  return dashes >= 20 && dashes >= cols / 2
+  // The rule over the input box holds the session's name, if it has one: on a
+  // narrow screen its dashes are fewer than half the width, though still most
+  // of its own letters.
+  return dashes >= 20 && (dashes >= cols / 2 || dashes * 2 >= [...s].length)
 }
 
 /** The rule of ▔ that Claude Code draws over a window filling the screen's width. */

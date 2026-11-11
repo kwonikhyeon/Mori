@@ -56,6 +56,17 @@ describe('readBox', () => {
     expect(b.rows).toBe(3)
   })
 
+  // A session with a name has it in the rule over the box: on a narrow
+  // screen the rule's dashes are fewer than half its width.
+  it('reads a box whose rule holds the session name', () => {
+    const b = readBox(toShot(SCREENS['box-titled']))!
+    expect(b).not.toBeNull()
+    expect(b.text).toBe('')
+    expect(b.mode?.label).toBe('묻지 않음')
+    expect(b.status).toHaveLength(2)
+    expect(b.rows).toBe(6)
+  })
+
   it('is null for a window, or with no box', () => {
     expect(readBox(toShot(SCREENS.model))).toBeNull()
     expect(readBox(toShot('그냥 글\n둘째 줄\n'))).toBeNull()

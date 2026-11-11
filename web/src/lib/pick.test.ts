@@ -280,6 +280,6 @@ describe('look', () => {
       expect(shotOf(t, rows).lines, name).toEqual(toShot(text, cols, 'normal').lines)
       t.dispose()
     }
-    expect(Object.keys(SCREENS)).toHaveLength(16)
+    expect(Object.keys(SCREENS)).toHaveLength(17)
   })
 })

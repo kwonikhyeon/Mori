@@ -329,6 +329,11 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const coverWas = useRef(false)
   if (!sending) coverWas.current = coverNow
   const covered = coverWas.current && !!rb && !seen
+  const coverRef = useRef(covered)
+  coverRef.current = covered
+  const focusRef = useRef(() => {})
+  // the box's own insertion, for a path uploaded while the cover is up
+  const pathTo = useRef<((text: string) => void) | null>(null)
   // text in the terminal's box: what the next send would follow
   const boxNote = boxable && rb.text !== '' && !sending
   useEffect(() => {
@@ -364,6 +369,11 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       if (a && a !== document.body && a !== document.documentElement) {
         if (a.closest(OWN_KEYS) || !a.closest('.term-pc')) return
         if ([...e.key].length !== 1 || e.key === ' ') return
+      }
+      // With the cover a letter goes to the box, and nothing else to the terminal (claude-input design §4.1)
+      if (coverRef.current) {
+        if ([...e.key].length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) focusRef.current()
+        return
       }
       const bytes = strayBytes(e, screen.current?.appCursor() ?? false)
       if (bytes === null || !link.send(bytes)) return
@@ -437,8 +447,9 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       }
       try {
         const r = await h.api.terminals.upload(addr, f)
-        // The path goes where the cursor is; a person sees it typed.
-        if (!link?.send(quotePath(r.path) + ' ')) toast(`올렸습니다: ${r.path}`)
+        // The path goes where the cursor is; a person sees it typed. With the cover, into the box.
+        if (covered && pathTo.current) pathTo.current(quotePath(r.path))
+        else if (!link?.send(quotePath(r.path) + ' ')) toast(`올렸습니다: ${r.path}`)
       } catch (e) {
         toastError(e, '파일을 올리지 못했습니다')
       }
@@ -461,6 +472,11 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       ref={stage}
       class={'term-stage' + (drop ? ' is-drop' : '')}
       onClick={() => {
+        // with the cover a PC gives the box the focus, and a phone nothing: its keyboard would shrink the terminal
+        if (covered) {
+          if (!phone) focusBox()
+          return
+        }
         if (canType) screen.current?.focus()
       }}
       onDragOver={(e) => {
@@ -698,6 +714,22 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     sendKeys(['shift+tab'], false).catch(fail('키를 보내지 못했습니다'))
   }
   const focusBox = () => document.getElementById(id + '-send')?.focus()
+  focusRef.current = focusBox
+  // On a PC the box takes the focus as the cover comes, from the page or the terminal
+  useEffect(() => {
+    if (!covered || phone) return
+    const a = document.activeElement
+    if (!a || a === document.body || a === document.documentElement || a.closest('.xterm')) focusBox()
+  }, [covered, phone])
+  // An empty box's Esc and Ctrl+letter, but Ctrl+V, go to the terminal as from its own box (spec §3 #217)
+  const termKey = (e: KeyboardEvent): boolean => {
+    let name: string | null = null
+    if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) name = 'esc'
+    else if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && /^[a-z]$/i.test(e.key) && e.key.toLowerCase() !== 'v') name = `ctrl+${e.key.toLowerCase()}`
+    if (!name) return false
+    const b = namedBytes(name, screen.current?.appCursor() ?? false)
+    return b !== null && !!link?.send(b)
+  }
   const band = covered && rb && (
     <StatusBand box={rb} top={coverTop()} phone={phone} mode={reading.mode} onMode={nextMode} onFocus={() => !phone && focusBox()} />
   )
@@ -721,6 +753,8 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       onMode={nextMode}
       boxNote={boxNote}
       onSending={setSending}
+      onTermKey={covered && !phone ? termKey : undefined}
+      bind={pathTo}
     />
   )
 
@@ -1116,6 +1150,10 @@ interface ComposerProps {
   boxNote?: boolean
   /** Hears when the box sends and stops. */
   onSending?: (busy: boolean) => void
+  /** With the cover on a PC: an empty box's Esc and Ctrl+letter go to the terminal; true when one went. */
+  onTermKey?: (e: KeyboardEvent) => boolean
+  /** Takes the box's insertion of text where the caret is, for paths uploaded with the cover up. */
+  bind?: { current: ((text: string) => void) | null }
 }
 
 /** What the box says when the terminal's own box holds text (claude-input design §3.2). */
@@ -1130,7 +1168,24 @@ const STUCK = '창이 닫히지 않아 보내지 않았습니다'
  * question, it presses Esc first and sends once the question is gone; over a
  * window Mori knows, it closes the window first in the same way (design §6.8).
  */
-function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, closeFirst, onPickKey, mode, onMode, boxNote, onSending }: ComposerProps) {
+function Composer({
+  addr,
+  phone,
+  id,
+  onSent,
+  ask,
+  rejecting,
+  onReject,
+  claude,
+  closeFirst,
+  onPickKey,
+  mode,
+  onMode,
+  boxNote,
+  onSending,
+  onTermKey,
+  bind,
+}: ComposerProps) {
   const h = useHost()
   const draft = draftKey(h.id, addr)
   const [text, setText] = useState(() => loadDraft(draft))
@@ -1207,6 +1262,28 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
     }
   }
   const chord = useChordSubmit((f) => void submit(f.value, rejecting))
+  // Text put in at, over to end, as a word: a space before it if the text
+  // before has none, and one after it.
+  const insert = (text: string, at: number, end: number) => {
+    const cur = latest.current
+    const a = Math.min(at, cur.length)
+    const before = cur.slice(0, a)
+    const after = cur.slice(Math.min(end, cur.length))
+    const lead = before && !/\s$/.test(before) ? ' ' : ''
+    const put = lead + text + ' '
+    edit(before + put + after.replace(/^ /, ''))
+    setHeld(false)
+    setStuck(false)
+    moveTo.current = a + put.length
+    setCaret(a + put.length)
+  }
+  if (bind) {
+    bind.current = (text) => {
+      const el = box.current
+      const n = latest.current.length
+      insert(text, el?.selectionStart ?? n, el?.selectionEnd ?? n)
+    }
+  }
   // An image pasted into the box goes up beside the terminal, and its path
   // goes where the caret was, for Claude Code to read (spec §3 #220). A paste
   // with text is the text's: a spreadsheet's cells come with a picture too.
@@ -1261,18 +1338,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
         }
       }
       setPasting((n) => n - 1)
-      if (!paths.length) return
-      const cur = latest.current
-      const a = Math.min(at, cur.length)
-      const before = cur.slice(0, a)
-      const after = cur.slice(Math.min(end, cur.length))
-      const lead = before && !/\s$/.test(before) ? ' ' : ''
-      const put = lead + paths.join(' ') + ' '
-      edit(before + put + after.replace(/^ /, ''))
-      setHeld(false)
-      setStuck(false)
-      moveTo.current = a + put.length
-      setCaret(a + put.length)
+      if (paths.length) insert(paths.join(' '), at, end)
     })()
   }
   const sendLabel = rejecting ? '거절하고 보내기' : closeFirst ? '닫고 보내기' : '보내기'
@@ -1350,6 +1416,10 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
             const k = PICK_KEYS[e.key]
             const free = text === '' || busy
             if (k && onPickKey && free && !e.isComposing && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && onPickKey(k)) {
+              e.preventDefault()
+              return
+            }
+            if (onTermKey && text === '' && !e.isComposing && onTermKey(e)) {
               e.preventDefault()
               return
             }

@@ -2007,4 +2007,85 @@ describe('pickers', () => {
       expect(band()).toBeNull()
     })
   })
+
+  // With the cover, the box takes the focus, what is typed, and the paths;
+  // on a PC an empty box's Esc and Ctrl+letter go to the terminal
+  // (claude-input design §4.1, spec §3 #217).
+  describe('with the cover', () => {
+    const IDLE = SCREENS['box-idle']
+    const textbox = () => screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+    const stage = () => document.querySelector<HTMLElement>('.term-stage')!
+
+    it('gives the box the focus, and a press on the terminal too', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      expect(document.activeElement).toBe(textbox())
+      ;(document.activeElement as HTMLElement).blur()
+      const xterm = FakeScreen.last().focused
+      fireEvent.click(stage())
+      expect(document.activeElement).toBe(textbox())
+      expect(FakeScreen.last().focused).toBe(xterm)
+    })
+
+    it('does nothing on a phone when the terminal is pressed', async () => {
+      const { ws } = await mount(undefined, { variant: 'phone', back: '#/folders' })
+      await attach(ws)
+      await show(IDLE)
+      const xterm = FakeScreen.last().focused
+      fireEvent.click(stage())
+      expect(FakeScreen.last().focused).toBe(xterm)
+      expect(document.activeElement).not.toBe(textbox())
+    })
+
+    it('sends a letter typed on the page to the box, not the terminal', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      ;(document.activeElement as HTMLElement).blur()
+      fireEvent.keyDown(document.body, { key: 'a' })
+      expect(document.activeElement).toBe(textbox())
+      fireEvent.keyDown(document.body, { key: 'Enter' })
+      expect(ws.input()).toEqual([])
+    })
+
+    it("sends an empty box's Esc and Ctrl+letter to the terminal", async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const box = textbox()
+      box.focus()
+      expect(fireEvent.keyDown(box, { key: 'Escape' })).toBe(false)
+      expect(fireEvent.keyDown(box, { key: 'o', ctrlKey: true })).toBe(false)
+      expect(ws.input()).toEqual(['\x1b', '\x0f'])
+      // Ctrl+V pastes; a word being composed, and text in the box, keep their keys
+      expect(fireEvent.keyDown(box, { key: 'v', ctrlKey: true })).toBe(true)
+      expect(fireEvent.keyDown(box, { key: 'Escape', isComposing: true })).toBe(true)
+      fireEvent.input(box, { target: { value: 'go' } })
+      expect(fireEvent.keyDown(box, { key: 'Escape' })).toBe(true)
+      expect(fireEvent.keyDown(box, { key: 'o', ctrlKey: true })).toBe(true)
+      expect(ws.input()).toEqual(['\x1b', '\x0f'])
+    })
+
+    it('keeps the keys in the box without the cover', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.idle.replace('❯', '❯ x'))
+      const box = textbox()
+      box.focus()
+      expect(fireEvent.keyDown(box, { key: 'Escape' })).toBe(true)
+      expect(ws.input()).toEqual([])
+    })
+
+    it('puts the path of a file pasted on the terminal into the box', async () => {
+      reply = (c) => (c.url.endsWith('/files') ? Response.json({ path: '/Users/me/dev/Mori/.mori/up/a.png', bytes: 3 }) : undefined)
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const files = [new File(['png'], 'a.png', { type: 'image/png' })]
+      fireEvent.paste(stage(), { clipboardData: { files, types: ['Files'], getData: () => '' } })
+      await vi.waitFor(() => expect(textbox().value).toBe('/Users/me/dev/Mori/.mori/up/a.png '))
+      expect(ws.input()).toEqual([])
+    })
+  })
 })

@@ -80,6 +80,37 @@ export function keyBytes(k: QuickKey, appCursor: boolean, ctrl = false, alt = fa
   return withMods(PLAIN[k] ?? '', ctrl, alt)
 }
 
+// The keys the core names that are one byte or one sequence.
+const NAMED: Record<string, string> = { enter: '\r', return: '\r', esc: '\x1b', escape: '\x1b', tab: '\t', space: ' ', backspace: '\x7f' }
+
+/**
+ * The bytes of a key named the way the core takes it ('up', 'shift+tab',
+ * 'ctrl+e', '2'), for the attach stream. Null for a key it has no bytes
+ * for here (a function key, PageUp): that one goes through the core.
+ */
+export function namedBytes(name: string, appCursor: boolean): string | null {
+  if ([...name].length === 1) return name
+  const mods = name.split('+')
+  const base = mods.pop()!
+  let ctrl = false
+  let alt = false
+  let shift = false
+  for (const m of mods) {
+    if (m === 'ctrl') ctrl = true
+    else if (m === 'alt') alt = true
+    else if (m === 'shift') shift = true
+    else return null
+  }
+  const arrow = ARROWS[base as QuickKey]
+  if (arrow) {
+    if (!shift) return keyBytes(base as QuickKey, appCursor, ctrl, alt)
+    return `\x1b[1;${2 + (alt ? 2 : 0) + (ctrl ? 4 : 0)}${arrow}`
+  }
+  if (shift) return base === 'tab' && !ctrl && !alt ? '\x1b[Z' : null
+  const b = NAMED[base] ?? ([...base].length === 1 ? base : null)
+  return b === null ? null : withMods(b, ctrl, alt)
+}
+
 export interface QuickKeyInfo {
   key: QuickKey | Mod
   /** What the key shows. */

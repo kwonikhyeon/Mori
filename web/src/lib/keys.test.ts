@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { keyBytes, LOCK_MS, QUICK_KEYS, strayBytes, tapMod, withMods, type StrayKey } from './keys'
+import { keyBytes, LOCK_MS, namedBytes, QUICK_KEYS, strayBytes, tapMod, withMods, type StrayKey } from './keys'
 
 describe('keyBytes', () => {
   it('sends the bytes a terminal keyboard sends', () => {
@@ -104,5 +104,22 @@ describe('strayBytes', () => {
     expect(strayBytes(press('F5'), false)).toBeNull()
     expect(strayBytes(press('ㅎ', { isComposing: true }), false)).toBeNull()
     expect(strayBytes(press('Process', { keyCode: 229 }), false)).toBeNull()
+  })
+})
+
+describe('namedBytes', () => {
+  it('sends the bytes of a key the core names', () => {
+    expect(namedBytes('up', true)).toBe('\x1bOA')
+    expect(namedBytes('up', false)).toBe('\x1b[A')
+    expect(namedBytes('shift+right', false)).toBe('\x1b[1;2C')
+    expect(namedBytes('space', false)).toBe(' ')
+    expect(namedBytes('tab', false)).toBe('\t')
+    expect(namedBytes('shift+tab', false)).toBe('\x1b[Z')
+    expect(namedBytes('enter', false)).toBe('\r')
+    expect(namedBytes('esc', false)).toBe('\x1b')
+    expect(namedBytes('ctrl+e', false)).toBe('\x05')
+    expect(namedBytes('alt+x', false)).toBe('\x1bx')
+    expect(namedBytes('2', false)).toBe('2')
+    expect(namedBytes('f5', false)).toBeNull()
   })
 })

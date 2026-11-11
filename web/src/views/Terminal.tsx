@@ -562,7 +562,8 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       rejecting={rejecting !== null}
       onReject={ask ? reject : undefined}
       pick={
-        seen && seen.options.length > 0
+        // a list the terminal cannot spare the room for is left there: the bar answers by its own keys
+        seen && seen.options.length > 0 && pick.cap > 0
           ? {
               list: (
                 <div class="term-pick-body" style={{ maxHeight: `${pick.cap}px` }}>

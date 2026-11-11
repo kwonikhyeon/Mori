@@ -27,7 +27,7 @@ export const NO_PANEL: Panel = { seen: null, stale: false, since: 0, lost: null,
 /** How long a window may be gone before the panel goes. */
 export const SETTLE_MS = 1000
 
-/** The least height of the panel's list, in px. */
+/** The least height of the panel's list, in px: under it, the list is left out. */
 export const MIN_CAP = 120
 
 /** The panel after a look at a time. */
@@ -58,8 +58,12 @@ export function restart(p: Panel, at: number): Panel {
 /**
  * The height of the panel's list: at most half the view, and enough left for
  * the terminal to keep the window's rows and the two of the box beside the
- * rest of the panel, its title and keys (chrome), but never under MIN_CAP.
+ * rest of the panel, its title and keys (chrome). Under MIN_CAP the list is
+ * left out (0): the window stays whole on the terminal, and the panel shows
+ * its title and keys alone (design §6.4). MIN_CAP while nothing was measured.
  */
 export function capOf(total: number, cellH: number, rows: number, viewH: number, chrome: number): number {
-  return Math.round(Math.max(MIN_CAP, Math.min(viewH / 2, total - cellH * (rows + 2) - chrome)))
+  if (total <= 0) return MIN_CAP
+  const room = Math.min(viewH / 2, total - cellH * (rows + 2) - chrome)
+  return room < MIN_CAP ? 0 : Math.round(room)
 }

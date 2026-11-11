@@ -1059,6 +1059,33 @@ describe('pickers', () => {
     expect(capIn('.term-ask')).toBe('204px')
   })
 
+  it('leaves the list out when the terminal cannot spare its room', async () => {
+    const px = layOut({ 'term-stage': 150, 'term-pick': 140, 'term-pick-body': 100 })
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS.model)
+    // 150 + 140 − 17 × (9 + 2) − (140 − 100) is under MIN_CAP: the keys alone, and the list on the terminal
+    const p = screen.getByRole('region', { name: TITLE })
+    expect(p.querySelector('.term-pick-body')).toBeNull()
+    expect(hintsOf(p).map((b) => b.textContent)).toEqual(['고르기', '노력 낮추기', '노력 높이기', '이 세션만', '닫기'])
+    // the terminal grows, as a phone's keyboard goes down: the list comes back
+    px['term-stage'] = 400
+    await act(() => ws.json({ type: 'size', cols: 80, rows: 30 }))
+    await frame()
+    expect(capIn('.term-pick')).toBe('213px')
+  })
+
+  it('answers a blocked list by the keys when the terminal cannot spare its room', async () => {
+    layOut({ 'term-stage': 150, 'term-ask': 200, 'term-pick-body': 100 })
+    const { ws } = await mount(blockedTerm())
+    await attach(ws)
+    await show(SCREENS.permission)
+    // 150 + 200 − 17 × (6 + 2) − (200 − 100) is under MIN_CAP: the bar's own keys, and the list on the terminal
+    const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
+    expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['1', '2', '3', 'Enter', 'Esc', '거절하고 지시'])
+    expect(document.querySelector('.term-pick, .term-pick-row')).toBeNull()
+  })
+
   it('shows nothing while idle', async () => {
     const { ws } = await mount()
     await attach(ws)

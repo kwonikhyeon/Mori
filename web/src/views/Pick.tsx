@@ -38,7 +38,7 @@ export interface PickState {
   seen: Seen | null
   /** The window went a moment ago: its panel stays, with its buttons off. */
   stale: boolean
-  /** The height the list may take, in px. */
+  /** The height the list may take, in px; 0 leaves the list out, as the terminal cannot spare its room. */
   cap: number
   /** What the bottom of the screen shows now. */
   now(): Look
@@ -130,6 +130,15 @@ export function usePick({ screen, ready, on, size, place, measure }: PickOptions
     const m = sizes.current()
     setCap(capOf(m.total, m.cellH, seen.rows, m.viewH, m.chrome))
   }, [shown.seen?.form, place])
+  // A list left out for want of room is measured again as the terminal's
+  // size changes: it grew, as when a phone's keyboard goes down, and the list
+  // may fit now. A list shown keeps its cap.
+  useLayoutEffect(() => {
+    const seen = shown.seen
+    if (cap > 0 || !seen) return
+    const m = sizes.current()
+    setCap(capOf(m.total, m.cellH, seen.rows, m.viewH, m.chrome))
+  }, [size])
 
   return { seen: shown.seen, stale: shown.stale, cap, now, wait }
 }
@@ -259,7 +268,7 @@ export function PickPanel({
       <h2 id={head} class="term-pick-title">
         {title}
       </h2>
-      {seen.options.length > 0 && (
+      {seen.options.length > 0 && cap > 0 && (
         <div class="term-pick-body" style={{ maxHeight: `${cap}px` }}>
           <PickList seen={seen} blocked={false} disabled={disabled} onChoose={onChoose} />
         </div>

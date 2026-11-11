@@ -158,6 +158,7 @@ describe('next', () => {
 
 describe('capOf', () => {
   it('gives the panel at most half the view and keeps the window on the terminal', () => {
+    // nothing measured yet
     expect(capOf(0, 17, 10, 768, 0)).toBe(MIN_CAP)
     expect(MIN_CAP).toBe(120)
     expect(capOf(800, 17, 10, 900, 0)).toBe(450)
@@ -168,6 +169,15 @@ describe('capOf', () => {
     // 1440×900: 32 rows of 19px, and the 16 rows of a 12-item /theme
     expect(capOf(608, 19, 16, 900, 92)).toBe(174)
     expect(capOf(800, 17, 30, 2000, 60)).toBe(196)
-    expect(capOf(400, 17, 10, 900, 100)).toBe(MIN_CAP)
+  })
+
+  // Under MIN_CAP the list would take the window's rows from the terminal,
+  // which would lose the window: the panel shows its title and keys alone,
+  // and the terminal the list (design §6.4).
+  it('leaves the list out where the terminal cannot spare MIN_CAP', () => {
+    expect(capOf(400, 17, 10, 900, 100)).toBe(0)
+    // a phone with its keyboard up, and /model
+    expect(capOf(350, 17, 9, 844, 140)).toBe(0)
+    expect(capOf(424, 17, 10, 900, 100)).toBe(MIN_CAP)
   })
 })

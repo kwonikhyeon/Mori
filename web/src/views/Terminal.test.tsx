@@ -2028,6 +2028,33 @@ describe('pickers', () => {
       expect(document.querySelector('.term-boxnote')).toBeNull()
     })
 
+    // the core answers the send before the terminal clears its box, at times
+    it('keeps the cover a moment after the send ends', async () => {
+      let done = () => {}
+      reply = (c) =>
+        c.url.endsWith('/send')
+          ? new Promise<Response>((r) => {
+              done = () => r(Response.json({ started: false }))
+            })
+          : undefined
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' })
+      fireEvent.input(box, { target: { value: 'hi' } })
+      fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+      await vi.waitFor(() => expect(sent('/api/terminals/t1/send')).toHaveLength(1))
+      await show(withText('hi'))
+      done()
+      await frame(50)
+      expect(band()).not.toBeNull()
+      expect(document.querySelector('.term-boxnote')).toBeNull()
+      // text that stays past the moment is text: the note shows
+      await frame(1000)
+      expect(band()).toBeNull()
+      expect(document.querySelector('.term-boxnote')?.textContent).toBe(NOTE)
+    })
+
     it('does not cover while only watching', async () => {
       const { ws } = await mount()
       await attach(ws)

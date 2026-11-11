@@ -323,11 +323,25 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const reading = useBox({ screen, ready: link, on: claudeOn })
   const sameSize = !fit || !size || (fit.cols === size.cols && fit.rows === size.rows)
   const [sending, setSending] = useState(false)
+  // a moment after a send ends, as the core may answer before the terminal
+  // clears its box: known in the very render the send ends in
+  const settleUntil = useRef(0)
+  const wasSending = useRef(false)
+  if (wasSending.current && !sending) settleUntil.current = Date.now() + SEND_SETTLE_MS
+  wasSending.current = sending
+  const [, settled] = useState(0)
+  useEffect(() => {
+    const left = settleUntil.current - Date.now()
+    if (left <= 0) return
+    const timer = setTimeout(() => settled((n) => n + 1), left)
+    return () => clearTimeout(timer)
+  }, [settleUntil.current])
+  const holding = sending || Date.now() < settleUntil.current
   const rb = reading.box
   const boxable = !!rb && !boxShown.value && canType && sameSize && reading.alternate
   const coverNow = boxable && reading.end && reading.row >= 0 && rb.text === ''
   const coverWas = useRef(false)
-  if (!sending) coverWas.current = coverNow
+  if (!holding) coverWas.current = coverNow
   const covered = coverWas.current && !!rb && !seen
   const coverRef = useRef(covered)
   coverRef.current = covered
@@ -335,7 +349,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   // the box's own insertion, for a path uploaded while the cover is up
   const pathTo = useRef<((text: string) => void) | null>(null)
   // text in the terminal's box: what the next send would follow
-  const boxNote = boxable && rb.text !== '' && !sending
+  const boxNote = boxable && rb.text !== '' && !holding
   useEffect(() => {
     if (boxNote) announce(BOX_NOTE)
   }, [boxNote])
@@ -1176,6 +1190,9 @@ interface ComposerProps {
   /** Where this device keeps what it sends to this terminal: host, address and start. */
   sentKey: string
 }
+
+/** How long the cover stays as it was after a send ends (claude-input design §3.2). */
+const SEND_SETTLE_MS = 1000
 
 /** What the box says when the terminal's own box holds text (claude-input design §3.2). */
 const BOX_NOTE = '터미널 입력칸에 글이 있습니다 — 보내면 그 뒤에 이어 붙습니다'

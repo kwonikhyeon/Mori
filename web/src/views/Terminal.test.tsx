@@ -988,9 +988,15 @@ describe('pickers', () => {
   const hintsOf = (el: HTMLElement) => [...el.querySelectorAll<HTMLButtonElement>('.term-pick-hints button')]
   const titles = (el: HTMLElement) => rowsOf(el).map((r) => r.querySelector('.qrow-title')?.textContent)
   const blockedTerm = () => term({ status: status('blocked', { kind: 'permission', msg: 'Bash(ls)를 실행할까요?' }), ask: ASK })
-  /** Heights a browser would lay out, by class, in px; the record may change as a test goes on. */
-  const layOut = (px: Record<string, number>) => {
-    const of = (el: Element) => Object.entries(px).find(([c]) => el.classList.contains(c))?.[1] ?? 0
+  /**
+   * Heights a browser would lay out, by class, in px, or worked out from the
+   * element as it is drawn; the record may change as a test goes on.
+   */
+  const layOut = (px: Record<string, number | ((el: HTMLElement) => number)>) => {
+    const of = (el: HTMLElement) => {
+      const h = Object.entries(px).find(([c]) => el.classList.contains(c))?.[1] ?? 0
+      return typeof h === 'function' ? h(el) : h
+    }
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
       return of(this)
     })
@@ -1084,6 +1090,70 @@ describe('pickers', () => {
     const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
     expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['1', '2', '3', 'Enter', 'Esc', '거절하고 지시'])
     expect(document.querySelector('.term-pick, .term-pick-row')).toBeNull()
+  })
+
+  // The panel's title and keys take their room from the terminal too, list or
+  // no list: where they alone would cut the window, no panel shows, and the
+  // window stays whole on the terminal (design §6.4).
+  it('shows no panel where its title and keys alone would cut the window', async () => {
+    const view = { h: 200 }
+    layOut({
+      // the stage has what the panel leaves of the view
+      'term-stage': () => view.h - (panel()?.offsetHeight ?? 0),
+      'term-pick': (el) => 40 + (el.querySelector('.term-pick-body') ? 100 : 0),
+      'term-pick-body': 100,
+    })
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS.model)
+    // 200 − 17 × (9 + 2) − 40 is under 0
+    expect(panel()).toBeNull()
+    // a send still closes the window first
+    expect(screen.getByRole('button', { name: '닫고 보내기' })).toBeTruthy()
+    await frame()
+    // read out once, and that it is answered on the terminal
+    expect(said()).toBe(`고르는 목록: ${TITLE}. 자리가 모자라 터미널에서 고릅니다`)
+    // the view grows, as a phone's keyboard goes down: the panel comes, with its list
+    view.h = 400
+    await act(() => ws.json({ type: 'size', cols: 80, rows: 30 }))
+    await frame()
+    // 400 − 17 × (9 + 2) − 40
+    expect(capIn('.term-pick')).toBe('173px')
+  })
+
+  it('measures a window by its own title and keys after one the terminal kept', async () => {
+    const view = { h: 240 }
+    layOut({
+      'term-stage': () => view.h - (panel()?.offsetHeight ?? 0),
+      // 20px for the title, and 20px for each key
+      'term-pick': (el) => 20 + 20 * el.querySelectorAll('.term-pick-hints button').length + (el.querySelector('.term-pick-body') ? 100 : 0),
+      'term-pick-body': 100,
+    })
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS.model)
+    // /model's five keys: 240 − 17 × (9 + 2) − 120 is under 0
+    expect(panel()).toBeNull()
+    await show(SCREENS.idle)
+    await show(SCREENS.permission)
+    // its own two keys, not /model's five: 240 − 17 × (6 + 2) − 60 leaves room for its title and keys, though not for its list
+    const p = panel()!
+    expect(p).not.toBeNull()
+    expect(p.querySelector('.term-pick-body')).toBeNull()
+    expect(hintsOf(p).map((b) => b.textContent)).toEqual(['닫기', 'Ctrl+E · explain'])
+  })
+
+  // The screen's cells sit inside the scroll box's padding: it is no room for the window's rows.
+  it('leaves the terminal its padding beside the window', async () => {
+    layOut({ 'term-stage': 300, 'term-pick': 200, 'term-pick-body': 100 })
+    const { ws } = await mount()
+    await attach(ws)
+    const sc = document.querySelector<HTMLElement>('.term-scroll')!
+    sc.style.paddingTop = '12px'
+    sc.style.paddingBottom = '16px'
+    await show(SCREENS.model)
+    // 300 + 200 − (12 + 16) − 17 × (9 + 2) − (200 − 100)
+    expect(capIn('.term-pick')).toBe('185px')
   })
 
   it('shows nothing while idle', async () => {

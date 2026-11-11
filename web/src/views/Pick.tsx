@@ -40,7 +40,11 @@ export interface PickState {
   stale: boolean
   /** A window held out of the panel until the input box shows; the terminal may still show it. */
   held: Seen | null
-  /** The height the list may take, in px; 0 leaves the list out, as the terminal cannot spare its room. */
+  /**
+   * The height the list may take, in px; 0 leaves the list out, as the
+   * terminal cannot spare its room; under 0 (NO_ROOM), no panel shows, as its
+   * title and keys alone would cut the window.
+   */
   cap: number
   /** What the bottom of the screen shows now. */
   now(): Look
@@ -51,10 +55,13 @@ export interface PickState {
 /** Reads the window at the bottom of the terminal as the screen changes. */
 export function usePick({ screen, ready, on, size, place, measure }: PickOptions): PickState {
   const [panel, setPanel] = useState<Panel>(NO_PANEL)
-  const [cap, setCap] = useState(MIN_CAP)
+  // the cap, and the window and place it was taken for
+  const [fit, setFit] = useState({ cap: MIN_CAP, of: '' })
   const cur = useRef(panel)
   const sizes = useRef(measure)
   sizes.current = measure
+  // the title and keys last measured, for a window drawn with none
+  const chrome = useRef(0)
 
   const now = (): Look => {
     const s = screen.current
@@ -122,24 +129,29 @@ export function usePick({ screen, ready, on, size, place, measure }: PickOptions
     })
 
   const shown = on ? panel : NO_PANEL
+  const of = shown.seen ? `${shown.seen.form} ${String(place)}` : ''
+  // A window new to its place is drawn with its title and keys at least, so
+  // that they are measured, though the last window showed no panel.
+  const cap = fit.cap < 0 && fit.of !== of ? 0 : fit.cap
+  const take = () => {
+    const seen = shown.seen
+    if (!seen) return
+    const m = sizes.current()
+    // with no panel drawn, its title and keys as they were last
+    if (m.chrome > 0) chrome.current = m.chrome
+    const c = capOf(m.total, m.cellH, seen.rows, m.viewH, chrome.current)
+    setFit((f) => (f.cap === c && f.of === of ? f : { cap: c, of }))
+  }
   // The cap is taken once the window's panel is drawn, as its title and keys
   // take their part of the room, and drawn again before the screen shows it;
   // then it is kept, so the panel does not move under a finger, though a
   // redraw cuts the window's title.
+  useLayoutEffect(take, [shown.seen?.form, place])
+  // A list left out for want of room, or a panel, is measured again as the
+  // terminal's size changes: it grew, as when a phone's keyboard goes down,
+  // and they may fit now. A list shown keeps its cap.
   useLayoutEffect(() => {
-    const seen = shown.seen
-    if (!seen) return
-    const m = sizes.current()
-    setCap(capOf(m.total, m.cellH, seen.rows, m.viewH, m.chrome))
-  }, [shown.seen?.form, place])
-  // A list left out for want of room is measured again as the terminal's
-  // size changes: it grew, as when a phone's keyboard goes down, and the list
-  // may fit now. A list shown keeps its cap.
-  useLayoutEffect(() => {
-    const seen = shown.seen
-    if (cap > 0 || !seen) return
-    const m = sizes.current()
-    setCap(capOf(m.total, m.cellH, seen.rows, m.viewH, m.chrome))
+    if (cap <= 0) take()
   }, [size])
 
   return { seen: shown.seen, stale: shown.stale, held: shown.held, cap, now, wait }
@@ -243,6 +255,25 @@ export function PickHints({
   )
 }
 
+/** What the panel's title says of a window. */
+const headOf = (seen: Seen) => seen.title || (seen.options.length ? '터미널이 고르기를 기다립니다' : '터미널에 창이 떠 있습니다')
+
+/** What a screen reader hears of a window. */
+const spoken = (seen: Seen) => (seen.title ? `고르는 목록: ${seen.title}` : headOf(seen))
+
+/**
+ * A window the terminal keeps whole, as the panel's title and keys alone
+ * would cut it (design §6.4): nothing shows, but a screen reader hears of it
+ * once, and that it is answered on the terminal. Its own component, not the
+ * panel drawn empty: a panel drawn for a moment, then this, is read out once.
+ */
+export function PickKept({ seen }: { seen: Seen }): null {
+  useEffect(() => {
+    announce(`${spoken(seen)}. 자리가 모자라 터미널에서 고릅니다`)
+  }, [seen.form, seen.title])
+  return null
+}
+
 /** A window that is not a question the program is blocked on. */
 export function PickPanel({
   id,
@@ -260,10 +291,10 @@ export function PickPanel({
   onHint: (h: Hint) => void
 }): JSX.Element {
   const head = id + '-pick'
-  const title = seen.title || (seen.options.length ? '터미널이 고르기를 기다립니다' : '터미널에 창이 떠 있습니다')
+  const title = headOf(seen)
   // read out once a window, though its cursor moves or a redraw cuts its title
   useEffect(() => {
-    announce(seen.title ? `고르는 목록: ${seen.title}` : title)
+    announce(spoken(seen))
   }, [seen.form, seen.title])
   return (
     <section class="term-pick" aria-labelledby={head}>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cursorAt, SCREENS, toShot } from '../../test/screens'
 import { look, NOTHING, type Look } from './pick'
-import { capOf, MIN_CAP, next, NO_PANEL, restart, SETTLE_MS, type Panel } from './pickpanel'
+import { capOf, MIN_CAP, next, NO_PANEL, NO_ROOM, restart, SETTLE_MS, type Panel } from './pickpanel'
 
 const at = (name: string): Look => look(toShot(SCREENS[name]))
 const model = at('model')
@@ -179,5 +179,17 @@ describe('capOf', () => {
     // a phone with its keyboard up, and /model
     expect(capOf(350, 17, 9, 844, 140)).toBe(0)
     expect(capOf(424, 17, 10, 900, 100)).toBe(MIN_CAP)
+  })
+
+  // Where the panel's title and keys alone would take the window's rows from
+  // the terminal, the panel shows nothing: the window stays whole on the
+  // terminal (design §6.4).
+  it('shows no panel where its title and keys alone would cut the window', () => {
+    expect(NO_ROOM).toBe(-1)
+    // a phone with its keyboard up: 226px for the terminal and the panel, rows of 18px, the 11 rows of /model it shows, 136px of title and keys
+    expect(capOf(226, 18, 11, 430, 136)).toBe(NO_ROOM)
+    // the title and keys leave the terminal the window's rows and the box's two, to the pixel
+    expect(capOf(17 * 12 + 100, 17, 10, 900, 100)).toBe(0)
+    expect(capOf(17 * 12 + 99, 17, 10, 900, 100)).toBe(NO_ROOM)
   })
 })

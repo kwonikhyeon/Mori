@@ -42,7 +42,7 @@ import { toast, toastError } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
 import { openScreen, type Screen } from '../lib/xterm'
 import { gitFrom } from './Git'
-import { PickHints, PickList, PickPanel, usePick } from './Pick'
+import { PickHints, PickKept, PickList, PickPanel, usePick } from './Pick'
 import { titleOf, type Variant } from './rows'
 import { useSlash } from './Slash'
 import { TermFontSheet } from './TermFont'
@@ -255,11 +255,15 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const hostTag = others.value.length > 0 ? nameOf(h) : ''
 
   // Claude Code's window at the bottom of the screen, read into a panel in
-  // the approval bar's place (pickers design §6.5). Its room is the stage and
-  // what stands in that place now, as the panel takes its place; of that, the
+  // the approval bar's place (pickers design §6.5). Its room is the stage,
+  // less the scroll box's padding, where no cells go (measure), and what
+  // stands in that place now, as the panel takes its place; of that, the
   // panel's title and keys take what its list leaves.
   const pickSizes = () => {
-    let total = stage.current?.clientHeight ?? 0
+    const sc = scroll.current
+    const cs = sc && getComputedStyle(sc)
+    const px = (v: string | undefined) => parseFloat(v ?? '') || 0
+    let total = (stage.current?.clientHeight ?? 0) - px(cs?.paddingTop) - px(cs?.paddingBottom)
     let chrome = 0
     root.current?.querySelectorAll<HTMLElement>('.term-ask, .term-pick').forEach((el) => {
       total += el.offsetHeight
@@ -576,10 +580,15 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       }
     />
   )
-  // A window the program is not blocked on stands where the approval bar would.
-  const pickPanel = seen && (
-    <PickPanel id={id} seen={seen} cap={pick.cap} disabled={observing || pick.stale || answering} onChoose={choose} onHint={hint} />
-  )
+  // A window the program is not blocked on stands where the approval bar
+  // would; where its title and keys alone would cut it, the terminal keeps it.
+  const pickPanel =
+    seen &&
+    (pick.cap < 0 ? (
+      <PickKept seen={seen} />
+    ) : (
+      <PickPanel id={id} seen={seen} cap={pick.cap} disabled={observing || pick.stale || answering} onChoose={choose} onHint={hint} />
+    ))
   // the window a send closes first: the panel's, or one its own cut keeps out of it
   const toClose = seen ?? pick.held
   const observeBar = observing && active && <ObserveBar onOff={() => observe(false)} />

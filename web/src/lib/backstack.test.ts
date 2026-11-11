@@ -2,8 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pressBack } from '../../test/closewatcher'
 import { initBackstack, layersOpen, marked, openLayer, resetBackstack, unmarked, writeHistory } from './backstack'
 
-/** Lets jsdom go through history, which it does a task later, as a browser does. */
-const traversed = () => new Promise((r) => setTimeout(r, 5))
+/** Node's, on which jsdom queues its tasks; the DOM's types do not have it. */
+declare function setImmediate(f: () => void): unknown
+
+/**
+ * Lets jsdom go through history, which it does a few tasks later, as a browser
+ * does: each step takes two turns of setImmediate, and a step may queue the
+ * next. It counts turns, not milliseconds, so a busy machine that stalls the
+ * loop cannot ring a timer before the step is done.
+ */
+const traversed = async () => {
+  for (let i = 0; i < 10; i++) await new Promise<void>((r) => setImmediate(() => r()))
+}
 
 let stop: () => void = () => {}
 

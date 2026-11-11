@@ -409,6 +409,13 @@ describe('Terminal on a PC', () => {
     expect(sent('/api/terminals/t1/send')).toEqual([])
   })
 
+  // One line high, as its button; it grows with its text (spec §3 #222).
+  it('starts the box one line high', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    expect((screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement).rows).toBe(1)
+  })
+
   // A spreadsheet's cells come as text and as a picture of them: the text goes in.
   it('leaves a paste with text to the box', async () => {
     const { ws } = await mount()

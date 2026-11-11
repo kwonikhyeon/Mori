@@ -97,6 +97,18 @@ describe('the stylesheets', () => {
     expect(phoneRules(sheets['../views/terminal.css']).get('.term-pick-row')).toMatch(/min-height: 44px/)
   })
 
+  // The send box starts at the height of its button and grows with its text,
+  // the button staying at its foot (spec §3 #222).
+  it('start the send box at the height of its button', () => {
+    const css = new Map(rules(sheets['../views/terminal.css']).map(([sel, body]) => [sel, body]))
+    expect(css.get('textarea.term-send-input')).toMatch(/min-height: var\(--size-element-lg\);/)
+    expect(css.get('textarea.term-send-input')).toMatch(/padding: var\(--spacing-1-5\) var\(--spacing-3\);/)
+    expect(css.get('.term-phone textarea.term-send-input')).toMatch(/min-height: var\(--mori-size-touch\);/)
+    expect(css.get('.term-phone textarea.term-send-input')).toMatch(/padding: var\(--spacing-2\) var\(--spacing-3\);/)
+    expect(css.get('.term-phone .term-send-btn')).toMatch(/height: var\(--mori-size-touch\);/)
+    expect(css.get('.term-send')).toMatch(/align-items: flex-end;/)
+  })
+
   // A Claude Code window's panel lies over the terminal: one that took the
   // terminal's rows would have Claude Code draw its list cut short (pickers
   // design §14 #44). Its place in the z-index ladder is 4.

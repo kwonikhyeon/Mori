@@ -812,12 +812,14 @@ a.term-back {
   padding: var(--spacing-3) var(--spacing-4);
 }
 
+/* The box starts at the height of its button, one line, and grows with its
+   text; the button stays at its foot (spec §3 #222). */
 textarea.term-send-input {
   flex: 1;
   min-width: 0;
-  min-height: 62px;
+  min-height: var(--size-element-lg);
   max-height: 168px;
-  padding: var(--spacing-2) var(--spacing-3);
+  padding: var(--spacing-1-5) var(--spacing-3);
   background-color: var(--color-background-muted);
   line-height: var(--text-body-leading);
   resize: none;
@@ -856,15 +858,15 @@ textarea.term-send-input {
 }
 
 .term-phone textarea.term-send-input {
-  min-height: 44px;
+  min-height: var(--mori-size-touch);
   max-height: 120px;
-  padding: var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-3);
   border-radius: var(--radius-container);
 }
 
 .term-phone .term-send-btn {
-  width: 44px;
-  height: 44px;
+  width: var(--mori-size-touch);
+  height: var(--mori-size-touch);
   padding: 0;
   border-radius: var(--radius-container);
 }

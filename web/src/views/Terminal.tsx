@@ -1208,7 +1208,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
           id={field}
           class="input term-send-input"
           data-draft=""
-          rows={phone ? 1 : 2}
+          rows={1}
           value={text}
           readOnly={busy}
           {...slash.aria}

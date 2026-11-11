@@ -21,6 +21,9 @@ describe('PickSwitch', () => {
     render(<PickSwitch />)
     expect(toggle().checked).toBe(true)
     expect(pickOn.value).toBe(true)
+    expect(document.getElementById(toggle().getAttribute('aria-describedby') ?? '')?.textContent).toBe(
+      '번호 목록과 안내 줄을 알아봐 입력창 위에 단추로 보여 줍니다. 끄면 터미널에서 고릅니다. 이 기기에만 적용됩니다.',
+    )
     fireEvent.click(toggle())
     expect(toggle().checked).toBe(false)
     expect(pickOn.value).toBe(false)

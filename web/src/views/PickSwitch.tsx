@@ -15,7 +15,7 @@ export function PickSwitch(): JSX.Element {
           Claude Code 창 알아보기
         </span>
         <span id={id + '-sub'} class="st-row-sub is-wrap">
-          Claude Code가 띄운 고르는 창을 입력창 위에 단추로 보여 줍니다. 끄면 터미널에서 고릅니다. 이 기기에만 적용됩니다.
+          번호 목록과 안내 줄을 알아봐 입력창 위에 단추로 보여 줍니다. 끄면 터미널에서 고릅니다. 이 기기에만 적용됩니다.
         </span>
       </span>
       <input

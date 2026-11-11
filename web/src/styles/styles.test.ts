@@ -121,6 +121,8 @@ describe('the stylesheets', () => {
     expect(css.get('.term-phone textarea.term-send-input')).toMatch(/padding: var\(--spacing-2\) var\(--spacing-3\);/)
     expect(css.get('.term-phone .term-send-btn')).toMatch(/height: var\(--mori-size-touch\);/)
     expect(css.get('.term-send')).toMatch(/align-items: flex-end;/)
+    // a hint as long as the box wide stays one line, as the box sizes to it too
+    expect(css.get('textarea.term-send-input::placeholder')).toMatch(/white-space: nowrap;/)
   })
 
   // A Claude Code window's panel lies over the terminal: one that took the

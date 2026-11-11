@@ -886,6 +886,15 @@ textarea.term-send-input {
   field-sizing: content;
 }
 
+/* The box sizes to its placeholder too: a long hint (the terminal's, spec
+   §3 #225) stays one line, ended by "…", so the box keeps its button's
+   height. */
+textarea.term-send-input::placeholder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .term-held,
 .term-reject {
   display: flex;

@@ -1698,6 +1698,31 @@ describe('pickers', () => {
       await vi.waitFor(() => expect(ws.input()).toEqual([DOWN, UP, '\r']))
     })
 
+    // The core answers a send once it has watched for a turn to start, some
+    // 5s for a command that starts none, as /model: the box holds the text it
+    // sent until then, though the window showed long before (pickers design §14 #45).
+    // The box still holds "/model" then, and the slash list would open over
+    // it and take the keys: it stays shut while the box sends.
+    it('sends the keys while the box is still sending what opened the window', async () => {
+      reply = (c) =>
+        c.url.endsWith('/send')
+          ? new Promise<Response>(() => {})
+          : c.url.endsWith('/commands')
+            ? Response.json({ commands: [{ name: 'model', desc: 'Switch between Claude models', menu: true }] })
+            : undefined
+      const { ws } = await mount()
+      await attach(ws)
+      const box = textbox()
+      fireEvent.input(box, { target: { value: '/model' } })
+      fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+      await vi.waitFor(() => expect(sent('/api/terminals/t1/send')).toHaveLength(1))
+      await show(SCREENS.model)
+      expect(box.value).toBe('/model')
+      expect(document.querySelector('.term-slash')).toBeNull()
+      expect(fireEvent.keyDown(box, { key: 'ArrowDown' })).toBe(false)
+      expect(ws.input()).toEqual([DOWN])
+    })
+
     it('reads out the item the cursor goes to', async () => {
       const { ws } = await mount()
       await attach(ws)

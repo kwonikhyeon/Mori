@@ -1075,7 +1075,8 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
   }
   const track = (e: Event) => setCaret((e.currentTarget as HTMLTextAreaElement).selectionStart)
   const slash = useSlash({
-    on: claude,
+    // shut while the box sends: its text went already, and its keys go to a window it may have opened
+    on: claude && !busy,
     text,
     caret,
     host: h.id,
@@ -1235,8 +1236,12 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
               onReject(null)
               return
             }
+            // An empty box, or one still sending: its text went to the terminal
+            // already, and the core answers once it has watched for a turn, some
+            // 5s for a command that starts none (/model)
             const k = PICK_KEYS[e.key]
-            if (k && onPickKey && text === '' && !e.isComposing && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && onPickKey(k)) {
+            const free = text === '' || busy
+            if (k && onPickKey && free && !e.isComposing && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && onPickKey(k)) {
               e.preventDefault()
               return
             }

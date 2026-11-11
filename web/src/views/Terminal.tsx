@@ -6,6 +6,7 @@
 // Open while a person looks, its finish is seen here and its notifications
 // close (#190, #191). An answer names the question it is for (#194), and a
 // question can be turned down with what to do instead (#195).
+import type { ComponentChildren } from 'preact'
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { Chip } from '../components/Chip'
 import { Confirm } from '../components/Confirm'
@@ -21,6 +22,7 @@ import { watchFocus } from '../lib/focus'
 import { appName, askText, chip, endText, place, type EndFacts } from '../lib/format'
 import { useChordSubmit } from '../lib/ime'
 import { isMod, NO_MODS, QUICK_KEYS, strayBytes } from '../lib/keys'
+import { pickOn } from '../lib/pickpref'
 import { isApple } from '../lib/platform'
 import { closeNotes, noteTag } from '../lib/push'
 import { navigate, parseHash } from '../lib/router'
@@ -36,6 +38,7 @@ import { toast, toastError } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
 import { openScreen, type Screen } from '../lib/xterm'
 import { gitFrom } from './Git'
+import { PickHints, PickList, PickPanel, usePick } from './Pick'
 import { titleOf, type Variant } from './rows'
 import { useSlash } from './Slash'
 import { TermFontSheet } from './TermFont'
@@ -76,6 +79,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const host = useRef<HTMLDivElement>(null)
   const screen = useRef<Screen | null>(null)
   const file = useRef<HTMLInputElement>(null)
+  const root = useRef<HTMLDivElement>(null)
   const [link, setLink] = useState<TermLink | null>(null)
   const [broken, setBroken] = useState(false)
   const [renaming, setRenaming] = useState(false)
@@ -245,6 +249,25 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const sub = t ? `${appName(t, h.presets.value)} · ${place(t, h.folders.value)}` : ''
   // With other hosts about, the header says which one the session runs on.
   const hostTag = others.value.length > 0 ? nameOf(h) : ''
+
+  // Claude Code's window at the bottom of the screen, read into a panel in
+  // the approval bar's place (pickers design §6.5). Its room is the stage and
+  // what stands in that place now, as the panel takes its place.
+  const pickSizes = () => {
+    let total = stage.current?.clientHeight ?? 0
+    root.current?.querySelectorAll<HTMLElement>('.term-ask, .term-pick').forEach((el) => {
+      total += el.offsetHeight
+    })
+    return { total, cellH: screen.current?.cell()[1] ?? 0, viewH: window.innerHeight }
+  }
+  const pick = usePick({
+    screen,
+    ready: link,
+    on: !!t && isClaude(t) && pickOn.value && active,
+    size: size ? `${size.cols}x${size.rows}` : null,
+    measure: pickSizes,
+  })
+  const seen = pick.seen
 
   // A question that went or changed takes its rejection with it.
   useEffect(() => {
@@ -466,9 +489,34 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     />
   )
 
+  // A choice and a hint's key are sent from the panel's next step (plan Task 6).
+  const choose = () => {}
+  const hint = () => {}
   const askBar = blocked && t && (
-    <AskBar t={t} phone={phone} id={id} busy={answering} onKey={answer} rejecting={rejecting !== null} onReject={ask ? reject : undefined} />
+    <AskBar
+      t={t}
+      phone={phone}
+      id={id}
+      busy={answering}
+      onKey={answer}
+      rejecting={rejecting !== null}
+      onReject={ask ? reject : undefined}
+      pick={
+        seen && seen.options.length > 0
+          ? {
+              list: (
+                <div class="term-pick-body" style={{ maxHeight: `${pick.cap}px` }}>
+                  <PickList seen={seen} disabled={answering || pick.stale} onChoose={choose} />
+                </div>
+              ),
+              hints: <PickHints hints={seen.hints} disabled={answering || pick.stale} skip="esc" onHint={hint} />,
+            }
+          : undefined
+      }
+    />
   )
+  // A window the program is not blocked on stands where the approval bar would.
+  const pickPanel = seen && <PickPanel id={id} seen={seen} cap={pick.cap} disabled={observing || pick.stale} onChoose={choose} onHint={hint} />
   const observeBar = observing && active && <ObserveBar onOff={() => observe(false)} />
   const endBar = finished && <EndBar t={t} ended={ended} onRemove={() => void remove()} />
   const composer = canType && (
@@ -487,7 +535,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
 
   if (!phone) {
     return (
-      <div class="term term-pc">
+      <div ref={root} class="term term-pc">
         <header class="term-bar">
           <div class="term-id">
             <div class="term-title-row">
@@ -541,7 +589,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
           </div>
         </header>
         {stageEl}
-        {askBar}
+        {askBar || pickPanel}
         {observeBar}
         {endBar}
         {composer}
@@ -567,7 +615,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   }
 
   return (
-    <div class="term term-phone">
+    <div ref={root} class="term term-phone">
       <header class="term-head">
         <a class="btn btn-icon btn-ghost term-back" href={backTo} aria-label="뒤로">
           <Icon name="back" size={22} />
@@ -600,7 +648,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       <div class="term-body">
         {stageEl}
         <div class="term-dock">
-          {askBar}
+          {askBar || pickPanel}
           {observeBar}
           {endBar}
           {canType && <QuickKeys link={link} open={open} />}
@@ -672,14 +720,22 @@ interface AskBarProps {
   rejecting: boolean
   /** Starts or stops that; without it the question cannot be named (spec §3 #195). */
   onReject?: () => void
+  /**
+   * The window's own list and keys, read from the screen, in place of the
+   * number keys and Enter (pickers design §6.5). Esc stays, as does turning
+   * the question down: neither needs the list read right.
+   */
+  pick?: { list: ComponentChildren; hints: ComponentChildren }
 }
 
 /** What a blocked program asks, and the keys that answer it. */
-function AskBar({ t, phone, id, busy, onKey, rejecting, onReject }: AskBarProps) {
+function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick }: AskBarProps) {
   const head = id + '-ask'
+  const label = pick ? '승인 대기 — 골라서 응답' : '승인 대기 — 키로 응답'
   const msg = askText(t, 'blocked')
   const more = useMore(msg)
-  const keys = BLOCKED_KEYS[phone ? 'phone' : 'pc'].map((k) => (
+  const named = BLOCKED_KEYS[phone ? 'phone' : 'pc'].filter((k) => !pick || k.name === 'esc')
+  const keys = named.map((k) => (
     <button
       key={k.name}
       type="button"
@@ -708,7 +764,7 @@ function AskBar({ t, phone, id, busy, onKey, rejecting, onReject }: AskBarProps)
           <div class="term-ask-top">
             <h2 id={head}>
               <Icon name="warning" size={18} />
-              승인 대기 — 키로 응답
+              {label}
             </h2>
             {(more.long || more.open) && (
               <button
@@ -728,7 +784,9 @@ function AskBar({ t, phone, id, busy, onKey, rejecting, onReject }: AskBarProps)
             {msg}
           </p>
         </div>
+        {pick?.list}
         <div class="term-ask-grid">{keys}</div>
+        {pick?.hints}
       </section>
     )
   }
@@ -738,12 +796,16 @@ function AskBar({ t, phone, id, busy, onKey, rejecting, onReject }: AskBarProps)
         <Icon name="warning" size={18} />
         <span>
           <b id={head} class="term-ask-title">
-            승인 대기 — 키로 응답
+            {label}
           </b>
           <span class="term-ask-msg"> · {msg}</span>
         </span>
       </p>
-      <div class="term-ask-keys">{keys}</div>
+      {pick?.list}
+      <div class="term-ask-keys">
+        {keys}
+        {pick?.hints}
+      </div>
     </section>
   )
 }

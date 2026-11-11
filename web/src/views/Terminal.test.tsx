@@ -4,6 +4,7 @@ import { FakeScreen } from '../../test/fakeScreen'
 import { FakeWebSocket } from '../../test/fakeWs'
 import { folder, status, term } from '../../test/fixtures'
 import { inHost, withHost } from '../../test/scopes'
+import { SCREENS } from '../../test/screens'
 import { now } from '../lib/clock'
 import { resetPickPref, setPickOn } from '../lib/pickpref'
 import { route } from '../lib/router'
@@ -964,5 +965,189 @@ describe('Terminal on a phone', () => {
     expect(items(screen.getByRole('menu'))).toEqual(['이름 바꾸기', '글자 크기', '목록에서 지우기'])
     fireEvent.click(screen.getAllByRole('button', { name: '목록에서 지우기' })[0])
     await vi.waitFor(() => expect(route.value).toEqual({ name: 'folders' }))
+  })
+})
+
+describe('pickers', () => {
+  const TITLE = 'Select model Switch between Claude models. Applies to this session and future sessions.'
+  const ASK = '3.0badc0de'
+  // half drawn, as the terminal shows it for a moment while it redraws: no window and no input box
+  const half = SCREENS.model.split('\n').slice(0, 3).join('\n') + '\n'
+  const frame = (ms = 20) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms)
+    })
+  const show = async (text: string) => {
+    act(() => FakeScreen.last().show(text))
+    await frame()
+  }
+  const panel = () => document.querySelector<HTMLElement>('.term-pick')
+  const live = () => document.querySelector('[data-mori-live="polite"]')
+  const said = () => live()?.textContent ?? ''
+  const rowsOf = (el: HTMLElement) => [...el.querySelectorAll<HTMLButtonElement>('.term-pick-row')]
+  const hintsOf = (el: HTMLElement) => [...el.querySelectorAll<HTMLButtonElement>('.term-pick-hints button')]
+  const titles = (el: HTMLElement) => rowsOf(el).map((r) => r.querySelector('.qrow-title')?.textContent)
+  const blockedTerm = () => term({ status: status('blocked', { kind: 'permission', msg: 'Bash(ls)를 실행할까요?' }), ask: ASK })
+
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'Date'],
+    })
+  })
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
+  })
+
+  it('shows the list of a window at the bottom', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS.model)
+    const p = screen.getByRole('region', { name: TITLE })
+    expect(titles(p)).toEqual(['Default (recommended)', 'Sonnet', 'Haiku'])
+    const rows = rowsOf(p)
+    expect(rows[0].getAttribute('aria-current')).toBe('true')
+    expect(rows[0].classList.contains('is-selected')).toBe(true)
+    expect(rows[1].hasAttribute('aria-current')).toBe(false)
+    expect(rows[1].classList.contains('is-selected')).toBe(false)
+    // the item in use says so in words, not in a colour alone (design §6.4)
+    expect(rows[0].querySelector('.term-pick-mark')?.textContent).toBe('지금 쓰는 것')
+    expect(rows[1].querySelector('.term-pick-mark')).toBeNull()
+    expect(hintsOf(p).map((b) => b.textContent)).toEqual(['고르기', '노력 낮추기', '노력 높이기', '이 세션만', '닫기'])
+    expect([...rows, ...hintsOf(p)].every((b) => !b.disabled)).toBe(true)
+    // in the approval bar's place, under the terminal, and scrolled inside its cap
+    expect(p.previousElementSibling?.classList.contains('term-stage')).toBe(true)
+    expect(p.querySelector<HTMLElement>('.term-pick-body')?.style.maxHeight).toBe('120px')
+    await frame()
+    expect(said()).toBe(`고르는 목록: ${TITLE}`)
+  })
+
+  it('shows nothing while idle', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS.idle)
+    expect(panel()).toBeNull()
+    // the reading is live: a window drawn now shows
+    await show(SCREENS.model)
+    expect(panel()).not.toBeNull()
+  })
+
+  it('shows no panel for an answer list', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS['answer-list'])
+    expect(panel()).toBeNull()
+    await show(SCREENS.model)
+    expect(panel()).not.toBeNull()
+  })
+
+  it('shows no panel for a typed list', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS['typed-list'])
+    expect(panel()).toBeNull()
+    await show(SCREENS.model)
+    expect(panel()).not.toBeNull()
+  })
+
+  it('does not flap through its own resize', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS.model)
+    await frame()
+    expect(said()).toBe(`고르는 목록: ${TITLE}`)
+    // the panel took rows from the terminal, which redraws smaller and shows no window for a moment
+    await act(() => ws.json({ type: 'size', cols: 80, rows: 20 }))
+    await show(half)
+    const p = screen.getByRole('region', { name: TITLE })
+    expect([...rowsOf(p), ...hintsOf(p)].every((b) => b.disabled)).toBe(true)
+    live()!.textContent = ''
+    await show(SCREENS.model)
+    await frame()
+    expect(screen.getByRole('region', { name: TITLE })).toBe(p)
+    expect([...rowsOf(p), ...hintsOf(p)].every((b) => !b.disabled)).toBe(true)
+    // the same window, so it is not read out again
+    expect(said()).toBe('')
+  })
+
+  it('holds a lasting cut until the box shows', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS.model)
+    // shown a while: only the panel's own resize makes the loss its doing
+    await frame(2000)
+    await act(() => ws.json({ type: 'size', cols: 80, rows: 20 }))
+    await show(half)
+    expect(panel()).not.toBeNull()
+    await frame(1000) // SETTLE_MS
+    expect(panel()).toBeNull()
+    // the same window again would only be cut once more
+    await show(SCREENS.model)
+    expect(panel()).toBeNull()
+    // the input box ends the hold
+    await show(SCREENS.idle)
+    await show(SCREENS.model)
+    expect(screen.getByRole('region', { name: TITLE })).toBeTruthy()
+  })
+
+  it('turns off with the setting', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS.model)
+    expect(panel()).not.toBeNull()
+    act(() => setPickOn(false))
+    expect(panel()).toBeNull()
+    // on again, it reads what the screen shows at once
+    act(() => setPickOn(true))
+    expect(screen.getByRole('region', { name: TITLE })).toBeTruthy()
+  })
+
+  it("shows an observed terminal's list with its buttons off", async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    fireEvent.click(screen.getByRole('button', { name: '보기 전용' }))
+    const watch = FakeWebSocket.last()
+    await attach(watch)
+    await show(SCREENS.model)
+    const p = screen.getByRole('region', { name: TITLE })
+    const buttons = [...rowsOf(p), ...hintsOf(p)]
+    expect(buttons).toHaveLength(8)
+    expect(buttons.every((b) => b.disabled)).toBe(true)
+  })
+
+  it('answers a blocked window by its list', async () => {
+    const { ws } = await mount(blockedTerm())
+    await attach(ws)
+    await show(SCREENS.permission)
+    const ask = screen.getByRole('region', { name: '승인 대기 — 골라서 응답' })
+    expect(rowsOf(ask)).toHaveLength(3)
+    expect(titles(ask)[0]).toBe('Yes')
+    expect(rowsOf(ask)[0].getAttribute('aria-current')).toBe('true')
+    expect(within(ask).getByRole('button', { name: 'Esc' })).toBeTruthy()
+    expect(within(ask).getByRole('button', { name: '거절하고 지시' })).toBeTruthy()
+    for (const name of ['1', '2', '3', 'Enter']) expect(within(ask).queryByRole('button', { name })).toBeNull()
+    // the window's Esc is the bar's own key
+    expect(hintsOf(ask).map((b) => b.textContent)).toEqual(['Ctrl+E · explain'])
+    // one bar, not a panel as well
+    expect(panel()).toBeNull()
+  })
+
+  it('keeps the keys for a blocked hint-only window', async () => {
+    const { ws } = await mount(blockedTerm())
+    await attach(ws)
+    await show(SCREENS.btw)
+    const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
+    expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['1', '2', '3', 'Enter', 'Esc', '거절하고 지시'])
+    expect(document.querySelector('.term-pick, .term-pick-row')).toBeNull()
+  })
+
+  it('puts the panel at the top of the dock on a phone', async () => {
+    const { ws } = await mount(undefined, { variant: 'phone', back: '#/folders' })
+    await attach(ws)
+    await show(SCREENS.model)
+    const p = screen.getByRole('region', { name: TITLE })
+    expect(p.parentElement?.classList.contains('term-dock')).toBe(true)
+    expect(p.parentElement?.firstElementChild).toBe(p)
   })
 })

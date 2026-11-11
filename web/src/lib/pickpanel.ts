@@ -1,0 +1,59 @@
+// What the panel of a Claude Code window shows from one look to the next
+// (pickers design §6.5). A window shows at once. While the terminal redraws,
+// a look can find neither the window nor the input box: the panel stays a
+// moment, its buttons off, and goes after SETTLE_MS. A window lost soon after
+// it showed, or after the panel's own resize, is likely the panel's doing,
+// as the panel cut the terminal's rows: it is held, and shows again only
+// after the input box has shown.
+
+import type { Look, Seen } from './pick'
+
+export interface Panel {
+  seen: Seen | null
+  /** The window went a moment ago: the panel stays, its buttons off. */
+  stale: boolean
+  /** When the window showed, or when the panel last resized the terminal. */
+  since: number
+  /** When the window went; null while it shows. */
+  lost: number | null
+  /** The id of a window kept out until the input box shows. */
+  held: string | null
+}
+
+export const NO_PANEL: Panel = { seen: null, stale: false, since: 0, lost: null, held: null }
+
+/** How long a window may be gone before the panel goes. */
+export const SETTLE_MS = 1000
+
+/** The least height of the panel's list, in px. */
+export const MIN_CAP = 120
+
+/** The panel after a look at a time. */
+export function next(p: Panel, l: Look, at: number): Panel {
+  const seen = l.seen
+  if (seen) {
+    if (seen.id === p.held) return p
+    // the same window: a look that finds it as it was changes nothing, so the view need not redraw
+    if (p.seen && seen.id === p.seen.id) return !p.stale && seen.sig === p.seen.sig ? p : { ...p, seen, stale: false, lost: null }
+    return { seen, stale: false, since: at, lost: null, held: null }
+  }
+  if (!p.seen) return l.box ? (p.held === null ? p : { ...p, held: null }) : p
+  if (l.box) return NO_PANEL
+  const lost = p.lost ?? at
+  if (at - lost < SETTLE_MS) return p.stale && p.lost === lost ? p : { ...p, stale: true, lost }
+  return { ...NO_PANEL, held: lost - p.since < SETTLE_MS ? p.seen.id : null }
+}
+
+/** The panel resized the terminal at a time: what goes next may be its doing. */
+export function restart(p: Panel, at: number): Panel {
+  return p.seen ? { ...p, since: at } : p
+}
+
+/**
+ * The height of the panel's list: at most half the view, and enough left for
+ * the terminal to keep the window's rows and the two of the box, but never
+ * under MIN_CAP.
+ */
+export function capOf(total: number, cellH: number, rows: number, viewH: number): number {
+  return Math.round(Math.max(MIN_CAP, Math.min(viewH / 2, total - cellH * (rows + 2))))
+}

@@ -263,7 +263,7 @@ describe('Terminal on a PC', () => {
 
     it('keeps the instruction when the question stays', async () => {
       reply = (c) => (c.url.endsWith('/reject') ? conflict('blocked', 'Esc를 보냈지만 아직 승인 대기입니다') : undefined)
-      await mount(asking())
+      const { container } = await mount(asking())
       fireEvent.click(within(region()).getByRole('button', { name: '거절하고 지시' }))
       const box = screen.getByRole('textbox', { name: '거절하고 대신 보낼 글' }) as HTMLTextAreaElement
       fireEvent.input(box, { target: { value: 'stop' } })
@@ -271,7 +271,8 @@ describe('Terminal on a PC', () => {
       await vi.waitFor(() => expect(toasts.value.map((t) => t.text)).toEqual(['Esc를 보냈지만 아직 승인 대기입니다']))
       expect(box.value).toBe('stop')
       expect(note()).toBeTruthy()
-      expect(screen.queryByRole('alert')).toBeNull()
+      // The toast is spoken as an alert (lib/announce.ts); the view itself holds none.
+      expect(within(container as HTMLElement).queryByRole('alert')).toBeNull()
     })
 
     it('stops turning it down from 취소, Escape, a second press, or when the question changes', async () => {

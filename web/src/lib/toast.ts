@@ -1,6 +1,8 @@
 // Short notes at the bottom of the screen: what an action did, or why it
-// failed. Each goes away by itself.
+// failed. Each goes away by itself. A screen reader hears each as it comes
+// (lib/announce.ts): a failure at once, anything else when it is idle.
 import { signal } from '@preact/signals'
+import { announce } from './announce'
 import { ApiError } from './api'
 
 export interface Toast {
@@ -18,6 +20,7 @@ const MAX = 3
 export function toast(text: string, kind: Toast['kind'] = 'info'): void {
   const t: Toast = { id: next++, text, kind }
   toasts.value = [...toasts.value, t].slice(-MAX)
+  announce(text, kind === 'error' ? 'assertive' : 'polite')
   setTimeout(() => dismiss(t.id), kind === 'error' ? LIFE * 1.5 : LIFE)
 }
 

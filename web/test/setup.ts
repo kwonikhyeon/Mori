@@ -1,6 +1,14 @@
 // What jsdom leaves out and the components use.
 
+import { afterEach } from 'vitest'
 import { FakeCloseWatcher } from './closewatcher'
+
+// The live regions of lib/announce.ts stay in <body>, as a page keeps them.
+// Each test starts without them, so words a test spoke are not found by the
+// next one's role queries.
+afterEach(() => {
+  document.querySelectorAll('[data-mori-live]').forEach((el) => el.remove())
+})
 
 // The back key closes a menu through a CloseWatcher, as in Chrome
 // (lib/backstack.ts); a test of the other path takes it away.

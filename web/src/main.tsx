@@ -6,11 +6,13 @@ import './styles/ui.css'
 import { effect } from '@preact/signals'
 import { render } from 'preact'
 import { App } from './app'
+import { initAnnounce } from './lib/announce'
 import { initBackstack } from './lib/backstack'
 import { showNeeds } from './lib/badge'
 import { boot } from './lib/boot'
 import { startClock } from './lib/clock'
 import { trackWidth } from './lib/media'
+import { initPress } from './lib/press'
 import { initRouter, navigate, parseHash } from './lib/router'
 import { totalNeeds } from './lib/scope'
 import { initTheme } from './lib/theme'
@@ -22,6 +24,8 @@ trackViewport()
 trackWidth()
 initRouter()
 initBackstack()
+initAnnounce()
+initPress()
 startClock()
 startWake()
 effect(() => showNeeds(totalNeeds.value))

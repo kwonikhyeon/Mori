@@ -1976,6 +1976,17 @@ describe('pickers', () => {
       expect(screen.getByRole('button', { name: '모드: 기본' })).toBeTruthy()
     })
 
+    // rows that do not fit go whole, from the bottom (claude-input design §3.3)
+    it('drops whole rows from the bottom of a band too short for them', async () => {
+      layOut({ 'term-cover': 50, 'term-cover-row': 24 })
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const rows = [...band()!.querySelectorAll<HTMLElement>('.term-cover-row')]
+      expect(rows).toHaveLength(4)
+      expect(rows.map((r) => r.hidden)).toEqual([false, false, true, true])
+    })
+
     it('names a bar with no name for a screen reader', async () => {
       const { ws } = await mount()
       await attach(ws)

@@ -6,7 +6,7 @@
 // mode is a button that sends Shift+Tab.
 
 import type { JSX } from 'preact'
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { readBox, type BoxLook, type Mode } from '../lib/box'
 import { DEPTH } from '../lib/pick'
 import { readStatus } from '../lib/status'
@@ -113,8 +113,26 @@ export function StatusBand({
 }): JSX.Element {
   const parts = readStatus(box.status)
   const extras = mode?.extras ?? []
+  const self = useRef<HTMLElement>(null)
+  // Rows that do not fit the rows covered go whole, from the bottom: the
+  // first, with the mode, stays (claude-input design §3.3).
+  useLayoutEffect(() => {
+    const el = self.current
+    if (!el) return
+    const rows = [...el.querySelectorAll<HTMLElement>(':scope > .term-cover-row')]
+    for (const r of rows) r.hidden = false
+    const cs = getComputedStyle(el)
+    const room = el.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0)
+    const gap = parseFloat(cs.rowGap) || 0
+    let used = 0
+    rows.forEach((r, i) => {
+      used += r.offsetHeight + (i ? gap : 0)
+      if (i > 0 && used > room) r.hidden = true
+    })
+  })
   return (
     <section
+      ref={self}
       class="term-cover"
       aria-label="Claude Code 상태"
       style={{ top: `${top}px` }}

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { term } from '../../test/fixtures'
-import { commandsOf, forgetCommands, insert, isClaude, note, rank, RECENT_MAX, recent, slashAt, used } from './slash'
+import { COMMON, commandsOf, forgetCommands, insert, isClaude, note, rank, RECENT_MAX, recent, slashAt, used } from './slash'
 import type { CommandList, SlashCommand } from './types'
 
 const cmd = (name: string, over: Partial<SlashCommand> = {}): SlashCommand => ({ name, desc: '', source: 'builtin', ...over })
@@ -41,6 +41,13 @@ describe('rank', () => {
     expect(names(rank(list, 'd'))).toEqual(['Kit:deploy', 'add-dir', 'model', 'code-review'])
     // from two letters on, only the query orders them
     expect(names(rank(list, 'co', ['context']))).toEqual(['compact', 'context', 'code-review'])
+  })
+
+  it('counts /btw among the common ones', () => {
+    expect(COMMON).toContain('btw')
+    expect(names(rank([...list, cmd('btw')], ''))).toEqual([
+      'compact', 'clear', 'model', 'context', 'btw', 'add-dir', 'review-pr', 'Kit:deploy', 'code-review',
+    ])
   })
 })
 

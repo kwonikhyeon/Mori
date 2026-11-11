@@ -5,6 +5,7 @@ import { FakeWebSocket } from '../../test/fakeWs'
 import { folder, status, term } from '../../test/fixtures'
 import { inHost, withHost } from '../../test/scopes'
 import { now } from '../lib/clock'
+import { resetPickPref, setPickOn } from '../lib/pickpref'
 import { route } from '../lib/router'
 import { resetSeen, seenMarks } from '../lib/seen'
 import { forgetCommands } from '../lib/slash'
@@ -66,6 +67,7 @@ beforeEach(() => {
   localStorage.clear()
   forgetCommands()
   resetTermFont()
+  resetPickPref()
   FakeWebSocket.reset()
   FakeScreen.reset()
   vi.stubGlobal('WebSocket', FakeWebSocket)
@@ -586,7 +588,7 @@ describe('The slash list', () => {
     expect(box().value).toBe('/model ')
     expect(box().selectionStart).toBe(7)
     expect(screen.queryByRole('listbox')).toBeNull()
-    expect(toasts.value.map((t) => t.text)).toEqual(['/model: 보내면 터미널에 메뉴가 열립니다'])
+    expect(toasts.value.map((t) => t.text)).toEqual(['/model: 보내면 아래에 고르는 목록이 뜹니다'])
     expect(sent('/api/terminals/t1/send')).toEqual([])
     // Tab does the same, and a tap; what came after the word stays
     type('/co')
@@ -598,6 +600,29 @@ describe('The slash list', () => {
     fireEvent.keyUp(box(), { key: 'ArrowLeft' })
     fireEvent.click(within(await screen.findByRole('listbox')).getByText('/deploy'))
     expect(box().value).toBe('/deploy 지금')
+  })
+
+  // A window the panel does not read yet opens in the terminal (pickers design §12).
+  it('tells a window the list will not show', async () => {
+    const config = { name: 'config', desc: '설정을 엽니다', source: 'builtin', menu: true }
+    reply = (c) =>
+      c.url === '/api/terminals/t1/commands' ? Response.json({ ...commands, commands: [...commands.commands, config] }) : undefined
+    await mount()
+    type('/conf')
+    await screen.findByRole('listbox')
+    fireEvent.keyDown(box(), { key: 'Enter' })
+    expect(box().value).toBe('/config ')
+    expect(toasts.value.map((t) => t.text)).toEqual(['/config: 보내면 터미널에 창이 열립니다'])
+  })
+
+  it('tells the terminal when the setting is off', async () => {
+    setPickOn(false)
+    await mount()
+    type('/mo')
+    await screen.findByRole('listbox')
+    fireEvent.keyDown(box(), { key: 'Enter' })
+    expect(box().value).toBe('/model ')
+    expect(toasts.value.map((t) => t.text)).toEqual(['/model: 보내면 터미널에 창이 열립니다'])
   })
 
   it('closes with Esc until the text changes, and sends with ⌘ or Ctrl + Enter as before', async () => {

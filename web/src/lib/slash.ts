@@ -7,7 +7,12 @@ import { load, save } from './storage'
 import type { CommandList, SlashCommand, TerminalView } from './types'
 
 /** The ones used all the time: first on an empty or one-letter query, after the recent ones. */
-export const COMMON = ['compact', 'clear', 'model', 'resume', 'context']
+export const COMMON = ['compact', 'clear', 'model', 'resume', 'context', 'btw']
+/**
+ * The commands whose window the panel above the composer reads (pickers
+ * design §13 #3): the others open theirs in the terminal.
+ */
+export const PICK_COMMANDS = ['model', 'output-style', 'theme', 'export', 'copy', 'rewind', 'memory', 'login']
 export const RECENT_MAX = 8
 /** How many rows the list shows; the rest it counts. */
 export const SHOWN = 80

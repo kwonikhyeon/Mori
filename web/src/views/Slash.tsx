@@ -7,7 +7,8 @@
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
 import type { HostApi } from '../lib/api'
-import { commandsOf, insert, rank, recent, SHOWN, slashAt } from '../lib/slash'
+import { pickOn } from '../lib/pickpref'
+import { commandsOf, insert, PICK_COMMANDS, rank, recent, SHOWN, slashAt } from '../lib/slash'
 import { errorText, toast } from '../lib/toast'
 import type { CommandList, SlashCommand } from '../lib/types'
 
@@ -89,7 +90,11 @@ export function useSlash({ on, text, caret, host, addr, api, id, apply }: SlashO
     if (!want) return
     const r = insert(text, want.end, c.name)
     apply(r.text, r.caret)
-    if (c.menu) toast(`/${c.name}: 보내면 터미널에 메뉴가 열립니다`)
+    // where its window will show (pickers design §12): in the panel, or in the terminal
+    if (c.menu) {
+      const panel = pickOn.value && PICK_COMMANDS.includes(c.name)
+      toast(`/${c.name}: ${panel ? '보내면 아래에 고르는 목록이 뜹니다' : '보내면 터미널에 창이 열립니다'}`)
+    }
   }
 
   const onKeyDown = (e: KeyboardEvent): boolean => {

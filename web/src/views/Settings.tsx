@@ -10,6 +10,7 @@ import { nameOf, useHost } from '../lib/scope'
 import { setTheme, theme, THEME_LABEL, type ThemePref } from '../lib/theme'
 import type { CoreStatus } from '../lib/types'
 import { newBuild, reloadPage } from '../lib/update'
+import { PickSwitch } from './PickSwitch'
 import { DeviceCards } from './SettingsDevices'
 import { FONT_HINT, TermFontField } from './TermFont'
 import { FoldersCard, PresetsCard } from './SettingsEdit'
@@ -103,6 +104,7 @@ function ThemeCard({ variant }: SettingsProps) {
       <p class="st-hint">
         이 기기의 {variant === 'phone' ? '폰' : 'PC'} 화면에 쓰입니다. {FONT_HINT}
       </p>
+      <PickSwitch />
     </section>
   )
 }

@@ -141,6 +141,12 @@ label.st-row {
   cursor: pointer;
 }
 
+/* A row in a card that is not a list of rows (the 화면 card's switch): the
+   card's padding is its inset already, so its text lines up with the hints. */
+.st-card:not(.st-list) > .st-row {
+  padding-inline: 0;
+}
+
 label.st-row:has(input:disabled) {
   cursor: default;
 }

@@ -8,6 +8,7 @@ import { Terminal, type ITheme } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { isApple } from './platform'
 import { LINE_HEIGHT, POWERLINE, followPixelRatio, loadPowerline } from './powerline'
+import { shotOf, type Shot } from './shot'
 import { touchScroll } from './touchscroll'
 
 export interface Screen {
@@ -33,6 +34,8 @@ export interface Screen {
    * (wrote). Returns the function that stops it.
    */
   onView(fn: (wrote: boolean) => void): () => void
+  /** The last n lines of the live screen, cell by cell, wherever the view is. */
+  shot(n: number): Shot
   /** Draws with letters of px CSS pixels; resolves true once it changed. */
   setFontSize(px: number): Promise<boolean>
   onData(fn: (s: string) => void): () => void
@@ -174,6 +177,7 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
         views.delete(fn)
       }
     },
+    shot: (n) => shotOf(term, n),
     setFontSize: async (px) => {
       if (px === size || gone) return false
       size = px

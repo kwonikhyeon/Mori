@@ -2,7 +2,9 @@
 // settings. A test types into it as a person would.
 
 import type { ITheme } from '@xterm/xterm'
+import type { Shot } from '../src/lib/shot'
 import type { Screen } from '../src/lib/xterm'
+import { toCells } from './cells'
 
 const dec = new TextDecoder()
 
@@ -26,6 +28,9 @@ export class FakeScreen implements Screen {
   fontSize: number | null = null
   disposed = false
   cellSize: [number, number] = [8, 17]
+  /** What the screen shows, bottom-aligned, as show() put it. */
+  shown: string[] = []
+  kind: Shot['kind'] = 'normal'
   private readonly data = new Set<(s: string) => void>()
   private readonly bin = new Set<(s: string) => void>()
   private readonly views = new Set<(wrote: boolean) => void>()
@@ -124,6 +129,20 @@ export class FakeScreen implements Screen {
 
   dispose(): void {
     this.disposed = true
+  }
+
+  /** The program draws text: its lines sit at the bottom of the screen. */
+  show(text: string, kind: Shot['kind'] = 'alternate'): void {
+    const lines = text.replace(/\n$/, '').split('\n').slice(-this.rows)
+    this.shown = [...Array<string>(this.rows - lines.length).fill(''), ...lines]
+    this.kind = kind
+    this.tell(true)
+  }
+
+  shot(n: number): Shot {
+    const lines = this.shown.length ? this.shown : Array<string>(this.rows).fill('')
+    const last = lines.slice(-Math.min(n, this.rows))
+    return { kind: this.kind, top: this.rows - last.length, cols: this.cols, lines: last.map((l) => toCells(l, this.cols)) }
   }
 
   /** A person types s. */

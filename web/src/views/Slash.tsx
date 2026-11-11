@@ -51,8 +51,13 @@ type Got = { list: CommandList } | { error: string }
 
 export function useSlash({ on, text, caret, host, addr, api, id, apply }: SlashOptions): Slash {
   const want = on && caret !== null ? slashAt(text, caret) : null
-  // Esc closes the list until the text changes.
+  // Esc closes the list until the text changes. The Esc is forgotten as soon as
+  // the text differs, so the same text typed again (a "/" taken out and put
+  // back, or after a send) opens the list once more.
   const [dismissed, setDismissed] = useState<string | null>(null)
+  useEffect(() => {
+    if (dismissed !== null && text !== dismissed) setDismissed(null)
+  }, [text, dismissed])
   const open = want !== null && dismissed !== text
   const typing = open ? want : null // what is typed, while the list is open
   const [got, setGot] = useState<Got | null>(null)

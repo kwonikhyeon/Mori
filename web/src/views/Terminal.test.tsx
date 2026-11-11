@@ -619,6 +619,18 @@ describe('The slash list', () => {
     expect(rows(await screen.findByRole('listbox'))[0]).toBe('/deploy')
   })
 
+  it('opens again after Esc once the text has changed, even back to what it was', async () => {
+    await mount()
+    type('/')
+    await screen.findByRole('listbox')
+    fireEvent.keyDown(box(), { key: 'Escape' })
+    expect(screen.queryByRole('listbox')).toBeNull()
+    // the "/" taken out and typed again
+    type('')
+    type('/')
+    expect(await screen.findByRole('listbox')).toBeTruthy()
+  })
+
   it('says when the list could not be read or is not all there', async () => {
     reply = (c) =>
       c.url === '/api/terminals/t1/commands' ? Response.json({ error: { kind: 'internal', message: '읽지 못했습니다' } }, { status: 500 }) : undefined

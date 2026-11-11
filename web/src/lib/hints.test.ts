@@ -13,6 +13,17 @@ describe('hints', () => {
     expect(h.map((x) => x.move)).toEqual([false, true, true, false])
   })
 
+  // A list where many can be chosen ticks with one key and submits with
+  // another: one 고르기, on Enter, and the other key by its name.
+  it('gives 고르기 to Enter alone', () => {
+    expect(labels('Space to select · Enter to confirm · Esc to cancel')).toEqual(['Space · select', '고르기', '닫기'])
+    const h = read('Space/Enter to select · Esc to cancel')
+    expect(h.map((x) => [x.label, x.key])).toEqual([
+      ['고르기', 'enter'],
+      ['닫기', 'esc'],
+    ])
+  })
+
   it('leaves out amend and notes', () => {
     expect(labels('Esc to cancel · Tab to amend')).toEqual(['닫기'])
   })

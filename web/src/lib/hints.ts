@@ -122,7 +122,8 @@ export function readHints(parts: HintPart[]): Hint[] {
     if (!keys.length) continue
     const a = action.toLowerCase()
     if (SKIP.test(a)) continue
-    if (SELECT.test(a)) out.push(button('고르기', keys[0]))
+    // 고르기 is Enter's alone: a list where many can be chosen ticks with another key, named as it is
+    if (SELECT.test(a) && keys.includes('enter')) out.push(button('고르기', 'enter'))
     else if (CLOSE.test(a)) out.push(button('닫기', keys.includes('esc') ? 'esc' : keys[0]))
     else if (COPY.test(a)) out.push({ ...button('복사', keys[0]), copy: true })
     else if (SESSION.test(a)) out.push(button('이 세션만', keys[0]))

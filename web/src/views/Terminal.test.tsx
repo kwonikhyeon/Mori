@@ -1281,4 +1281,90 @@ describe('pickers', () => {
       await vi.waitFor(() => expect(toasted()).toEqual([['복사하지 못했습니다', 'error']]))
     })
   })
+
+  describe('close and send', () => {
+    const STUCK = '창이 닫히지 않아 보내지 않았습니다'
+    const textbox = () => screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+    const sends = () => sent('/api/terminals/t1/send').map((c) => c.body)
+    const stuck = () => document.querySelector('p.term-held')
+    const loud = () => document.querySelector('[data-mori-live="assertive"]')?.textContent ?? ''
+
+    it('names the send button for an open window', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      expect(screen.getByRole('button', { name: '닫고 보내기' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: '보내기' })).toBeNull()
+      await show(SCREENS.idle)
+      expect(screen.getByRole('button', { name: '보내기' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: '닫고 보내기' })).toBeNull()
+    })
+
+    it('closes, waits for the box, then sends', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      const box = textbox()
+      fireEvent.input(box, { target: { value: '테스트 돌려줘' } })
+      fireEvent.click(screen.getByRole('button', { name: '닫고 보내기' }))
+      await vi.waitFor(() => expect(ws.input()).toEqual(['\x1b']))
+      // nothing goes while the window shows
+      await frame()
+      expect(sends()).toEqual([])
+      await show(SCREENS.idle)
+      await vi.waitFor(() => expect(sends()).toEqual([{ text: '테스트 돌려줘' }]))
+      await vi.waitFor(() => expect(box.value).toBe(''))
+      expect(ws.input()).toEqual(['\x1b'])
+      expect(sent('/api/terminals/t1/keys')).toEqual([])
+      expect(stuck()).toBeNull()
+    })
+
+    it('keeps the text when the window stays', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      const box = textbox()
+      fireEvent.input(box, { target: { value: 'go on' } })
+      fireEvent.click(screen.getByRole('button', { name: '닫고 보내기' }))
+      await vi.waitFor(() => expect(ws.input()).toEqual(['\x1b']))
+      await frame(2000) // CLOSE_MS
+      expect(stuck()?.textContent).toBe(STUCK)
+      // spoken through announce(), not by a live region of its own
+      expect(stuck()?.hasAttribute('role')).toBe(false)
+      await frame()
+      expect(loud()).toBe(STUCK)
+      expect(box.value).toBe('go on')
+      expect(sends()).toEqual([])
+      // typing again takes the note away, as with a held send
+      fireEvent.input(box, { target: { value: 'go on!' } })
+      expect(stuck()).toBeNull()
+      // and the window closing takes it too
+      fireEvent.click(screen.getByRole('button', { name: '닫고 보내기' }))
+      await frame(2000)
+      expect(stuck()?.textContent).toBe(STUCK)
+      await show(SCREENS.idle)
+      expect(stuck()).toBeNull()
+      expect(screen.getByRole('button', { name: '보내기' })).toBeTruthy()
+      expect(sends()).toEqual([])
+    })
+
+    it('keeps the blocked path', async () => {
+      reply = (c) =>
+        c.url.endsWith('/send') ? Response.json({ error: { kind: 'blocked', message: '승인을 기다립니다' } }, { status: 409 }) : undefined
+      const { ws } = await mount(blockedTerm())
+      await attach(ws)
+      await show(SCREENS.permission)
+      expect(screen.queryByRole('button', { name: '닫고 보내기' })).toBeNull()
+      const box = textbox()
+      fireEvent.input(box, { target: { value: 'go on' } })
+      fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+      await vi.waitFor(() => expect(document.querySelector('div.term-held')?.textContent).toContain('승인 대기 중 — 키로 응답'))
+      expect(sends()).toEqual([{ text: 'go on' }])
+      // no Esc: the approval bar and 거절하고 지시 answer a blocked window (spec §3 #195)
+      expect(ws.input()).toEqual([])
+      expect(sent('/api/terminals/t1/keys')).toEqual([])
+      expect(box.value).toBe('go on')
+      expect(stuck()).toBeNull()
+    })
+  })
 })

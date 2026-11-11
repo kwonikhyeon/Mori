@@ -13,6 +13,7 @@ import { Confirm } from '../components/Confirm'
 import { ConnBanner } from '../components/ConnBanner'
 import { Icon } from '../components/Icon'
 import { Menu, type MenuItem } from '../components/Menu'
+import { announce } from '../lib/announce'
 import { ApiError } from '../lib/api'
 import type { Closed, Size } from '../lib/attach'
 import { now } from '../lib/clock'
@@ -24,7 +25,7 @@ import { appName, askText, chip, endText, place, type EndFacts } from '../lib/fo
 import type { Hint } from '../lib/hints'
 import { useChordSubmit } from '../lib/ime'
 import { isMod, namedBytes, NO_MODS, QUICK_KEYS, strayBytes } from '../lib/keys'
-import { choose as chooseItem, tap, type Press } from '../lib/pickpress'
+import { choose as chooseItem, closeFor, tap, type Press } from '../lib/pickpress'
 import { pickOn } from '../lib/pickpref'
 import { isApple } from '../lib/platform'
 import { closeNotes, noteTag } from '../lib/push'
@@ -587,6 +588,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       rejecting={rejecting}
       onReject={setRejecting}
       claude={!!t && isClaude(t)}
+      closeFirst={seen && !blocked ? () => closeFor(press, seen) : undefined}
     />
   )
 
@@ -950,19 +952,30 @@ interface ComposerProps {
   onReject: (ask: string | null) => void
   /** It runs Claude Code: a "/" at the start lists its commands (spec §3 #197). */
   claude: boolean
+  /**
+   * A window Mori knows shows, and the program is not blocked on it: Esc
+   * closes it first, and the text goes once the input box shows. False when
+   * the window stays (pickers design §6.8, spec §3 #214).
+   */
+  closeFirst?: () => Promise<boolean>
 }
+
+/** What the box says when the window would not close, and nothing went. */
+const STUCK = '창이 닫히지 않아 보내지 않았습니다'
 
 /**
  * Several lines sent at once with POST send (spec §3 #124). What is typed
  * stays as this device's draft until it is sent (spec §3 #181). Rejecting a
- * question, it presses Esc first and sends once the question is gone.
+ * question, it presses Esc first and sends once the question is gone; over a
+ * window Mori knows, it closes the window first in the same way (design §6.8).
  */
-function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude }: ComposerProps) {
+function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, closeFirst }: ComposerProps) {
   const h = useHost()
   const draft = draftKey(h.id, addr)
   const [text, setText] = useState(() => loadDraft(draft))
   const [busy, setBusy] = useState(false)
   const [held, setHeld] = useState(false)
+  const [stuck, setStuck] = useState(false)
   const [caret, setCaret] = useState<number | null>(null) // null: the box does not have the focus
   const box = useRef<HTMLTextAreaElement>(null)
   const moveTo = useRef<number | null>(null)
@@ -984,6 +997,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude }:
     apply: (v, at) => {
       edit(v)
       setHeld(false)
+      setStuck(false)
       setCaret(at)
       moveTo.current = at
     },
@@ -994,11 +1008,23 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude }:
     box.current.setSelectionRange(moveTo.current, moveTo.current)
     moveTo.current = null
   })
+  // the window went: what the note says is over
+  const closing = !!closeFirst
+  useEffect(() => {
+    if (!closing) setStuck(false)
+  }, [closing])
   const submit = async (value: string, against: string | null) => {
     if (busy || value.trim() === '') return
     setBusy(true)
     setHeld(false)
+    setStuck(false)
     try {
+      // the text would land in the window: Esc, and nothing goes while it stays
+      if (!against && closeFirst && !(await closeFirst())) {
+        setStuck(true)
+        announce(STUCK, 'assertive')
+        return
+      }
       if (against) await h.api.terminals.reject(addr, value, against)
       else await h.api.terminals.send(addr, value)
       if (claude) noteSlash(value)
@@ -1013,7 +1039,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude }:
     }
   }
   const chord = useChordSubmit((f) => void submit(f.value, rejecting))
-  const sendLabel = rejecting ? '거절하고 보내기' : '보내기'
+  const sendLabel = rejecting ? '거절하고 보내기' : closeFirst ? '닫고 보내기' : '보내기'
   return (
     <div class="term-compose">
       {slash.view}
@@ -1036,6 +1062,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude }:
           )}
         </div>
       )}
+      {stuck && <p class="term-held">{STUCK}</p>}
       <form
         class="term-send"
         onSubmit={(e) => {
@@ -1062,6 +1089,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude }:
           onInput={(e) => {
             edit(e.currentTarget.value)
             setHeld(false)
+            setStuck(false)
             track(e)
           }}
           onFocus={track}

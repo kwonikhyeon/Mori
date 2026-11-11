@@ -70,9 +70,18 @@ export function useBox({ screen, ready, on }: { screen: { current: Screen | null
 }
 
 /** The mode as a button: Shift+Tab moves to the next one. */
-export function ModeButton({ mode, onPress, class: cls }: { mode: Mode; onPress: () => void; class: string }): JSX.Element {
+export function ModeButton({ mode, onPress, class: cls, disabled }: { mode: Mode; onPress: () => void; class: string; disabled?: boolean }): JSX.Element {
   return (
-    <button type="button" class={cls} onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()} onClick={onPress}>
+    <button
+      type="button"
+      class={cls}
+      disabled={disabled}
+      onPointerDown={(e) => e.preventDefault()}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => {
+        if (!disabled) onPress()
+      }}
+    >
       모드: {mode.label}
     </button>
   )

@@ -731,6 +731,14 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) name = 'esc'
     else if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && /^[a-z]$/i.test(e.key) && e.key.toLowerCase() !== 'v') name = `ctrl+${e.key.toLowerCase()}`
     if (!name) return false
+    // On Windows and Linux Ctrl+C copies the terminal's selection, as from xterm itself (lib/xterm.ts)
+    if (name === 'ctrl+c' && !isApple()) {
+      const sel = screen.current?.takeSelection() ?? ''
+      if (sel) {
+        void copyText(sel)
+        return true
+      }
+    }
     const b = namedBytes(name, screen.current?.appCursor() ?? false)
     return b !== null && !!link?.send(b)
   }
@@ -754,6 +762,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       closeFirst={toClose && !blocked ? () => closeFor(press, toClose) : undefined}
       onPickKey={seen && !blocked ? pickKey : undefined}
       mode={!phone && claudeOn ? reading.mode : null}
+      modeOff={!!seen || blocked}
       onMode={nextMode}
       boxNote={boxNote}
       onSending={setSending}
@@ -1151,6 +1160,8 @@ interface ComposerProps {
   /** Claude Code's mode, on a PC: a button of the box's row sends Shift+Tab (claude-input design §3.3). */
   mode?: Mode | null
   onMode?: () => void
+  /** A window or a question shows: Shift+Tab would land in it (in an edit permission, it allows every edit). */
+  modeOff?: boolean
   /** The terminal's own box holds text: the next send follows it (claude-input design §3.2). */
   boxNote?: boolean
   /** Hears when the box sends and stops. */
@@ -1188,6 +1199,7 @@ function Composer({
   onPickKey,
   mode,
   onMode,
+  modeOff,
   boxNote,
   onSending,
   onTermKey,
@@ -1381,7 +1393,7 @@ function Composer({
           void submit(text, rejecting)
         }}
       >
-        {mode && onMode && <ModeButton mode={mode} onPress={onMode} class="btn term-mode" />}
+        {mode && onMode && <ModeButton mode={mode} onPress={onMode} class="btn term-mode" disabled={modeOff} />}
         <label class="sr-only" for={field}>
           {rejecting ? '거절하고 대신 보낼 글' : '터미널에 여러 줄 보내기'}
         </label>

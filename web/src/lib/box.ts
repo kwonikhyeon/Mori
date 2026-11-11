@@ -65,10 +65,10 @@ export function readMode(line: string): Mode | null {
     name = ''
     rest = t.replace(/^\?\s+for shortcuts\b/, '')
   } else return null
+  // what follows: a notice at the right of the line, then pieces after "·"; the cycle hint is no extra
   const extras = rest
     .split('·')
-    .slice(1)
-    .map((s) => extra(s.trim()))
+    .map((s, i) => (i === 0 && /^\(.*shift\+tab.*\)$/i.test(s.trim()) ? '' : extra(s.trim())))
     .filter(Boolean)
   return { name, label: name ? (LABELS[name] ?? name) : '기본', extras }
 }

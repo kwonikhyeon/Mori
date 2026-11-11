@@ -72,11 +72,14 @@ func Read(config, project string, limit int) ([]Prompt, error) {
 			return nil, nil
 		}
 	}
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 0, 64<<10), 1<<20)
 	var all []Prompt
-	for sc.Scan() {
-		b := bytes.TrimSpace(sc.Bytes())
+	for {
+		// a line of any length, a big paste: no more than the tail read
+		raw, err := r.ReadBytes('\n')
+		if len(raw) == 0 && err != nil {
+			break
+		}
+		b := bytes.TrimSpace(raw)
 		if len(b) == 0 {
 			continue
 		}
@@ -96,7 +99,6 @@ func Read(config, project string, limit int) ([]Prompt, error) {
 		}
 		all = append(all, Prompt{Text: text, At: e.At})
 	}
-	// a line over the scanner's limit ends the read; what came before stands
 	slices.Reverse(all)
 	limit = min(max(limit, 0), MaxLimit)
 	if len(all) > limit {

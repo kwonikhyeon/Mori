@@ -120,3 +120,14 @@ func TestReadNoFile(t *testing.T) {
 		t.Fatalf("%v %v", ps, err)
 	}
 }
+
+// A line longer than any read buffer, a big paste, does not end the read:
+// what was sent after it still comes.
+func TestReadPastAHugeLine(t *testing.T) {
+	huge := line(t, strings.Repeat("ㅋ", 700_000), "/a", 1, nil) // about 2MB
+	dir := write(t, huge, line(t, "그 뒤의 글", "/a", 2, nil))
+	ps, err := Read(dir, "/a", 200)
+	if err != nil || len(ps) != 2 || ps[0].Text != "그 뒤의 글" {
+		t.Fatalf("%d %v", len(ps), err)
+	}
+}

@@ -30,6 +30,8 @@ export interface Screen {
    * (inputmode="none"), so the view, and the terminal, keep their size.
    */
   setKeyboard(on: boolean): void
+  /** What is selected on the screen, '' for nothing; the selection is cleared. */
+  takeSelection(): string
   focus(): void
   /** Shows the end of the output, where the cursor is. */
   scrollToBottom(): void
@@ -164,6 +166,11 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     appCursor: () => term.modes.applicationCursorKeysMode,
     setTheme: (t) => {
       term.options.theme = t
+    },
+    takeSelection: () => {
+      const s = term.hasSelection() ? term.getSelection() : ''
+      term.clearSelection()
+      return s
     },
     setKeyboard: (on) => {
       if (on) term.textarea?.removeAttribute('inputmode')

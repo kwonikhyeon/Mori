@@ -71,6 +71,9 @@ describe('readMode', () => {
     expect(readMode('⏵⏵ zoom on')).toEqual({ name: 'zoom', label: 'zoom', extras: [] })
     expect(readMode('⏵⏵ bypass permissions on · 2 shells')?.extras).toEqual(['셸 2'])
     expect(readMode('current ○○○ 6%')).toBeNull()
+    // a notice at the right of the line, with no "·" before it, stays
+    expect(readMode('⏵⏵ accept edits on  Context left until auto-compact: 9%')?.extras).toEqual(['Context left until auto-compact: 9%'])
+    expect(readMode('⏵⏵ bypass permissions on (shift+tab to cycle) · 1 shell')?.extras).toEqual(['셸 1'])
   })
 })
 

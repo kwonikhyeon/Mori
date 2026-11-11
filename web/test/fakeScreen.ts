@@ -21,6 +21,14 @@ export class FakeScreen implements Screen {
   app = false
   theme: ITheme | null = null
   focused = 0
+  /** What a person selected on the screen. */
+  selected = ''
+  takeSelection(): string {
+    const s = this.selected
+    this.selected = ''
+    return s
+  }
+
   /** Whether a touch on the screen may bring up the device's keyboard. */
   keyboard = true
   /** How often the screen was moved to its end. */

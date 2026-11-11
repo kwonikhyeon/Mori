@@ -2072,6 +2072,48 @@ describe('pickers', () => {
       expect(ws.input()).toEqual(['\x1b', '\x0f'])
     })
 
+    // Shift+Tab would land in the question: in an edit permission it allows every edit
+    it('turns the mode button off while a window or a question shows', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const mode = () => screen.getByRole('button', { name: '모드: 묻지 않음' }) as HTMLButtonElement
+      expect(mode().disabled).toBe(false)
+      await show(SCREENS.model)
+      expect(mode().disabled).toBe(true)
+      fireEvent.click(mode())
+      expect(ws.input()).toEqual([])
+      await show(IDLE)
+      expect(mode().disabled).toBe(false)
+      act(() => load([blockedTerm()]))
+      await frame()
+      expect(mode().disabled).toBe(true)
+    })
+
+    // On Windows and Linux Ctrl+C copies the terminal's selection, as from xterm itself
+    it('copies the terminal selection with Ctrl+C rather than interrupt', async () => {
+      const writeText = vi.fn(async () => {})
+      vi.stubGlobal('isSecureContext', true)
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true })
+      try {
+        const { ws } = await mount()
+        await attach(ws)
+        await show(IDLE)
+        FakeScreen.last().selected = '고른 글'
+        const box = textbox()
+        box.focus()
+        expect(fireEvent.keyDown(box, { key: 'c', ctrlKey: true })).toBe(false)
+        expect(ws.input()).toEqual([])
+        await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('고른 글'))
+        expect(FakeScreen.last().selected).toBe('')
+        // nothing chosen: Ctrl+C interrupts
+        fireEvent.keyDown(box, { key: 'c', ctrlKey: true })
+        expect(ws.input()).toEqual(['\x03'])
+      } finally {
+        delete (navigator as { clipboard?: unknown }).clipboard
+      }
+    })
+
     it('keeps the keys in the box without the cover', async () => {
       const { ws } = await mount()
       await attach(ws)

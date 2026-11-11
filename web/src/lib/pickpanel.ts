@@ -4,9 +4,11 @@
 // moment, its buttons off, and goes after SETTLE_MS. A window lost soon after
 // it showed, or after the panel's own resize, is likely the panel's doing,
 // as the panel cut the terminal's rows: it is held, and shows again only
-// after the input box has shown.
+// after the input box has shown. A terminal the panel cut may redraw the
+// window without its title, or the first lines of it: the window is the
+// same (alike), and the panel keeps the title it shows.
 
-import type { Look, Seen } from './pick'
+import { alike, type Look, type Seen } from './pick'
 
 export interface Panel {
   seen: Seen | null
@@ -16,8 +18,8 @@ export interface Panel {
   since: number
   /** When the window went; null while it shows. */
   lost: number | null
-  /** The id of a window kept out until the input box shows. */
-  held: string | null
+  /** A window kept out until the input box shows. */
+  held: Seen | null
 }
 
 export const NO_PANEL: Panel = { seen: null, stale: false, since: 0, lost: null, held: null }
@@ -32,16 +34,20 @@ export const MIN_CAP = 120
 export function next(p: Panel, l: Look, at: number): Panel {
   const seen = l.seen
   if (seen) {
-    if (seen.id === p.held) return p
-    // the same window: a look that finds it as it was changes nothing, so the view need not redraw
-    if (p.seen && seen.id === p.seen.id) return !p.stale && seen.sig === p.seen.sig ? p : { ...p, seen, stale: false, lost: null }
+    if (p.held && alike(seen, p.held)) return p
+    if (p.seen && alike(seen, p.seen)) {
+      // a redraw that cuts the title keeps the one the panel shows
+      const kept = seen.title !== p.seen.title && p.seen.title.endsWith(seen.title) ? { ...seen, title: p.seen.title } : seen
+      // the same window: a look that finds it as it was changes nothing, so the view need not redraw
+      return !p.stale && kept.sig === p.seen.sig ? p : { ...p, seen: kept, stale: false, lost: null }
+    }
     return { seen, stale: false, since: at, lost: null, held: null }
   }
   if (!p.seen) return l.box ? (p.held === null ? p : { ...p, held: null }) : p
   if (l.box) return NO_PANEL
   const lost = p.lost ?? at
   if (at - lost < SETTLE_MS) return p.stale && p.lost === lost ? p : { ...p, stale: true, lost }
-  return { ...NO_PANEL, held: lost - p.since < SETTLE_MS ? p.seen.id : null }
+  return { ...NO_PANEL, held: lost - p.since < SETTLE_MS ? p.seen : null }
 }
 
 /** The panel resized the terminal at a time: what goes next may be its doing. */

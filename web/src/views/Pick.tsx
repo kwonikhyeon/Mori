@@ -12,6 +12,7 @@ import { announce } from '../lib/announce'
 import type { Hint } from '../lib/hints'
 import { DEPTH, look, NOTHING, type Look, type Option, type Seen } from '../lib/pick'
 import { capOf, MIN_CAP, next, NO_PANEL, restart, SETTLE_MS, type Panel } from '../lib/pickpanel'
+import { reach } from '../lib/pickpress'
 import type { Screen } from '../lib/xterm'
 import './lists.css'
 
@@ -121,13 +122,14 @@ export function usePick({ screen, ready, on, size, place, measure }: PickOptions
   const shown = on ? panel : NO_PANEL
   // The cap is taken once the window's panel is drawn, as its title and keys
   // take their part of the room, and drawn again before the screen shows it;
-  // then it is kept, so the panel does not move under a finger.
+  // then it is kept, so the panel does not move under a finger, though a
+  // redraw cuts the window's title.
   useLayoutEffect(() => {
     const seen = shown.seen
     if (!seen) return
     const m = sizes.current()
     setCap(capOf(m.total, m.cellH, seen.rows, m.viewH, m.chrome))
-  }, [shown.seen?.id, place])
+  }, [shown.seen?.form, place])
 
   return { seen: shown.seen, stale: shown.stale, cap, now, wait }
 }
@@ -152,8 +154,21 @@ function Mark({ mark }: { mark: Option['mark'] }): JSX.Element | null {
   return null
 }
 
-/** The window's items, the one under its cursor marked. */
-export function PickList({ seen, disabled, onChoose }: { seen: Seen; disabled: boolean; onChoose: (n: number) => void }): JSX.Element {
+/**
+ * The window's items, the one under its cursor marked. An item the cursor
+ * cannot reach from where it stands is off (lib/pickpress.ts reach).
+ */
+export function PickList({
+  seen,
+  blocked,
+  disabled,
+  onChoose,
+}: {
+  seen: Seen
+  blocked: boolean
+  disabled: boolean
+  onChoose: (n: number) => void
+}): JSX.Element {
   return (
     <ul class="qrows term-pick-list">
       {seen.options.map((o) => {
@@ -164,7 +179,7 @@ export function PickList({ seen, disabled, onChoose }: { seen: Seen; disabled: b
               type="button"
               class={'qrow term-pick-row' + (at ? ' is-selected' : '')}
               aria-current={at ? 'true' : undefined}
-              disabled={disabled}
+              disabled={disabled || !reach(seen, o.n, blocked)}
               onPointerDown={keep}
               onMouseDown={keep}
               onClick={() => onChoose(o.n)}
@@ -235,9 +250,10 @@ export function PickPanel({
 }): JSX.Element {
   const head = id + '-pick'
   const title = seen.title || (seen.options.length ? '터미널이 고르기를 기다립니다' : '터미널에 창이 떠 있습니다')
+  // read out once a window, though its cursor moves or a redraw cuts its title
   useEffect(() => {
     announce(seen.title ? `고르는 목록: ${seen.title}` : title)
-  }, [seen.id])
+  }, [seen.form, seen.title])
   return (
     <section class="term-pick" aria-labelledby={head}>
       <h2 id={head} class="term-pick-title">
@@ -245,7 +261,7 @@ export function PickPanel({
       </h2>
       {seen.options.length > 0 && (
         <div class="term-pick-body" style={{ maxHeight: `${cap}px` }}>
-          <PickList seen={seen} disabled={disabled} onChoose={onChoose} />
+          <PickList seen={seen} blocked={false} disabled={disabled} onChoose={onChoose} />
         </div>
       )}
       <PickHints hints={seen.hints} disabled={disabled} onHint={onHint} />

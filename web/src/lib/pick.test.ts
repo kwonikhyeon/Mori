@@ -1,8 +1,8 @@
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { Terminal } from '@xterm/xterm'
 import { describe, expect, it } from 'vitest'
-import { SCREENS, cursorAt, toShot } from '../../test/screens'
-import { DEPTH, NOTHING, look } from './pick'
+import { CHAT, SCREENS, cursorAt, toShot } from '../../test/screens'
+import { alike, DEPTH, NOTHING, look } from './pick'
 import { shotOf } from './shot'
 
 const seen = (text: string, cols?: number) => look(toShot(text, cols)).seen
@@ -120,6 +120,36 @@ describe('look', () => {
   it('tells one window from another', () => {
     expect(seen(SCREENS.model)!.id).not.toBe(seen(SCREENS.permission)!.id)
     expect(seen(SCREENS.btw)!.id).not.toBe(seen(SCREENS.model)!.id)
+  })
+
+  // A question's cursor goes on to "Chat about this", below its items: the
+  // window is the same, with no item under the cursor (design §6.3).
+  it('reads a list whose cursor is on a row without a number', () => {
+    const a = seen(SCREENS['ask-preview'])!
+    const s = seen(CHAT)!
+    expect(s.options.map((o) => o.n)).toEqual([1, 2])
+    expect(s.options.map((o) => o.label)).toEqual(['파란 하늘색', '짙은 숲색'])
+    expect(s.cursor).toBe(0)
+    expect(s.title).toBe(a.title)
+    expect(s.rows).toBe(a.rows)
+    expect(s.id).toBe(a.id)
+    expect(s.sig).not.toBe(a.sig)
+  })
+
+  // A terminal the panel cut redraws the window from its top down: its
+  // title, or the first lines of it, may not show (design §6.4).
+  it('knows a window by its labels when a redraw cuts its title', () => {
+    const whole = seen(SCREENS.model)!
+    const cut = seen(join(lines(SCREENS.model).slice(3)))!
+    const tail = seen(join(lines(SCREENS.model).filter((_, i) => i !== 1)))!
+    expect([cut.title, tail.title]).toEqual(['', 'Switch between Claude models. Applies to this session and future sessions.'])
+    for (const s of [cut, tail]) {
+      expect(s.form).toBe(whole.form)
+      expect(alike(s, whole)).toBe(true)
+      expect(alike(whole, s)).toBe(true)
+    }
+    expect(alike(seen(SCREENS.permission)!, whole)).toBe(false)
+    expect(seen(SCREENS.btw)!.form).not.toBe(whole.form)
   })
 
   it('counts the rows from the title to the hint line', () => {

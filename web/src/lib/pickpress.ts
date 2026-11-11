@@ -5,9 +5,11 @@
 // #194: the number carries expect), and by moving the cursor elsewhere: the
 // Enter goes only once the cursor shows on the item. A list where many can
 // be chosen is only moved in: its hint keys tick and submit (design §6.5).
+// Moving counts from the item under the cursor: with the cursor on a row
+// without a number, only a blocked window's number reaches an item.
 
 import type { Hint } from './hints'
-import type { Look, Seen } from './pick'
+import { alike, type Look, type Seen } from './pick'
 
 /** The terminal a press goes to, and the screen it reads back. */
 export interface Press {
@@ -33,9 +35,12 @@ const same = (p: Press, seen: Seen) => p.now().seen?.sig === seen.sig
 /** Many can be chosen: the items have checkboxes. */
 const many = (seen: Seen) => seen.options.some((o) => o.mark === 'on' || o.mark === 'off')
 
-/** Chooses item n; false when the window changed and nothing was chosen. */
+/** Item n can be chosen from where the cursor stands: moving needs the cursor on an item; a blocked window takes the number. */
+export const reach = (seen: Seen, n: number, blocked: boolean) => seen.cursor > 0 || (blocked && n <= 9 && !many(seen))
+
+/** Chooses item n; false when the window changed, or n cannot be reached, and nothing was chosen. */
 export async function choose(p: Press, seen: Seen, n: number, blocked: boolean): Promise<boolean> {
-  if (!same(p, seen)) return false
+  if (!same(p, seen) || !reach(seen, n, blocked)) return false
   const multi = many(seen)
   if (blocked && n <= 9 && !multi) {
     await p.answer(String(n))
@@ -44,7 +49,7 @@ export async function choose(p: Press, seen: Seen, n: number, blocked: boolean):
   const d = n - seen.cursor
   if (d !== 0) await p.move(Array<string>(Math.abs(d)).fill(d > 0 ? 'down' : 'up'))
   if (multi) return true
-  const at = await p.wait((l) => l.seen?.id === seen.id && l.seen.cursor === n, SEE_MS)
+  const at = await p.wait((l) => !!l.seen && alike(l.seen, seen) && l.seen.cursor === n, SEE_MS)
   if (!at) return false
   await p.answer('enter')
   return true

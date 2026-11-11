@@ -566,7 +566,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
           ? {
               list: (
                 <div class="term-pick-body" style={{ maxHeight: `${pick.cap}px` }}>
-                  <PickList seen={seen} disabled={answering || pick.stale} onChoose={choose} />
+                  <PickList seen={seen} blocked={blocked} disabled={answering || pick.stale} onChoose={choose} />
                 </div>
               ),
               hints: <PickHints hints={seen.hints} disabled={answering || pick.stale} skip="esc" onHint={hint} />,

@@ -4,7 +4,7 @@ import { FakeScreen } from '../../test/fakeScreen'
 import { FakeWebSocket } from '../../test/fakeWs'
 import { folder, status, term } from '../../test/fixtures'
 import { inHost, withHost } from '../../test/scopes'
-import { cursorAt, SCREENS } from '../../test/screens'
+import { CHAT, cursorAt, SCREENS } from '../../test/screens'
 import { now } from '../lib/clock'
 import { resetPickPref, setPickOn } from '../lib/pickpref'
 import { route } from '../lib/router'
@@ -1125,6 +1125,54 @@ describe('pickers', () => {
     await show(SCREENS.idle)
     await show(SCREENS.model)
     expect(screen.getByRole('region', { name: TITLE })).toBeTruthy()
+  })
+
+  // The panel cut the terminal, which redraws the window from its top down
+  // with its title cut off: the window is the same (design §6.4).
+  it('keeps the title of a window its redraw cuts', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS.model)
+    await frame()
+    const p = screen.getByRole('region', { name: TITLE })
+    live()!.textContent = ''
+    await act(() => ws.json({ type: 'size', cols: 80, rows: 20 }))
+    await show(SCREENS.model.split('\n').slice(3).join('\n'))
+    expect(screen.getByRole('region', { name: TITLE })).toBe(p)
+    expect([...rowsOf(p), ...hintsOf(p)].every((b) => !b.disabled)).toBe(true)
+    await frame()
+    expect(said()).toBe('')
+  })
+
+  // A question's cursor goes on to "Chat about this", a row without a number
+  // below its items: the window stays, with no item under the cursor.
+  it('keeps the panel when the cursor goes to a row without a number', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS['ask-preview'])
+    await frame()
+    const p = screen.getByRole('region', { name: '어떤 색으로 칠할까요?' })
+    live()!.textContent = ''
+    await show(CHAT)
+    expect(screen.getByRole('region', { name: '어떤 색으로 칠할까요?' })).toBe(p)
+    expect(rowsOf(p)).toHaveLength(2)
+    expect(rowsOf(p).some((r) => r.hasAttribute('aria-current'))).toBe(false)
+    // moving counts from the item under the cursor, and there is none
+    expect(rowsOf(p).every((r) => r.disabled)).toBe(true)
+    expect(hintsOf(p).every((b) => !b.disabled)).toBe(true)
+    await frame()
+    expect(said()).toBe('')
+  })
+
+  it('answers a blocked question from a row without a number', async () => {
+    const { ws } = await mount(blockedTerm())
+    await attach(ws)
+    await show(SCREENS['ask-preview'])
+    await show(CHAT)
+    const ask = screen.getByRole('region', { name: '승인 대기 — 골라서 응답' })
+    expect(rowsOf(ask)).toHaveLength(2)
+    // a blocked window takes the number, wherever its cursor stands
+    expect(rowsOf(ask).every((r) => !r.disabled)).toBe(true)
   })
 
   it('turns off with the setting', async () => {

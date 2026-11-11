@@ -12,6 +12,9 @@ export const SCREENS: Record<string, string> = Object.fromEntries(
   Object.entries(files).map(([path, text]) => [path.replace(/^.*\//, '').replace(/\.txt$/, ''), text]),
 )
 
+/** The question with its cursor on the row without a number, "Chat about this". */
+export const CHAT = SCREENS['ask-preview'].replace('❯ 1. 파란 하늘색', '  1. 파란 하늘색').replace('\n  Chat about this', '\n❯ Chat about this')
+
 const rows = (text: string) => text.replace(/\n$/, '').split('\n')
 
 /** A sample as the shot of a screen that shows just it. */

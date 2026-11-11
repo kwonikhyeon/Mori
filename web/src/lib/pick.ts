@@ -1,7 +1,8 @@
 // What Claude Code's window at the bottom of a terminal asks (pickers design
-// §6.2, §6.3, §6.6): a numbered list with one cursor, or a window with only a
-// hint line, and where the input box stands. It reads cells, not bytes, so a
-// wide letter, a frame and a wrapped line all count as the screen draws them.
+// §6.2, §6.3, §6.6): a numbered list with one cursor, on an item or on a row
+// without a number below them, or a window with only a hint line, and where
+// the input box stands. It reads cells, not bytes, so a wide letter, a frame
+// and a wrapped line all count as the screen draws them.
 // A list is read only when nothing else on the screen could be it: Claude's
 // answers and what the user types sit above or inside the input box, so a
 // list with the box below it, or in it, is no window.
@@ -23,11 +24,13 @@ export interface Option {
 export interface Seen {
   /** Stays while the cursor moves: the title and the labels. */
   id: string
+  /** Stays while a redraw cuts the title too: the labels, or the hint line of a window with no list. */
+  form: string
   /** Changes with anything the window shows, the cursor included. */
   sig: string
   title: string
   options: Option[]
-  /** The item the cursor is on; 0 when there is no list. */
+  /** The item the cursor is on; 0 when there is no list, or when it stands on a row without a number. */
   cursor: number
   hints: Hint[]
   /** What the window shows above its hint line. */
@@ -48,6 +51,12 @@ export interface Look {
 }
 
 export const NOTHING: Look = { seen: null, box: null }
+
+/**
+ * The same window, as far as a look can tell: the same labels, or hint line,
+ * and one title the end of the other, as a redraw cuts a title from its top.
+ */
+export const alike = (a: Seen, b: Seen) => a.form === b.form && (a.title.endsWith(b.title) || b.title.endsWith(a.title))
 
 // At most this many non-blank lines below a list's last item (design §6.3).
 const BELOW = 10
@@ -240,9 +249,10 @@ function fnv(s: string): string {
   return h.toString(16)
 }
 
-function make(id: string, title: string, options: Option[], cursor: number, texts: string[], top: number, h: HintBlock): Seen {
+function make(id: string, form: string, title: string, options: Option[], cursor: number, texts: string[], top: number, h: HintBlock): Seen {
   return {
     id,
+    form,
     sig: fnv(texts.slice(top, h.e + 1).join('\n')),
     title,
     options,
@@ -256,8 +266,6 @@ function make(id: string, title: string, options: Option[], cursor: number, text
 function listed(texts: string[], cols: number, box: [number, number] | null): Seen | null {
   const list = items(texts)
   if (!list || list.length < 2) return null
-  const cursors = list.filter((it) => it.cursor)
-  if (cursors.length !== 1) return null
   const first = list[0].i
   const last = list[list.length - 1].i
   // Claude's answer above the box, or a list typed into it
@@ -265,10 +273,14 @@ function listed(texts: string[], cols: number, box: [number, number] | null): Se
   if (texts.slice(last + 1).filter((t) => t.trim()).length > BELOW) return null
   const h = hintAt(texts, last + 1, last + 1)
   if (!h) return null
+  const cursors = list.filter((it) => it.cursor)
+  if (cursors.length > 1) return null
+  // no item under the cursor: it stands on a row without a number below them, as a question's "Chat about this"
+  if (!cursors.length && texts.slice(last + 1, h.s).filter((t) => t.trimStart().startsWith('❯')).length !== 1) return null
   const options = list.map((it) => option(it, texts, h.s))
   const title = titleAt(texts, first, cols)
-  const id = fnv(title.text + '\0' + options.map((o) => o.label).join('\0'))
-  return make(id, title.text, options, cursors[0].n, texts, title.top, h)
+  const labels = options.map((o) => o.label).join('\0')
+  return make(fnv(title.text + '\0' + labels), fnv('list\0' + labels), title.text, options, cursors[0]?.n ?? 0, texts, title.top, h)
 }
 
 /** A window with no list it can read: a hint line near the bottom, under a rule, with no input box. */
@@ -281,7 +293,7 @@ function hinted(texts: string[], cols: number, box: [number, number] | null): Se
   let r = h.s - 1
   while (r >= 0 && !isRule(texts[r], cols)) r--
   if (r < 0) return null
-  return make(fnv(h.text), '', [], 0, texts, r + 1, h)
+  return make(fnv(h.text), fnv('hint\0' + h.text), '', [], 0, texts, r + 1, h)
 }
 
 /** What the bottom of the screen shows: a window to answer, and the input box. */

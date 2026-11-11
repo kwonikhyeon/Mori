@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { cursorAt, SCREENS, toShot } from '../../test/screens'
+import { CHAT, cursorAt, SCREENS, toShot } from '../../test/screens'
 import { look, NOTHING, type Look, type Seen } from './pick'
-import { choose, CLOSE_MS, closeFor, SEE_MS, tap, type Press } from './pickpress'
+import { choose, CLOSE_MS, closeFor, reach, SEE_MS, tap, type Press } from './pickpress'
 
 const at = (text: string): Look => look(toShot(text))
 const model = at(SCREENS.model)
 const model2 = at(cursorAt(SCREENS.model, 2))
 const model3 = at(cursorAt(SCREENS.model, 3))
+// redrawn in a terminal the panel cut, without its title
+const cut = at(SCREENS.model.split('\n').slice(3).join('\n'))
+const chat = at(CHAT) // the cursor on "Chat about this", below the items
 const perm = at(SCREENS.permission)
 const long = at(SCREENS['long-list'])
 const long10 = at(cursorAt(SCREENS['long-list'], 10))
@@ -92,6 +95,25 @@ describe('choose', () => {
     expect(await choose(f.p, model.seen!, 3, false)).toBe(false)
     expect(await choose(f.p, model.seen!, 2, true)).toBe(false)
     expect(f.sent).toEqual([])
+  })
+
+  it('sees the cursor land when the title comes back', async () => {
+    const f = fake(cut, model3)
+    expect(await choose(f.p, cut.seen!, 3, false)).toBe(true)
+    expect(f.sent).toEqual(['move down down', 'answer enter'])
+  })
+
+  // Moving counts from the item under the cursor; on a row without a number
+  // there is none to count from, and only a number reaches an item.
+  it('chooses from a row without a number only by the number', async () => {
+    expect(reach(chat.seen!, 2, false)).toBe(false)
+    expect(reach(chat.seen!, 2, true)).toBe(true)
+    expect(reach(model.seen!, 3, false)).toBe(true)
+    const f = fake(chat)
+    expect(await choose(f.p, chat.seen!, 2, false)).toBe(false)
+    expect(f.sent).toEqual([])
+    expect(await choose(f.p, chat.seen!, 2, true)).toBe(true)
+    expect(f.sent).toEqual(['answer 2'])
   })
 
   it('only moves in a list where many can be chosen', async () => {

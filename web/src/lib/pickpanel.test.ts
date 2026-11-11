@@ -6,6 +6,8 @@ import { capOf, MIN_CAP, next, NO_PANEL, restart, SETTLE_MS, type Panel } from '
 const at = (name: string): Look => look(toShot(SCREENS[name]))
 const model = at('model')
 const moved = look(toShot(cursorAt(SCREENS.model, 2)))
+// redrawn in a terminal the panel cut, without its title
+const cut = look(toShot(SCREENS.model.split('\n').slice(3).join('\n')))
 const btw = at('btw')
 const idle = at('idle') // the input box, and no window
 const gone: Look = NOTHING // half drawn: neither a window nor the box
@@ -30,6 +32,21 @@ describe('next', () => {
     expect(p.seen).toBe(moved.seen)
     expect(p.seen!.cursor).toBe(2)
     expect(p).toMatchObject({ stale: false, since: 500, lost: null })
+  })
+
+  it('keeps the title of a window whose redraw cuts it', () => {
+    const p = run([
+      [model, 500],
+      [cut, 800],
+    ])
+    expect(p.seen!.title).toBe(model.seen!.title)
+    expect(p.seen!.sig).toBe(cut.seen!.sig)
+    expect(p.seen!.options).toBe(cut.seen!.options)
+    expect(p).toMatchObject({ stale: false, since: 500, lost: null })
+    // the title back as it was: the window is the same still
+    const back = next(p, model, 900)
+    expect(back.seen).toBe(model.seen)
+    expect(back.since).toBe(500)
   })
 
   it('shows another window as new', () => {
@@ -63,11 +80,12 @@ describe('next', () => {
       [gone, 600 + SETTLE_MS],
     ])
     expect(p.seen).toBeNull()
-    expect(p.held).toBe(model.seen!.id)
-    // the same window again is the one the panel's own cut keeps out
+    expect(p.held).toBe(model.seen)
+    // the same window again is the one the panel's own cut keeps out, its title cut or not
     const again = next(p, moved, 2000)
     expect(again.seen).toBeNull()
-    expect(again.held).toBe(model.seen!.id)
+    expect(again.held).toBe(model.seen)
+    expect(next(p, cut, 2000).seen).toBeNull()
     // the input box ends the hold, and the window shows once more
     const free = next(again, idle, 2100)
     expect(free).toEqual({ ...NO_PANEL, held: null })
@@ -130,7 +148,7 @@ describe('next', () => {
       r,
     )
     expect(p.seen).toBeNull()
-    expect(p.held).toBe(model.seen!.id)
+    expect(p.held).toBe(model.seen)
   })
 
   it('leaves an empty panel as it is on restart', () => {

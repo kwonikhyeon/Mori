@@ -769,6 +769,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       onTermKey={covered && !phone ? termKey : undefined}
       bind={pathTo}
       hint={claudeOn && rb && rb.text === '' ? rb.hint : ''}
+      sentKey={`${h.id}.${addr}.${t?.created_ms ?? 0}`}
     />
   )
 
@@ -1172,6 +1173,8 @@ interface ComposerProps {
   bind?: { current: ((text: string) => void) | null }
   /** The grey hint of the terminal's empty box: the box's placeholder, and Tab takes it (claude-input design §6). */
   hint?: string
+  /** Where this device keeps what it sends to this terminal: host, address and start. */
+  sentKey: string
 }
 
 /** What the box says when the terminal's own box holds text (claude-input design §3.2). */
@@ -1211,6 +1214,7 @@ function Composer({
   onTermKey,
   bind,
   hint,
+  sentKey,
 }: ComposerProps) {
   const h = useHost()
   const draft = draftKey(h.id, addr)
@@ -1275,7 +1279,8 @@ function Composer({
       if (against) await h.api.terminals.reject(addr, value, against)
       else await h.api.terminals.send(addr, value)
       if (claude) noteSlash(value)
-      rememberSent(h.id, addr, value)
+      if (claude) rememberSent(sentKey, value)
+      recall.sent(value)
       recall.refresh()
       edit('')
       onReject(null)
@@ -1318,17 +1323,17 @@ function Composer({
   const recall = useMemo(
     () =>
       new Recall(async () => {
-        if (claude) {
-          try {
-            const r = await h.api.terminals.prompts(addr)
-            if (r.source === 'claude' && r.prompts.length) return r.prompts.map((p) => p.text)
-          } catch {
-            // what this device sent stands in
-          }
+        // a terminal that is not Claude Code keeps no record here: what is typed into a shell stays off the device
+        if (!claude) return []
+        try {
+          const r = await h.api.terminals.prompts(addr)
+          if (r.source === 'claude' && r.prompts.length) return r.prompts.map((p) => p.text)
+        } catch {
+          // what this device sent stands in
         }
-        return sentHere(h.id, addr)
+        return sentHere(sentKey)
       }),
-    [h, addr, claude],
+    [h, addr, claude, sentKey],
   )
   const recalled = (v: string) => {
     edit(v)
@@ -1467,10 +1472,25 @@ function Composer({
               const c = el.selectionStart
               const flat = c === el.selectionEnd
               if (e.key === 'ArrowUp' && flat && !el.value.slice(0, c).includes('\n')) {
-                e.preventDefault()
-                void recall.older(el.value).then((v) => {
-                  if (v !== null) recalled(v)
-                })
+                const at = el.value
+                // what is typed while the record loads stays: the walk gives up
+                const back = () =>
+                  void recall.older(at).then((v) => {
+                    if (v === null) return
+                    if (latest.current === at) recalled(v)
+                    else recall.reset()
+                  })
+                // at the start, or walking already: one older at once
+                if (c === 0 || recall.browsing) {
+                  e.preventDefault()
+                  back()
+                  return
+                }
+                // a wrapped first paragraph: the browser moves the caret up its
+                // lines, and to the start from the first one; from there it calls back
+                setTimeout(() => {
+                  if (el.selectionStart === 0 && el.selectionEnd === 0 && latest.current === at) back()
+                }, 0)
                 return
               }
               if (e.key === 'ArrowDown' && recall.browsing && flat && !el.value.slice(c).includes('\n')) {

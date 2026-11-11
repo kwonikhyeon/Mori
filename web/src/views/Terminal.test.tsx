@@ -1849,6 +1849,72 @@ describe('pickers', () => {
       expect(said()).toBe(`${'가'.repeat(60)}…`)
     })
 
+    it('keeps what is typed while the record loads', async () => {
+      let done = () => {}
+      reply = (c) =>
+        c.url.includes('/prompts')
+          ? new Promise<Response>((r) => {
+              done = () => r(Response.json({ prompts: [{ text: '둘째', at: 2 }], source: 'claude' }))
+            })
+          : undefined
+      const { ws } = await mount()
+      await attach(ws)
+      const box = textbox()
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      fireEvent.input(box, { target: { value: '새 글' } })
+      done()
+      await frame(50)
+      expect(box.value).toBe('새 글')
+    })
+
+    // A long paragraph wraps: ↑ moves the caret up its lines first, and only
+    // from the first one, where the browser puts the caret at the start, calls back.
+    it('leaves ↑ on a wrapped line to the box', async () => {
+      record(['둘째'])
+      const { ws } = await mount()
+      await attach(ws)
+      const box = textbox()
+      fireEvent.input(box, { target: { value: '긴 문단이 다음 줄로 넘어갑니다' } })
+      box.setSelectionRange(10, 10)
+      expect(fireEvent.keyDown(box, { key: 'ArrowUp' })).toBe(true)
+      await frame()
+      expect(box.value).toBe('긴 문단이 다음 줄로 넘어갑니다')
+      // on the first line the browser puts the caret at the start: then it calls back
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      box.setSelectionRange(0, 0)
+      await vi.waitFor(() => expect(box.value).toBe('둘째'))
+      fireEvent.keyDown(box, { key: 'ArrowDown' })
+      await vi.waitFor(() => expect(box.value).toBe('긴 문단이 다음 줄로 넘어갑니다'))
+    })
+
+    it('puts a send first though the record does not have it yet', async () => {
+      record(['예전 글'])
+      const { ws } = await mount()
+      await attach(ws)
+      const box = textbox()
+      fireEvent.input(box, { target: { value: '새로 보낸 글' } })
+      fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+      await vi.waitFor(() => expect(box.value).toBe(''))
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      await vi.waitFor(() => expect(box.value).toBe('새로 보낸 글'))
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      await vi.waitFor(() => expect(box.value).toBe('예전 글'))
+    })
+
+    // what is typed into a shell stays off this device's storage; this visit still calls it back
+    it('keeps nothing sent to a terminal that is not Claude Code', async () => {
+      const { ws } = await mount(term({ argv: ['/bin/zsh'], status: status('idle', { app: 'zsh' }) }))
+      await attach(ws)
+      const box = textbox()
+      fireEvent.input(box, { target: { value: 'export TOKEN=비밀' } })
+      fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+      await vi.waitFor(() => expect(box.value).toBe(''))
+      expect(Object.keys(localStorage).filter((k) => k.startsWith('mori.sent.'))).toEqual([])
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      await vi.waitFor(() => expect(box.value).toBe('export TOKEN=비밀'))
+      expect(sent('/api/terminals/t1/prompts', 'GET')).toEqual([])
+    })
+
     it('falls back to what was sent here', async () => {
       record([], 'none')
       const { ws } = await mount()

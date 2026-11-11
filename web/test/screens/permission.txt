@@ -1,0 +1,14 @@
+● 목록을 보겠습니다.
+
+────────────────────────────────────────────────────────────────────────────────
+ Bash command
+
+   ls -la /tmp/mori-sample
+   List the sample folder
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and don't ask again for ls commands in /tmp/mori-sample
+   3. No, and tell Claude what to do differently (esc)
+
+ Esc to cancel · Tab to amend · ctrl+e to explain

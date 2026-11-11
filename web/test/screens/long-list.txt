@@ -1,0 +1,17 @@
+────────────────────────────────────────────────────────────────────────────────
+ Pick a color theme
+
+ ❯  1. Dark mode
+    2. Light mode
+    3. Dark (colorblind)
+    4. Light (colorblind)
+    5. Dark (ANSI)
+    6. Light (ANSI)
+    7. Dusk
+    8. Dawn
+    9. Ocean
+   10. Forest
+   11. Desert
+   12. Rose
+
+ Enter to select · ↑/↓ to navigate · Esc to cancel

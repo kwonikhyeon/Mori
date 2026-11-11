@@ -1,0 +1,45 @@
+// Screens made by hand for the window reader (pickers design §6.3): each file
+// in screens/ is what the bottom of a terminal shows, one line a row, with no
+// text from a real conversation. They are 80 cells wide; narrow-40 is 40.
+
+import type { Shot } from '../src/lib/shot'
+import { toCells } from './cells'
+
+const files = import.meta.glob<string>('./screens/*.txt', { query: '?raw', import: 'default', eager: true })
+
+/** The samples by name: 'model' is screens/model.txt. */
+export const SCREENS: Record<string, string> = Object.fromEntries(
+  Object.entries(files).map(([path, text]) => [path.replace(/^.*\//, '').replace(/\.txt$/, ''), text]),
+)
+
+const rows = (text: string) => text.replace(/\n$/, '').split('\n')
+
+/** A sample as the shot of a screen that shows just it. */
+export function toShot(text: string, cols = 80, kind: Shot['kind'] = 'alternate'): Shot {
+  return { kind, top: 0, cols, lines: rows(text).map((l) => toCells(l, cols)) }
+}
+
+const CURSOR = /^\s*❯\s+\d{1,2}\.\s/
+const ITEM = /^\s*(?:❯\s+)?(\d{1,2})\.\s/
+
+/**
+ * The sample with its cursor on item n instead. What stands before a
+ * number is spaces and ❯, one cell each, so a letter's index there is its
+ * column.
+ */
+export function cursorAt(text: string, n: number): string {
+  const lines = rows(text)
+  const from = lines.findIndex((l) => CURSOR.test(l))
+  if (from < 0) throw new Error('no cursor')
+  const c = lines[from].indexOf('❯')
+  let to = -1
+  lines.forEach((l, i) => {
+    if (Number(ITEM.exec(l)?.[1]) === n) to = i
+  })
+  if (to < 0) throw new Error(`no item ${n}`)
+  const put = (l: string, ch: string) => l.slice(0, c) + ch + l.slice(c + 1)
+  lines[from] = put(lines[from], ' ')
+  if (lines[to][c] !== ' ') throw new Error(`no room for the cursor on item ${n}`)
+  lines[to] = put(lines[to], '❯')
+  return lines.join('\n') + '\n'
+}

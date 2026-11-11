@@ -6,6 +6,6 @@
 .term-font-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  gap: var(--spacing-2);
+  padding-bottom: calc(var(--spacing-4) + env(safe-area-inset-bottom, 0));
 }

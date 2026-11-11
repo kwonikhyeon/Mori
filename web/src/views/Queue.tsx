@@ -61,10 +61,6 @@ function WorkCard({ t, p }: { t: TerminalView; p: ListProps }) {
   )
 }
 
-function rowsClass(p: ListProps): string {
-  return 'qrows' + (p.variant === 'phone' ? ' qrows-joined' : '')
-}
-
 function Group({ g, p }: { g: QueueGroup; p: ListProps }) {
   const h = useHost()
   const id = `q-${p.variant}-${g.key}`
@@ -76,7 +72,7 @@ function Group({ g, p }: { g: QueueGroup; p: ListProps }) {
     body = g.items.map((t) => <WorkCard key={t.address} t={t} p={p} />)
   } else {
     body = (
-      <ul class={rowsClass(p)}>
+      <ul class="qrows">
         {g.items.map((t) => (
           <TermRow key={t.address} t={t} p={p} sub={appPlace(h, t)} />
         ))}
@@ -109,7 +105,7 @@ function Fold({ g, p, open, onToggle }: { g: QueueGroup; p: ListProps; open: boo
         </button>
       </h2>
       {open && (
-        <ul id={id + '-list'} class={rowsClass(p)}>
+        <ul id={id + '-list'} class="qrows">
           {g.items.map((t) =>
             t.state === 'finished' ? (
               <TermRow

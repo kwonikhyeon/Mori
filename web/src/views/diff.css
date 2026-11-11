@@ -1,8 +1,7 @@
-/* The lines of a diff. Whoever holds it gives the box, the size of the type
-   and the scrolling. */
+/* The lines of a diff. Whoever holds it gives the box, the type's role
+   (its size and leading) and the scrolling. */
 .dv {
-  font-family: var(--font-mono);
-  line-height: 1.6;
+  font-family: var(--font-family-code);
 }
 
 .dv-lines {
@@ -17,7 +16,7 @@
 }
 
 .dv-line {
-  padding: 0 12px;
+  padding: 0 var(--spacing-3);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -33,12 +32,12 @@
 }
 
 .dv-del {
-  background: var(--diff-del-bg);
+  background-color: var(--diff-del-bg);
   color: var(--diff-del);
 }
 
 .dv-add {
-  background: var(--diff-add-bg);
+  background-color: var(--diff-add-bg);
   color: var(--diff-add);
 }
 
@@ -49,25 +48,25 @@
 /* Not slanted: Korean has no italic, and a browser only skews it. */
 .dv-note,
 .dv-say {
-  color: var(--text-3);
-  font-family: var(--font-sans);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-body);
 }
 
 .dv-say {
-  padding: 4px 12px;
+  padding: var(--spacing-1) var(--spacing-3);
 }
 
 /* Positioned for the counts read out: see .gc-text. */
 .dv-file {
   position: relative;
   display: flex;
-  gap: 8px;
-  margin: 8px 0 4px;
-  padding: 6px 12px;
-  border-block: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 500;
+  gap: var(--spacing-2);
+  margin: var(--spacing-2) 0 var(--spacing-1);
+  padding: var(--spacing-1-5) var(--spacing-3);
+  border-block: 1px solid var(--color-border);
+  background-color: var(--color-background-surface);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
   overflow-wrap: anywhere;
 }
 
@@ -94,5 +93,5 @@
 }
 
 .dv-more {
-  padding: 8px 12px 0;
+  padding: var(--spacing-2) var(--spacing-3) 0;
 }

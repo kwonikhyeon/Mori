@@ -3,7 +3,7 @@
 .fp-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -12,28 +12,30 @@
 .fp-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--spacing-3);
   width: 100%;
   min-height: 52px;
-  padding: 6px 10px;
+  padding: var(--spacing-1-5) var(--spacing-3);
   border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text);
+  border-radius: var(--radius-element);
+  background-color: transparent;
+  color: var(--color-text-primary);
   text-align: left;
 }
 
-.fp-row:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .fp-row:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
 .fp-row[aria-current="true"] {
-  background: var(--selected);
+  background-color: var(--color-accent-muted);
 }
 
 .fp-icon {
   flex: none;
-  color: var(--text-2);
+  color: var(--color-icon-secondary);
 }
 
 .fp-main {
@@ -46,64 +48,68 @@
 
 .fp-name {
   overflow: hidden;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .fp-path {
   overflow: hidden;
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .fp-tag {
   flex: none;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--chip);
-  color: var(--chip-text);
-  font-size: 11px;
-  font-weight: 600;
+  padding: var(--spacing-0-5) var(--spacing-2);
+  border-radius: var(--radius-full);
+  background-color: var(--color-background-gray);
+  color: var(--color-text-gray);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+  font-weight: var(--font-weight-medium);
 }
 
 .fp-check {
   flex: none;
-  color: var(--accent-text);
+  color: var(--color-text-accent);
 }
 
 .fp-go {
   flex: none;
-  color: var(--text-3);
+  color: var(--color-icon-secondary);
 }
 
 .fp-bar {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px 0;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4) 0;
 }
 
 .fp-input {
   flex: 1;
   min-width: 0;
   height: 38px;
-  font-size: 13px;
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
 }
 
 .fp-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .fp-none {
-  padding: 16px 4px;
-  color: var(--text-3);
-  font-size: 13px;
+  padding: var(--spacing-4) var(--spacing-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-align: center;
 }
 
@@ -114,23 +120,31 @@
 .fp-hidden {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: var(--text-2);
-  font-size: 13px;
+  gap: var(--spacing-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   cursor: pointer;
 }
 
+/* astryx's Checkbox: the native box at 20 px, at least 24 px to a finger. */
 .fp-hidden input {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   margin: 0;
-  accent-color: var(--accent);
+  accent-color: var(--color-accent);
+}
+
+@media (pointer: coarse) {
+  .fp-hidden input {
+    width: 24px;
+    height: 24px;
+  }
 }
 
 @media (max-width: 767px) {
   .fp-input {
     height: 44px;
-    font-size: 16px;
   }
 
   .fp-hidden {

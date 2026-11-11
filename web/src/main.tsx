@@ -1,5 +1,6 @@
-import './styles/fonts.css'
+// tokens.css first: its notice (/*!) is kept only at the head of the built sheet.
 import './styles/tokens.css'
+import './styles/fonts.css'
 import './styles/base.css'
 import './styles/ui.css'
 import { effect } from '@preact/signals'

@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "icons": "node scripts/icons.mjs"
+    "icons": "node scripts/icons.mjs",
+    "tokens": "node scripts/tokens.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "5.3.0",

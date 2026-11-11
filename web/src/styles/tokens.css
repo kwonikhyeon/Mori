@@ -1,61 +1,263 @@
-/* Design tokens of candidate B (spec §3 #113, #118). Every color the UI
-   uses comes from here. The dark set is written twice: once for the OS
-   setting, once for an explicit choice in Settings. */
+/*! Mori design tokens.
+ * Token names, scales and structural values are adapted from astryx
+ * (https://github.com/meta/astryx, commit 1e214aaf990d2d3c6ba4fa6bf86764d48e69cfbc):
+ * packages/core/src/theme/tokens.stylex.ts and
+ * packages/themes/neutral/src/neutralTheme.ts. Colours are Mori's own.
+ *
+ * MIT License
+ *
+ * Copyright (c) 2026 Meta Platforms, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+/* scripts/tokens.mjs writes this file (npm run tokens): change a token
+   there, not here.
+
+   Every value the UI uses comes from here (spec §3 #201): astryx's token
+   names, its spacing, size, radius, type and motion scales and its shadow
+   tiers, with Mori's warm palette. Rules elsewhere name a token, never a
+   value: styles.test.ts keeps them so. A role astryx has no token for is a
+   --mori-* token, and the app's own sets (--term-*, --diff-*, --count-*,
+   --kind-*, --lane-*) keep their names. The dark set is written twice: once
+   for the OS setting, once for an explicit choice in Settings. */
+
+:root {
+  /* Spacing: 4px steps, in rem. */
+  --spacing-0: 0rem;
+  --spacing-0-5: 0.125rem;
+  --spacing-1: 0.25rem;
+  --spacing-1-5: 0.375rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-7: 1.75rem;
+  --spacing-8: 2rem;
+  --spacing-9: 2.25rem;
+  --spacing-10: 2.5rem;
+  --spacing-11: 2.75rem;
+  --spacing-12: 3rem;
+
+  /* Control heights. A phone keeps 44px controls (styles.test.ts). */
+  --size-element-sm: 28px;
+  --size-element-md: 32px;
+  --size-element-lg: 36px;
+  --mori-size-touch: 44px;
+  --border-width: 1px;
+
+  /* The focus ring. astryx draws it in --color-accent; Mori draws it in the
+     accent text colour, which keeps its contrast on the dark set too. */
+  --focus-outline-width: 2px;
+  --focus-outline-style: solid;
+  --focus-outline-color: var(--color-text-accent);
+  --focus-outline-offset: 3px;
+
+  /* Hover and press lay an overlay over a control's own fill, as astryx's
+     interaction overlay does: a gradient, so it sits on any background. */
+  --mori-overlay-hover-image: linear-gradient(var(--color-overlay-hover), var(--color-overlay-hover));
+  --mori-overlay-pressed-image: linear-gradient(var(--color-overlay-pressed), var(--color-overlay-pressed));
+
+  /* Radii: the neutral theme's. */
+  --radius-none: 0px;
+  --radius-inner: 0.375rem;
+  --radius-element: 0.625rem;
+  --radius-container: 0.75rem;
+  --radius-page: 1.75rem;
+  --radius-full: 9999px;
+
+  /* Motion: the neutral theme's durations and astryx's easings. A release
+     or a way out runs over --duration-exit with --ease-exit. */
+  --duration-fast-min: 95ms;
+  --duration-fast: 125ms;
+  --duration-fast-max: 165ms;
+  --duration-medium-min: 225ms;
+  --duration-medium: 300ms;
+  --duration-medium-max: 400ms;
+  --duration-slow-min: 525ms;
+  --duration-slow: 700ms;
+  --duration-slow-max: 935ms;
+  --duration-exit: var(--duration-fast);
+  --ease-standard: cubic-bezier(0.24, 1, 0.4, 1);
+  --ease-entrance: cubic-bezier(0.24, 1, 0.4, 1);
+  --ease-move: cubic-bezier(0.24, 1, 0.4, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 0.6, 0.6);
+
+  /* Type: Mori's faces on astryx's scale (base 14, ratio 1.2) and roles. A
+     rule sets a role's size, weight and leading, not a number. */
+  --font-family-body: 'Inter', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
+  --font-family-code: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', monospace;
+  --font-size-xs: 0.625rem;
+  --font-size-sm: 0.75rem;
+  --font-size-base: 0.875rem;
+  --font-size-lg: 1.0625rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* The phone's quick keys keep 12px on both scales: eleven share a 320px
+     row, and the touch scale's 14px would leave a word no room in its key. */
+  --mori-font-size-key: 0.75rem;
+
+  --text-heading-1-size: var(--font-size-2xl);
+  --text-heading-1-weight: var(--font-weight-semibold);
+  --text-heading-1-leading: 1.3333;
+  --text-heading-2-size: var(--font-size-xl);
+  --text-heading-2-weight: var(--font-weight-semibold);
+  --text-heading-2-leading: 1.4;
+  --text-heading-3-size: var(--font-size-lg);
+  --text-heading-3-weight: var(--font-weight-bold);
+  --text-heading-3-leading: 1.4118;
+  --text-heading-4-size: var(--font-size-base);
+  --text-heading-4-weight: var(--font-weight-bold);
+  --text-heading-4-leading: 1.4286;
+  --text-heading-5-size: var(--font-size-sm);
+  --text-heading-5-weight: var(--font-weight-semibold);
+  --text-heading-5-leading: 1.6667;
+  --text-heading-6-size: var(--font-size-xs);
+  --text-heading-6-weight: var(--font-weight-semibold);
+  --text-heading-6-leading: 1.6;
+  --text-body-size: var(--font-size-base);
+  --text-body-weight: var(--font-weight-normal);
+  --text-body-leading: 1.4286;
+  --text-large-size: var(--font-size-lg);
+  --text-large-weight: var(--font-weight-semibold);
+  --text-large-leading: 1.4118;
+  --text-label-size: var(--font-size-base);
+  --text-label-weight: var(--font-weight-medium);
+  --text-label-leading: 1.4286;
+  --text-code-size: var(--font-size-base);
+  --text-code-weight: var(--font-weight-normal);
+  --text-code-leading: 1.4286;
+  --text-supporting-size: var(--font-size-sm);
+  --text-supporting-weight: var(--font-weight-normal);
+  --text-supporting-leading: 1.6667;
+}
+
+/* On a touch screen narrower than a laptop, the neutral theme's mobile type:
+   base 16 at ratio 1.1736 (spec §3 #202). Body text is 16px, so a field
+   never makes iOS zoom in, and nothing needs a phone size of its own. */
+@media (pointer: coarse) and (max-width: 1023px) {
+  :root {
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.1875rem;
+    --font-size-xl: 1.375rem;
+    --font-size-2xl: 1.625rem;
+    --text-heading-1-leading: 1.3846;
+    --text-heading-2-leading: 1.4545;
+    --text-heading-3-leading: 1.4737;
+    --text-heading-4-leading: 1.5;
+    --text-heading-5-leading: 1.4286;
+    --text-heading-6-leading: 1.6667;
+    --text-body-leading: 1.5;
+    --text-large-leading: 1.4737;
+    --text-label-leading: 1.5;
+    --text-code-leading: 1.5;
+    --text-supporting-leading: 1.4286;
+  }
+}
 
 :root {
   color-scheme: light;
 
-  --font-sans: 'Inter', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'D2Coding', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', monospace;
+  /* Surfaces. */
+  --color-background-body: #F6F5F2;
+  --color-background-surface: #FFFFFF;
+  --color-background-card: #FFFFFF;
+  --color-background-popover: #FFFFFF;
+  --color-background-muted: #F6F5F2;
+  --color-background-inverted: #1C1B19;
+  --color-background-error-inverted: #B3123A;
+  --color-background-gray: #ECEAE5;
+  --color-background-blue: #DCE8FF;
 
-  --bg: #F6F5F2;
-  --surface: #FFFFFF;
-  --surface-2: #F6F5F2;
-  --border: #E4E1DA;
-  --divider: #ECEAE5;
-  --text: #1C1B19;
-  --text-2: #5F5B53;
-  --text-3: #6F6A62;
-  --text-4: #3D3A35;
+  /* Tints laid over any fill: a secondary control, a scrim, hover, press. */
+  --color-neutral: rgba(28, 27, 25, .08);
+  --color-overlay: rgba(28, 27, 25, .32);
+  --color-overlay-hover: rgba(28, 27, 25, .05);
+  --color-overlay-pressed: rgba(28, 27, 25, .10);
 
-  --accent: #2457D6;
-  --accent-hover: #1A3F9E;
-  --accent-text: #2457D6;
-  --on-accent: #FFFFFF;
-  --selected: #E8EEFB;
-  --pressed-border: #B9CBF3;
-  --pressed-text: #1D4FC4;
-  --choice-bg: #F3F6FD;
-  --focus-border: #9DB5EC;
-  --focus-ring: rgba(36, 87, 214, .35);
+  /* Lines. The emphasized border edges a field, a switch and a grabber. */
+  --color-border: #E4E1DA;
+  --color-border-emphasized: #C9C4BA;
+  --color-track: #ECEAE5;
 
-  --chip: #ECEAE5;
-  --chip-text: #3D3A35;
-  --blocked: #FFB15C;
-  --blocked-text: #1C1B19;
-  --blocked-box: #FFF4E6;
-  --blocked-box-text: #5C3B0E;
-  --blocked-title: #7A4A00;
-  --blocked-border: #F2D3A6;
-  --blocked-key-text: #3D2A0F;
-  --blocked-key-border: #E0C9A6;
-  --error: #B3123A;
-  --error-text: #FFFFFF;
-  --error-box: #FBEAEE;
-  --error-box-text: #7A0C27;
-  --danger: #B3123A;
-  --danger-border: #EBC3CD;
-  --on-danger: #FFFFFF;
-  --working: #DCE8FF;
-  --working-text: #1D4FC4;
-  --track: #ECEAE5;
-  --info-box: #F3F6FD;
-  --info-box-text: #3D3A35;
+  /* Text. Hue text sits on its own background. */
+  --color-text-primary: #1C1B19;
+  --color-text-secondary: #5F5B53;
+  --color-text-disabled: #A8A49C;
+  --color-text-accent: #2457D6;
+  --color-text-warning: #7A4A00;
+  --color-text-error: #B3123A;
+  --color-text-gray: #3D3A35;
+  --color-text-blue: #1D4FC4;
 
+  /* Icons and status dots. */
+  --color-icon-primary: #1C1B19;
+  --color-icon-secondary: #6F6A62;
+  --color-icon-disabled: #A8A49C;
+  --color-icon-accent: #2457D6;
+  --color-icon-warning: #B26B00;
+  --color-icon-error: #B3123A;
+
+  /* Accent and status fills, each with the ink that reads on it. */
+  --color-accent: #2457D6;
+  --color-accent-muted: #E8EEFB;
+  --color-on-accent: #FFFFFF;
+  --color-warning: #FFB15C;
+  --color-on-warning: #1C1B19;
+  --color-warning-muted: #FFF4E6;
+  --color-on-warning-muted: #5C3B0E;
+  --color-error: #B3123A;
+  --color-on-error: #FFFFFF;
+  --color-error-muted: #FBEAEE;
+  --color-on-error-muted: #7A0C27;
+  --color-info-muted: #F3F6FD;
+  --color-on-info-muted: #3D3A35;
+
+  /* Elevation: astryx's three tiers; the dark set adds its rim of light. */
+  --shadow-low: 0 2px 4px rgba(28, 27, 25, .05), 0 4px 8px rgba(28, 27, 25, .10);
+  --shadow-med: 0 2px 4px rgba(28, 27, 25, .05), 0 4px 12px rgba(28, 27, 25, .10);
+  --shadow-high: 0 4px 6px rgba(28, 27, 25, .10), 0 12px 24px rgba(28, 27, 25, .15);
+
+  /* Mori's own roles. Text on the inverted fill: astryx turns the toast's
+     colour scheme around, Mori sets its tokens per scheme. A sheet rises
+     from the bottom, so its high shadow falls upwards. */
+  --mori-on-inverted: #FFFFFF;
+  --mori-shadow-sheet: 0 -4px 6px rgba(28, 27, 25, .10), 0 -12px 24px rgba(28, 27, 25, .15);
+
+  /* A QR code is read off white paper, whatever the theme. */
+  --mori-qr-paper: #FFFFFF;
+
+  /* The terminal, which xterm.js paints itself (lib/xterm.ts). */
   --term-bg: #1F1E1C;
   --term-fg: #ECEAE5;
   --term-dim: #A8A49C;
+  --term-scrollbar: rgba(255, 255, 255, .25);
 
+  /* Diffs and change counts. */
   --diff-bg: #FAF9F7;
   --diff-del-bg: #FBE7EB;
   --diff-del: #8A1230;
@@ -66,86 +268,101 @@
   --count-add: #1D4FC4;
   --count-del: #B3123A;
 
+  /* A changed file's letter, by kind. */
   --kind-m: #2457D6;
   --kind-u: #5F5B53;
   --kind-r: #8A3FC4;
   --kind-a: #0F7B6C;
   --kind-d: #B3123A;
 
-  --dot-blocked: #FFB15C;
-  --dot-waiting: #8C877E;
-  --dot-error: #B3123A;
-  --dot-exited: #6F6A62;
-
+  /* The commit graph's lanes. */
   --lane-0: #2457D6;
   --lane-1: #8A3FC4;
   --lane-2: #0F7B6C;
   --lane-3: #5F5B53;
   --lane-4: #5E7A12;
-
-  --grabber: #C9C4BA;
-  --seg-track: #ECEAE5;
-  --seg-active: #FFFFFF;
-  --count-pill: #1C1B19;
-  --count-pill-text: #FFFFFF;
-  --toast: #1C1B19;
-  --toast-text: #FFFFFF;
-  --scrim: rgba(28, 27, 25, .32);
-  --shadow-card: 0 2px 8px rgba(28, 27, 25, .06);
-  --shadow-aside: 0 12px 32px rgba(28, 27, 25, .12);
-  --shadow-sheet: 0 -8px 24px rgba(28, 27, 25, .12);
-  --shadow-seg: 0 1px 2px rgba(28, 27, 25, .12);
-  --shadow-pop: 0 8px 24px rgba(28, 27, 25, .16);
-  --shadow-fab: 0 6px 16px rgba(36, 87, 214, .28);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #151412;
-    --surface: #1E1D1B;
-    --surface-2: #262522;
-    --border: #34322E;
-    --divider: #2B2A27;
-    --text: #ECEAE5;
-    --text-2: #B4AFA6;
-    --text-3: #9C978E;
-    --text-4: #D6D2CA;
-    --accent: #3D6BE0;
-    --accent-hover: #5A82EA;
-    --accent-text: #8FB0FF;
-    --on-accent: #FFFFFF;
-    --selected: rgba(127, 162, 255, .16);
-    --pressed-border: #4A66A8;
-    --pressed-text: #A9C1FF;
-    --choice-bg: rgba(127, 162, 255, .10);
-    --focus-border: #5A7BC8;
-    --focus-ring: rgba(143, 176, 255, .45);
-    --chip: #2E2C29;
-    --chip-text: #D6D2CA;
-    --blocked: #FFB15C;
-    --blocked-text: #1C1B19;
-    --blocked-box: #3A2A14;
-    --blocked-box-text: #FFD9A8;
-    --blocked-title: #FFC07A;
-    --blocked-border: #5C4220;
-    --blocked-key-text: #FFE3BF;
-    --blocked-key-border: #6B4E26;
-    --error: #C8203F;
-    --error-text: #FFFFFF;
-    --error-box: #3A1620;
-    --error-box-text: #FFB3C1;
-    --danger: #FF8FA3;
-    --danger-border: #5E2433;
-    --on-danger: #2B0A12;
-    --working: #1F2E52;
-    --working-text: #A9C1FF;
-    --track: #2E2C29;
-    --info-box: #20283A;
-    --info-box-text: #D6D2CA;
+
+    /* Surfaces. */
+    --color-background-body: #151412;
+    --color-background-surface: #1E1D1B;
+    --color-background-card: #1E1D1B;
+    --color-background-popover: #262522;
+    --color-background-muted: #262522;
+    --color-background-inverted: #ECEAE5;
+    --color-background-error-inverted: #C8203F;
+    --color-background-gray: #2E2C29;
+    --color-background-blue: #1F2E52;
+
+    /* Tints laid over any fill: a secondary control, a scrim, hover, press. */
+    --color-neutral: rgba(236, 234, 229, .10);
+    --color-overlay: rgba(0, 0, 0, .5);
+    --color-overlay-hover: rgba(236, 234, 229, .05);
+    --color-overlay-pressed: rgba(236, 234, 229, .10);
+
+    /* Lines. The emphasized border edges a field, a switch and a grabber. */
+    --color-border: #34322E;
+    --color-border-emphasized: #4A4843;
+    --color-track: #2E2C29;
+
+    /* Text. Hue text sits on its own background. */
+    --color-text-primary: #ECEAE5;
+    --color-text-secondary: #B4AFA6;
+    --color-text-disabled: #6F6A62;
+    --color-text-accent: #8FB0FF;
+    --color-text-warning: #FFC07A;
+    --color-text-error: #FF8FA3;
+    --color-text-gray: #D6D2CA;
+    --color-text-blue: #A9C1FF;
+
+    /* Icons and status dots. */
+    --color-icon-primary: #ECEAE5;
+    --color-icon-secondary: #9C978E;
+    --color-icon-disabled: #6F6A62;
+    --color-icon-accent: #8FB0FF;
+    --color-icon-warning: #FFB15C;
+    --color-icon-error: #FF6B86;
+
+    /* Accent and status fills, each with the ink that reads on it. */
+    --color-accent: #3D6BE0;
+    --color-accent-muted: rgba(127, 162, 255, .16);
+    --color-on-accent: #FFFFFF;
+    --color-warning: #FFB15C;
+    --color-on-warning: #1C1B19;
+    --color-warning-muted: #3A2A14;
+    --color-on-warning-muted: #FFD9A8;
+    --color-error: #C8203F;
+    --color-on-error: #FFFFFF;
+    --color-error-muted: #3A1620;
+    --color-on-error-muted: #FFB3C1;
+    --color-info-muted: #20283A;
+    --color-on-info-muted: #D6D2CA;
+
+    /* Elevation: astryx's three tiers; the dark set adds its rim of light. */
+    --shadow-low: 0 2px 4px rgba(0, 0, 0, .25), 0 4px 8px rgba(0, 0, 0, .40), inset 0 0 0 1px rgba(255, 255, 255, .08);
+    --shadow-med: 0 2px 4px rgba(0, 0, 0, .35), 0 4px 12px rgba(0, 0, 0, .50), inset 0 0 0 1px rgba(255, 255, 255, .12);
+    --shadow-high: 0 4px 6px rgba(0, 0, 0, .50), 0 12px 24px rgba(0, 0, 0, .70), inset 0 0 0 1px rgba(255, 255, 255, .15);
+
+    /* Mori's own roles. Text on the inverted fill: astryx turns the toast's
+       colour scheme around, Mori sets its tokens per scheme. A sheet rises
+       from the bottom, so its high shadow falls upwards. */
+    --mori-on-inverted: #1C1B19;
+    --mori-shadow-sheet: 0 -4px 6px rgba(0, 0, 0, .50), 0 -12px 24px rgba(0, 0, 0, .70), inset 0 0 0 1px rgba(255, 255, 255, .15);
+
+    /* A QR code is read off white paper, whatever the theme. */
+    --mori-qr-paper: #FFFFFF;
+
+    /* The terminal, which xterm.js paints itself (lib/xterm.ts). */
     --term-bg: #121110;
     --term-fg: #ECEAE5;
     --term-dim: #A8A49C;
+    --term-scrollbar: rgba(255, 255, 255, .25);
+
+    /* Diffs and change counts. */
     --diff-bg: #191816;
     --diff-del-bg: #3A1620;
     --diff-del: #FFB3C1;
@@ -155,83 +372,102 @@
     --diff-ctx: #B4AFA6;
     --count-add: #8FB0FF;
     --count-del: #FF8FA3;
+
+    /* A changed file's letter, by kind. */
     --kind-m: #8FB0FF;
     --kind-u: #B4AFA6;
     --kind-r: #C99BF0;
     --kind-a: #4FC2B0;
     --kind-d: #FF8FA3;
-    --dot-blocked: #FFB15C;
-    --dot-waiting: #9C978E;
-    --dot-error: #FF6B86;
-    --dot-exited: #9C978E;
+
+    /* The commit graph's lanes. */
     --lane-0: #6F95F5;
     --lane-1: #B583E8;
     --lane-2: #3DB8A5;
     --lane-3: #A8A49C;
     --lane-4: #9BBF3A;
-    --grabber: #4A4843;
-    --seg-track: #2B2A27;
-    --seg-active: #3A3834;
-    --count-pill: #ECEAE5;
-    --count-pill-text: #151412;
-    --toast: #3A3834;
-    --toast-text: #ECEAE5;
-    --scrim: rgba(0, 0, 0, .5);
-    --shadow-card: 0 2px 8px rgba(0, 0, 0, .4);
-    --shadow-aside: 0 12px 32px rgba(0, 0, 0, .4);
-    --shadow-sheet: 0 -8px 24px rgba(0, 0, 0, .4);
-    --shadow-seg: 0 1px 2px rgba(0, 0, 0, .4);
-    --shadow-pop: 0 8px 24px rgba(0, 0, 0, .5);
-    --shadow-fab: 0 6px 16px rgba(0, 0, 0, .45);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #151412;
-  --surface: #1E1D1B;
-  --surface-2: #262522;
-  --border: #34322E;
-  --divider: #2B2A27;
-  --text: #ECEAE5;
-  --text-2: #B4AFA6;
-  --text-3: #9C978E;
-  --text-4: #D6D2CA;
-  --accent: #3D6BE0;
-  --accent-hover: #5A82EA;
-  --accent-text: #8FB0FF;
-  --on-accent: #FFFFFF;
-  --selected: rgba(127, 162, 255, .16);
-  --pressed-border: #4A66A8;
-  --pressed-text: #A9C1FF;
-  --choice-bg: rgba(127, 162, 255, .10);
-  --focus-border: #5A7BC8;
-  --focus-ring: rgba(143, 176, 255, .45);
-  --chip: #2E2C29;
-  --chip-text: #D6D2CA;
-  --blocked: #FFB15C;
-  --blocked-text: #1C1B19;
-  --blocked-box: #3A2A14;
-  --blocked-box-text: #FFD9A8;
-  --blocked-title: #FFC07A;
-  --blocked-border: #5C4220;
-  --blocked-key-text: #FFE3BF;
-  --blocked-key-border: #6B4E26;
-  --error: #C8203F;
-  --error-text: #FFFFFF;
-  --error-box: #3A1620;
-  --error-box-text: #FFB3C1;
-  --danger: #FF8FA3;
-  --danger-border: #5E2433;
-  --on-danger: #2B0A12;
-  --working: #1F2E52;
-  --working-text: #A9C1FF;
-  --track: #2E2C29;
-  --info-box: #20283A;
-  --info-box-text: #D6D2CA;
+
+  /* Surfaces. */
+  --color-background-body: #151412;
+  --color-background-surface: #1E1D1B;
+  --color-background-card: #1E1D1B;
+  --color-background-popover: #262522;
+  --color-background-muted: #262522;
+  --color-background-inverted: #ECEAE5;
+  --color-background-error-inverted: #C8203F;
+  --color-background-gray: #2E2C29;
+  --color-background-blue: #1F2E52;
+
+  /* Tints laid over any fill: a secondary control, a scrim, hover, press. */
+  --color-neutral: rgba(236, 234, 229, .10);
+  --color-overlay: rgba(0, 0, 0, .5);
+  --color-overlay-hover: rgba(236, 234, 229, .05);
+  --color-overlay-pressed: rgba(236, 234, 229, .10);
+
+  /* Lines. The emphasized border edges a field, a switch and a grabber. */
+  --color-border: #34322E;
+  --color-border-emphasized: #4A4843;
+  --color-track: #2E2C29;
+
+  /* Text. Hue text sits on its own background. */
+  --color-text-primary: #ECEAE5;
+  --color-text-secondary: #B4AFA6;
+  --color-text-disabled: #6F6A62;
+  --color-text-accent: #8FB0FF;
+  --color-text-warning: #FFC07A;
+  --color-text-error: #FF8FA3;
+  --color-text-gray: #D6D2CA;
+  --color-text-blue: #A9C1FF;
+
+  /* Icons and status dots. */
+  --color-icon-primary: #ECEAE5;
+  --color-icon-secondary: #9C978E;
+  --color-icon-disabled: #6F6A62;
+  --color-icon-accent: #8FB0FF;
+  --color-icon-warning: #FFB15C;
+  --color-icon-error: #FF6B86;
+
+  /* Accent and status fills, each with the ink that reads on it. */
+  --color-accent: #3D6BE0;
+  --color-accent-muted: rgba(127, 162, 255, .16);
+  --color-on-accent: #FFFFFF;
+  --color-warning: #FFB15C;
+  --color-on-warning: #1C1B19;
+  --color-warning-muted: #3A2A14;
+  --color-on-warning-muted: #FFD9A8;
+  --color-error: #C8203F;
+  --color-on-error: #FFFFFF;
+  --color-error-muted: #3A1620;
+  --color-on-error-muted: #FFB3C1;
+  --color-info-muted: #20283A;
+  --color-on-info-muted: #D6D2CA;
+
+  /* Elevation: astryx's three tiers; the dark set adds its rim of light. */
+  --shadow-low: 0 2px 4px rgba(0, 0, 0, .25), 0 4px 8px rgba(0, 0, 0, .40), inset 0 0 0 1px rgba(255, 255, 255, .08);
+  --shadow-med: 0 2px 4px rgba(0, 0, 0, .35), 0 4px 12px rgba(0, 0, 0, .50), inset 0 0 0 1px rgba(255, 255, 255, .12);
+  --shadow-high: 0 4px 6px rgba(0, 0, 0, .50), 0 12px 24px rgba(0, 0, 0, .70), inset 0 0 0 1px rgba(255, 255, 255, .15);
+
+  /* Mori's own roles. Text on the inverted fill: astryx turns the toast's
+     colour scheme around, Mori sets its tokens per scheme. A sheet rises
+     from the bottom, so its high shadow falls upwards. */
+  --mori-on-inverted: #1C1B19;
+  --mori-shadow-sheet: 0 -4px 6px rgba(0, 0, 0, .50), 0 -12px 24px rgba(0, 0, 0, .70), inset 0 0 0 1px rgba(255, 255, 255, .15);
+
+  /* A QR code is read off white paper, whatever the theme. */
+  --mori-qr-paper: #FFFFFF;
+
+  /* The terminal, which xterm.js paints itself (lib/xterm.ts). */
   --term-bg: #121110;
   --term-fg: #ECEAE5;
   --term-dim: #A8A49C;
+  --term-scrollbar: rgba(255, 255, 255, .25);
+
+  /* Diffs and change counts. */
   --diff-bg: #191816;
   --diff-del-bg: #3A1620;
   --diff-del: #FFB3C1;
@@ -241,32 +477,18 @@
   --diff-ctx: #B4AFA6;
   --count-add: #8FB0FF;
   --count-del: #FF8FA3;
+
+  /* A changed file's letter, by kind. */
   --kind-m: #8FB0FF;
   --kind-u: #B4AFA6;
   --kind-r: #C99BF0;
   --kind-a: #4FC2B0;
   --kind-d: #FF8FA3;
-  --dot-blocked: #FFB15C;
-  --dot-waiting: #9C978E;
-  --dot-error: #FF6B86;
-  --dot-exited: #9C978E;
+
+  /* The commit graph's lanes. */
   --lane-0: #6F95F5;
   --lane-1: #B583E8;
   --lane-2: #3DB8A5;
   --lane-3: #A8A49C;
   --lane-4: #9BBF3A;
-  --grabber: #4A4843;
-  --seg-track: #2B2A27;
-  --seg-active: #3A3834;
-  --count-pill: #ECEAE5;
-  --count-pill-text: #151412;
-  --toast: #3A3834;
-  --toast-text: #ECEAE5;
-  --scrim: rgba(0, 0, 0, .5);
-  --shadow-card: 0 2px 8px rgba(0, 0, 0, .4);
-  --shadow-aside: 0 12px 32px rgba(0, 0, 0, .4);
-  --shadow-sheet: 0 -8px 24px rgba(0, 0, 0, .4);
-  --shadow-seg: 0 1px 2px rgba(0, 0, 0, .4);
-  --shadow-pop: 0 8px 24px rgba(0, 0, 0, .5);
-  --shadow-fab: 0 6px 16px rgba(0, 0, 0, .45);
 }

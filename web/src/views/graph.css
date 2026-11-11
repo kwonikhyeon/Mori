@@ -50,43 +50,46 @@
 
 .gs-pc.gr .gs-head {
   flex-wrap: wrap;
-  gap: 10px 16px;
-  padding: 12px 16px;
+  gap: var(--spacing-2) var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
 }
 
 .gs-pc.gr .gs-titles {
   flex: 1 1 220px;
-  gap: 2px;
+  gap: var(--spacing-0-5);
 }
 
 .gs-pc.gr .gs-sub {
-  font-size: 13px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gr-tools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-1-5);
 }
 
 .gr-tools .seg {
-  gap: 2px;
-  padding: 3px;
-  border-radius: 9px;
+  gap: var(--spacing-0-5);
+  padding: var(--spacing-1);
+  border-radius: var(--radius-element);
 }
 
 .gr-tools .seg-btn {
   flex: none;
   height: 28px;
-  padding: 0 12px;
-  border-radius: 7px;
-  font-size: 13px;
+  padding: 0 var(--spacing-3);
+  border-radius: var(--radius-inner);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-leading);
 }
 
 .gr-back {
-  gap: 6px;
-  padding: 0 12px;
+  gap: var(--spacing-1-5);
+  padding: 0 var(--spacing-3);
 }
 
 /* ---------- the list ---------- */
@@ -104,7 +107,7 @@
   display: flex;
   flex-direction: column;
   margin: 0;
-  padding: 6px 0;
+  padding: var(--spacing-1-5) 0;
   list-style: none;
 }
 
@@ -117,20 +120,22 @@
 .gr-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
   height: 44px;
-  padding: 0 16px 0 8px;
-  color: var(--text);
+  padding: 0 var(--spacing-4) 0 var(--spacing-2);
+  color: var(--color-text-primary);
   text-decoration: none;
 }
 
-.gr-row:hover {
-  background: var(--surface-2);
-  color: var(--text);
+@media (hover: hover) {
+  .gr-row:hover {
+    background-image: var(--mori-overlay-hover-image);
+    color: var(--color-text-primary);
+  }
 }
 
 .gr-row[aria-current='true'] {
-  background: var(--selected);
+  background-color: var(--color-accent-muted);
 }
 
 .gr-row:focus-visible {
@@ -148,14 +153,15 @@
 .gr-line1 {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-1-5);
   min-width: 0;
 }
 
 .gr-subject {
   min-width: 0;
   overflow: hidden;
-  font-size: 13.5px;
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -163,11 +169,12 @@
 .gr-meta {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--spacing-1);
   min-width: 0;
   overflow: hidden;
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   white-space: nowrap;
 }
 
@@ -186,11 +193,11 @@
 }
 
 .gr-row[aria-current='true'] .gr-subject {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .gr-row[aria-current='true'] .gr-meta {
-  color: var(--text-2);
+  color: var(--color-text-secondary);
 }
 
 /* ---------- names ---------- */
@@ -199,7 +206,7 @@
   display: inline-flex;
   flex: 0 1 auto;
   align-items: center;
-  gap: 4px;
+  gap: var(--spacing-1);
   min-width: 0;
   max-width: 60%;
   overflow: hidden;
@@ -210,15 +217,15 @@
   display: inline-flex;
   flex: 0 1 auto;
   align-items: center;
-  gap: 3px;
+  gap: var(--spacing-1);
   min-width: 0;
   max-width: 200px;
-  height: 20px;
-  padding: 0 8px;
+  height: var(--spacing-5);
+  padding: 0 var(--spacing-2);
   border: 1px solid transparent;
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 11px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-family-code);
+  font-size: var(--text-supporting-size);
   line-height: 1;
   white-space: nowrap;
 }
@@ -234,10 +241,10 @@
 }
 
 .gr-chip.is-head {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 500;
+  border-color: var(--color-accent);
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: var(--font-weight-medium);
 }
 
 .gr-chip.is-branch {
@@ -248,18 +255,18 @@
 .gr-chip.is-remote {
   border-color: var(--tone);
   border-style: dashed;
-  color: var(--text-2);
+  color: var(--color-text-secondary);
 }
 
 .gr-chip.is-tag {
-  background: var(--chip);
-  color: var(--chip-text);
+  background-color: var(--color-background-gray);
+  color: var(--color-text-gray);
 }
 
 .gr-chip.is-more {
   flex: none;
-  background: var(--chip);
-  color: var(--text-2);
+  background-color: var(--color-background-gray);
+  color: var(--color-text-secondary);
 }
 
 /* ---------- the foot ---------- */
@@ -269,11 +276,12 @@
   flex: none;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  padding: 10px 16px;
-  border-top: 1px solid var(--border);
-  color: var(--text-3);
-  font-size: 12px;
+  gap: var(--spacing-2) var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gr-foot p {
@@ -286,7 +294,7 @@
 
 .gr-foot-error {
   flex-basis: 100%;
-  color: var(--danger);
+  color: var(--color-text-error);
   white-space: pre-line;
 }
 
@@ -299,33 +307,33 @@
 
 .gr-scope {
   flex: none;
-  padding: 0 calc(16px + env(safe-area-inset-right, 0px)) 10px calc(16px + env(safe-area-inset-left, 0px));
+  padding: 0 calc(var(--spacing-4) + env(safe-area-inset-right, 0)) var(--spacing-2) calc(var(--spacing-4) + env(safe-area-inset-left, 0));
 }
 
 .gr-scope .seg {
-  gap: 4px;
-  padding: 4px;
-  border-radius: 12px;
+  gap: var(--spacing-1);
+  padding: var(--spacing-1);
+  border-radius: var(--radius-container);
 }
 
 .gr-scope .seg-btn {
   height: 44px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
 }
 
 .gs-phone .gr-scroll {
-  padding: 0 calc(16px + env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+  padding: 0 calc(var(--spacing-4) + env(safe-area-inset-right, 0)) calc(var(--spacing-6) + env(safe-area-inset-bottom, 0)) calc(var(--spacing-4) + env(safe-area-inset-left, 0));
 }
 
 .gr-card {
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-card);
 }
 
 .gs-phone .gr-list {
-  padding: 4px 0;
+  padding: var(--spacing-1) 0;
 }
 
 .gs-phone .gr-li {
@@ -333,21 +341,17 @@
 }
 
 .gs-phone .gr-row {
-  gap: 6px;
+  gap: var(--spacing-1-5);
   height: 56px;
-  padding: 0 14px 0 4px;
+  padding: 0 var(--spacing-4) 0 var(--spacing-1);
 }
 
 .gs-phone .gr-text {
-  gap: 2px;
-}
-
-.gs-phone .gr-subject {
-  font-size: 14px;
+  gap: var(--spacing-0-5);
 }
 
 .gs-phone .gr-meta {
-  gap: 6px;
+  gap: var(--spacing-1-5);
 }
 
 .gs-phone .gr-chips {
@@ -355,12 +359,12 @@
 }
 
 .gs-phone .gr-chip {
-  padding: 0 7px;
+  padding: 0 var(--spacing-2);
 }
 
 .gs-phone .gr-foot {
   justify-content: center;
-  padding: 14px 4px 0;
+  padding: var(--spacing-3) var(--spacing-1) 0;
   border-top: 0;
   text-align: center;
 }
@@ -375,8 +379,8 @@
 
 /* The rows under the sheet still scroll up out from under it. */
 .gr.has-sheet .gr-scroll {
-  padding-bottom: calc(48dvh + 16px);
-  scroll-padding-bottom: calc(48dvh + 8px);
+  padding-bottom: calc(48dvh + var(--spacing-4));
+  scroll-padding-bottom: calc(48dvh + var(--spacing-2));
 }
 
 /* ---------- the phone's sheet ---------- */
@@ -391,11 +395,11 @@
   flex-direction: column;
   height: 48vh;
   height: 48dvh;
-  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
-  border-top: 1px solid var(--border);
-  border-radius: 20px 20px 0 0;
-  background: var(--surface);
-  box-shadow: var(--shadow-sheet);
+  padding: 0 env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+  border-top: 1px solid var(--color-border);
+  border-radius: var(--radius-container) var(--radius-container) 0 0;
+  background-color: var(--color-background-surface);
+  box-shadow: var(--mori-shadow-sheet);
 }
 
 .cs.is-diff {
@@ -407,28 +411,29 @@
   flex: none;
   width: 36px;
   height: 4px;
-  margin: 8px auto 4px;
-  border-radius: 999px;
-  background: var(--grabber);
+  margin: var(--spacing-2) auto var(--spacing-1);
+  border-radius: var(--radius-full);
+  background-color: var(--color-border-emphasized);
 }
 
 .cs-head {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-1-5);
   height: 48px;
-  padding: 0 8px 0 20px;
+  padding: 0 var(--spacing-2) 0 var(--spacing-5);
 }
 
 .cs.is-diff .cs-head {
-  padding-left: 8px;
+  padding-left: var(--spacing-2);
 }
 
 .cs-title {
   flex: none;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-heading-4-size);
+  line-height: var(--text-heading-4-leading);
+  font-weight: var(--text-heading-4-weight);
 }
 
 .cs-title:focus {
@@ -438,8 +443,9 @@
 .cs-hash {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-2);
-  font-size: 15px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -448,7 +454,6 @@
   flex: none;
   width: 44px;
   height: 44px;
-  border-radius: 10px;
 }
 
 .cs-close {
@@ -466,27 +471,29 @@
 .cs-sum {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 2px 20px 12px;
-  border-bottom: 1px solid var(--border);
+  gap: var(--spacing-0-5);
+  padding: var(--spacing-0-5) var(--spacing-5) var(--spacing-3);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .cs-subject {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--text-heading-4-size);
+  line-height: var(--text-heading-4-leading);
+  font-weight: var(--text-heading-4-weight);
   overflow-wrap: anywhere;
 }
 
 .cs-body {
-  margin: 4px 0 2px;
-  color: var(--text-2);
-  font-size: 13px;
+  margin: var(--spacing-1) 0 var(--spacing-0-5);
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .cs-refs {
-  margin: 6px 0 4px;
+  margin: var(--spacing-1-5) 0 var(--spacing-1);
 }
 
 .cs-refs .gr-chips {
@@ -501,14 +508,16 @@
 }
 
 .cs-meta {
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   overflow-wrap: anywhere;
 }
 
 .cs-meta a {
   position: relative;
-  font-size: 12px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 /* A parent in a sentence: 44 px tall to a finger, the line as it was. Not
@@ -520,45 +529,46 @@
 }
 
 .cs-files {
-  padding: 8px 8px 16px;
+  padding: var(--spacing-2) var(--spacing-2) var(--spacing-4);
 }
 
 .cs-files-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
-  padding: 4px 12px 6px;
+  gap: var(--spacing-2);
+  padding: var(--spacing-1) var(--spacing-3) var(--spacing-1-5);
 }
 
 .cs-files-title {
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 700;
+  color: var(--color-text-secondary);
+  font-size: var(--text-heading-5-size);
+  line-height: var(--text-heading-5-leading);
+  font-weight: var(--text-heading-5-weight);
 }
 
 .cs-file {
-  padding: 6px 12px;
+  padding: var(--spacing-1-5) var(--spacing-3);
 }
 
 .cs .gp-diff {
   flex: 1 1 0;
   min-height: 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--color-border);
 }
 
 .cs .qnote,
 .cs .gp-error {
-  padding: 12px 20px;
+  padding: var(--spacing-3) var(--spacing-5);
 }
 
 .cs .cm-note {
-  padding: 0 12px 6px;
+  padding: 0 var(--spacing-3) var(--spacing-1-5);
 }
 
 /* Under the files' head, where its words begin. */
 .cs .cs-files .qnote {
-  padding: 8px 12px;
+  padding: var(--spacing-2) var(--spacing-3);
 }
 
 /* ---------- the commit beside the graph ---------- */
@@ -566,8 +576,9 @@
 .cm-hash {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-2);
-  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -579,21 +590,23 @@
 .cm-sum {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .cm-subject {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-heading-4-size);
+  line-height: var(--text-heading-4-leading);
+  font-weight: var(--text-heading-4-weight);
   overflow-wrap: anywhere;
 }
 
 .cm-body {
   margin: 0;
-  color: var(--text-2);
-  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -601,14 +614,15 @@
 .cm-facts {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 4px 12px;
+  gap: var(--spacing-1) var(--spacing-3);
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .cm-facts dt {
   grid-column: 1;
-  color: var(--text-3);
+  color: var(--color-text-secondary);
 }
 
 .cm-facts dd {
@@ -624,12 +638,13 @@
 }
 
 .cm-psub {
-  color: var(--text-2);
+  color: var(--color-text-secondary);
 }
 
 .cm-full {
-  color: var(--text-2);
-  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   word-break: break-all;
 }
 
@@ -641,7 +656,8 @@
 .cm-totals,
 .cm-counts {
   position: relative;
-  font-size: 12px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .cm-counts {
@@ -660,18 +676,20 @@
 
 .cm-bin {
   flex: none;
-  color: var(--text-3);
-  font-family: var(--font-sans);
-  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-body);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .cm-note {
   margin: 0;
-  padding: 0 8px 4px;
-  color: var(--text-3);
-  font-size: 12px;
+  padding: 0 var(--spacing-2) var(--spacing-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gp .cm-files .qnote {
-  padding: 8px 8px 4px;
+  padding: var(--spacing-2) var(--spacing-2) var(--spacing-1);
 }

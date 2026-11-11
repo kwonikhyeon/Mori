@@ -1,124 +1,103 @@
-/* The pieces every screen uses: buttons, chips, the segmented control,
-   banners, the pane handle, toasts, empty states and form fields. */
+/* The pieces every screen uses: buttons, badges, the segmented control,
+   banners, the pane handle, toasts, empty states, form fields, the menu and
+   the dialogs. Each follows its astryx component (spec §3 #201). */
 
-/* Buttons. Links styled as buttons keep their own color, hover too. */
-.btn,
-a.btn,
-a.btn:hover {
-  color: var(--text);
-}
-
+/* Buttons (astryx Button). The plain one is astryx's secondary: a neutral
+   tint and no border. 36, 32 and 28 px on a PC; a phone keeps 44 px. A link
+   styled as a button takes the button's colours, under the pointer too. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--spacing-2);
   flex: none;
-  height: 40px;
-  padding: 0 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1;
+  min-width: 0;
+  max-width: 100%;
+  height: var(--size-element-lg);
+  padding: 0 var(--spacing-3);
+  border: 0;
+  border-radius: var(--radius-element);
+  background-color: var(--color-neutral);
+  color: var(--color-text-primary);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-leading);
   white-space: nowrap;
   text-decoration: none;
-  transition: background-color .12s, border-color .12s;
+  transition-property: background-color, color, opacity, transform;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-standard);
 }
 
-.btn:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .btn:not(:disabled, [aria-disabled="true"]):hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
-.btn:disabled {
+/* A mouse presses the button in a little; a finger gets the overlay alone
+   (base.css). */
+@media (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .btn:not(:disabled, [aria-disabled="true"]):active {
+    transform: scale(.98);
+  }
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
   opacity: .5;
 }
 
-.btn:disabled:hover {
-  background: var(--surface);
-}
-
-.btn-primary,
-a.btn-primary,
-a.btn-primary:hover {
-  color: var(--on-accent);
-}
-
-.btn-primary {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
-.btn-primary:hover,
-.btn-primary:disabled:hover {
-  border-color: var(--accent-hover);
-  background: var(--accent-hover);
-}
-
-.btn-primary:disabled:hover {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
 .btn-sm {
-  gap: 5px;
-  height: 34px;
-  padding: 0 10px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
+  height: var(--size-element-md);
 }
 
 .btn-xs {
-  gap: 4px;
-  height: 28px;
-  padding: 0 8px;
-  border-radius: 7px;
-  font-size: 12px;
-  font-weight: 500;
+  gap: var(--spacing-1);
+  height: var(--size-element-sm);
+  padding: 0 var(--spacing-2);
 }
 
+/* An icon alone is a square (astryx IconButton). */
 .btn-icon {
-  width: 40px;
+  width: var(--size-element-lg);
   padding: 0;
-  color: var(--text-2);
-}
-
-a.btn-icon,
-a.btn-icon:hover {
-  color: var(--text-2);
+  color: var(--color-icon-secondary);
 }
 
 .btn-icon.btn-sm {
-  width: 34px;
-}
-
-.btn-ghost {
-  border-color: transparent;
-  background: transparent;
-  color: var(--text-2);
-}
-
-.btn-danger,
-a.btn-danger,
-a.btn-danger:hover {
-  color: var(--danger);
-}
-
-.btn-danger {
-  border-color: var(--danger-border);
+  width: var(--size-element-md);
 }
 
 .btn-block {
   width: 100%;
 }
 
+.btn-primary {
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.btn-ghost {
+  background-color: transparent;
+}
+
+/* astryx's destructive button, as its neutral theme draws it. */
+.btn-danger {
+  background-color: var(--color-error-muted);
+  color: var(--color-on-error-muted);
+}
+
+/* The one that deletes for good, in a confirm. */
+.btn-danger-fill {
+  background-color: var(--color-error);
+  color: var(--color-on-error);
+}
+
 .btn[aria-pressed="true"],
 .btn[aria-current="page"] {
-  border-color: var(--pressed-border);
-  background: var(--selected);
-  color: var(--pressed-text);
+  background-color: var(--color-accent-muted);
+  color: var(--color-text-accent);
 }
 
 /* A finger needs 44 px on a phone: the small sizes grow there. */
@@ -135,93 +114,96 @@ a.btn-danger:hover {
   }
 }
 
-/* The state of a terminal. */
+/* The state of a terminal (astryx Badge): 20 px, a word or two. */
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--spacing-1);
   flex: none;
-  padding: 1px 9px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 18px;
+  height: var(--spacing-5);
+  padding: 0 var(--spacing-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-supporting-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--text-supporting-leading);
   white-space: nowrap;
 }
 
+/* The phone's alert cards. */
 .chip-big {
-  padding: 2px 10px;
+  height: var(--spacing-6);
+  padding: 0 var(--spacing-3);
 }
 
 .chip-blocked {
-  background: var(--blocked);
-  color: var(--blocked-text);
-  font-weight: 700;
+  background-color: var(--color-warning);
+  color: var(--color-on-warning);
 }
 
 .chip-error {
-  background: var(--error);
-  color: var(--error-text);
-  font-weight: 700;
+  background-color: var(--color-error);
+  color: var(--color-on-error);
 }
 
 .chip-waiting {
-  background: var(--chip);
-  color: var(--chip-text);
+  background-color: var(--color-background-gray);
+  color: var(--color-text-gray);
 }
 
 .chip-working {
-  background: var(--working);
-  color: var(--working-text);
+  background-color: var(--color-background-blue);
+  color: var(--color-text-blue);
 }
 
-.chip-none {
-  background: var(--chip);
-  color: var(--text-2);
-}
-
+.chip-none,
 .chip-exited {
-  background: var(--chip);
-  color: var(--text-3);
+  background-color: var(--color-background-gray);
+  color: var(--color-text-secondary);
 }
 
+/* How many wait, beside a choice: the accent badge the phone's tab bar shows
+   (.tab-badge), round while it holds one digit. A gray badge would vanish on
+   the segmented control's tinted track. */
 .count-pill {
-  display: inline-block;
-  min-width: 18px;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--count-pill);
-  color: var(--count-pill-text);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 18px;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--spacing-5);
+  height: var(--spacing-5);
+  padding: 0 var(--spacing-1-5);
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-supporting-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--text-supporting-leading);
 }
 
-/* A progress bar. */
+/* A progress bar (astryx ProgressBar), as a compact meter. */
 .bar {
   display: block;
   height: 4px;
   overflow: hidden;
-  border-radius: 999px;
-  background: var(--track);
+  border-radius: var(--radius-full);
+  background-color: var(--color-track);
 }
 
 .bar > span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--accent);
-  transition: width .3s;
+  background-color: var(--color-accent);
+  transition: width var(--duration-medium) var(--ease-standard);
 }
 
-/* Two or three choices, one pressed. */
+/* Two or three choices, one pressed (astryx SegmentedControl): the segments
+   sit in the tint, the pressed one on the surface. */
 .seg {
   display: flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 10px;
-  background: var(--seg-track);
+  gap: var(--spacing-0-5);
+  padding: var(--spacing-1);
+  border-radius: var(--radius-element);
+  background-color: var(--color-neutral);
 }
 
 .seg-btn {
@@ -229,27 +211,34 @@ a.btn-danger:hover {
   flex: 1;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--spacing-1-5);
   min-width: 0;
-  height: 36px;
-  padding: 0 8px;
+  height: calc(var(--size-element-lg) - 2 * var(--spacing-1));
+  padding: 0 var(--spacing-2);
   border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-2);
-  font-weight: 500;
+  border-radius: calc(var(--radius-element) - var(--spacing-1));
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-leading);
   white-space: nowrap;
+  transition-property: background-color, color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-standard);
 }
 
-.seg-btn:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .seg-btn:not([aria-pressed="true"], :disabled):hover {
+    background-image: var(--mori-overlay-hover-image);
+    color: var(--color-text-primary);
+  }
 }
 
 .seg-btn[aria-pressed="true"] {
-  background: var(--seg-active);
-  box-shadow: var(--shadow-seg);
-  color: var(--text);
-  font-weight: 600;
+  background-color: var(--color-background-surface);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 @media (max-width: 767px) {
@@ -258,29 +247,29 @@ a.btn-danger:hover {
   }
 }
 
-/* The host's dot. */
+/* The host's dot (astryx StatusDot): always beside words that say it. */
 .dot {
   display: inline-block;
   flex: none;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
 }
 
 .dot-ok {
-  background: var(--accent);
+  background-color: var(--color-accent);
 }
 
 .dot-warn {
-  background: var(--blocked);
+  background-color: var(--color-icon-warning);
 }
 
 .dot-off {
-  background: var(--dot-exited);
+  background-color: var(--color-icon-secondary);
 }
 
 .dot-bad {
-  background: var(--dot-error);
+  background-color: var(--color-icon-error);
 }
 
 /* Where the focus stays when 다시 시도 goes with the problem it tried. */
@@ -288,32 +277,31 @@ a.btn-danger:hover {
   outline: none;
 }
 
-/* What is wrong with the server or the core. */
+/* What is wrong with the server or the core (astryx Banner): the muted fill
+   of its state and no border. */
 .banner {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 13px;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--radius-container);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .banner-warn {
-  border-color: var(--blocked-border);
-  background: var(--blocked-box);
-  color: var(--blocked-box-text);
+  background-color: var(--color-warning-muted);
+  color: var(--color-on-warning-muted);
 }
 
 .banner-info {
-  background: var(--info-box);
-  color: var(--info-box-text);
+  background-color: var(--color-info-muted);
+  color: var(--color-on-info-muted);
 }
 
 .banner-error {
-  border-color: var(--danger-border);
-  background: var(--error-box);
-  color: var(--error-box-text);
+  background-color: var(--color-error-muted);
+  color: var(--color-on-error-muted);
 }
 
 .banner-icon {
@@ -326,11 +314,12 @@ a.btn-danger:hover {
 }
 
 .banner-text b {
-  font-weight: 700;
+  font-weight: var(--font-weight-semibold);
 }
 
 /* A banner with a button at its end: the words meet the button at its middle
-   on one line or two, and the icon stays with the first line. */
+   on one line or two, and the icon stays with the first line. The button
+   reaches into the padding, as astryx's end area does. */
 .banner-act {
   align-items: center;
 }
@@ -340,15 +329,19 @@ a.btn-danger:hover {
   flex: 1;
   min-width: 0;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--spacing-2);
 }
 
 .banner-act .btn {
   flex: none;
+  margin-block: calc(-1 * var(--spacing-1));
 }
 
+/* A turning refresh mark. astryx's thin arc turns once in --duration-slow-min;
+   the mark's arrows would whirl at that pace, so it takes the slowest of the
+   slow durations. base.css slows it further for reduced motion. */
 .spin {
-  animation: spin 1.2s linear infinite;
+  animation: spin var(--duration-slow-max) linear infinite;
 }
 
 @keyframes spin {
@@ -375,14 +368,18 @@ a.btn-danger:hover {
   left: 50%;
   width: 4px;
   height: 40px;
-  margin: -20px 0 0 -2px;
-  border-radius: 999px;
-  background: var(--border);
-  transition: background-color .12s, height .12s, margin .12s;
+  margin: calc(-1 * var(--spacing-5)) 0 0 calc(-1 * var(--spacing-0-5));
+  border-radius: var(--radius-full);
+  background-color: var(--color-border);
+  transition-property: background-color, height, margin;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-standard);
 }
 
-.splitter:hover::after {
-  background: var(--grabber);
+@media (hover: hover) {
+  .splitter:hover::after {
+    background-color: var(--color-border-emphasized);
+  }
 }
 
 .splitter:focus-visible {
@@ -392,8 +389,8 @@ a.btn-danger:hover {
 .splitter:focus-visible::after,
 .splitter[data-dragging]::after {
   height: 64px;
-  margin-top: -32px;
-  background: var(--accent);
+  margin-top: calc(-1 * var(--spacing-8));
+  background-color: var(--color-accent);
 }
 
 html.is-resizing,
@@ -403,39 +400,42 @@ html.is-resizing * {
   -webkit-user-select: none !important;
 }
 
-/* Short notes at the bottom. */
+/* Short notes at the bottom (astryx Toast), in the inverted colours. Mori
+   keeps them in the middle, above the tab bar on a phone (spec §3 #147). */
 .toasts {
   position: fixed;
-  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--spacing-6) + env(safe-area-inset-bottom, 0px));
   left: 50%;
   z-index: 50;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
   width: max-content;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100vw - 2 * var(--spacing-4));
   transform: translateX(-50%);
   pointer-events: none;
 }
 
+/* The close button meets the first line at its middle. */
 .toast {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: var(--spacing-3);
   max-width: 480px;
-  padding: 8px 8px 8px 14px;
-  border-radius: 10px;
-  background: var(--toast);
-  box-shadow: var(--shadow-pop);
-  color: var(--toast-text);
-  font-size: 13px;
+  padding: var(--spacing-3) var(--spacing-3) var(--spacing-3) var(--spacing-4);
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-inverted);
+  box-shadow: var(--shadow-med);
+  color: var(--mori-on-inverted);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
   pointer-events: auto;
 }
 
 .toast-error {
-  background: var(--error);
-  color: var(--error-text);
+  background-color: var(--color-background-error-inverted);
+  color: var(--color-on-error);
 }
 
 .toast-text {
@@ -444,21 +444,27 @@ html.is-resizing * {
   overflow-wrap: anywhere;
 }
 
+/* astryx's small ghost button. It reaches into the padding, so a one-line
+   toast is no taller for it. */
 .toast-close {
   display: grid;
   flex: none;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: var(--size-element-sm);
+  height: var(--size-element-sm);
+  margin: calc(-1 * var(--spacing-1)) 0;
   border: 0;
-  border-radius: 6px;
-  background: transparent;
+  border-radius: var(--radius-element);
+  background-color: transparent;
   color: inherit;
   opacity: .8;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
-.toast-close:hover {
-  opacity: 1;
+@media (hover: hover) {
+  .toast-close:hover {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 767px) {
@@ -470,17 +476,19 @@ html.is-resizing * {
   .toast-close {
     width: 44px;
     height: 44px;
-    margin: -8px -8px -8px 0;
+    margin: calc(-1 * var(--spacing-3)) calc(-1 * var(--spacing-3)) calc(-1 * var(--spacing-3)) 0;
   }
 }
 
-/* Nothing to show yet. */
+/* Nothing to show yet (astryx EmptyState): what is missing, and the next
+   step. The icon, the words and the button stand 16 px apart, the title and
+   its text 8 px. */
 .empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 48px 24px;
+  gap: var(--spacing-2);
+  padding: var(--spacing-8) var(--spacing-6);
   text-align: center;
 }
 
@@ -489,129 +497,155 @@ html.is-resizing * {
   place-items: center;
   width: 56px;
   height: 56px;
-  margin-bottom: 8px;
-  border-radius: 50%;
-  background: var(--chip);
-  color: var(--text-2);
+  margin-bottom: var(--spacing-2);
+  border-radius: var(--radius-full);
+  background-color: var(--color-background-gray);
+  color: var(--color-icon-secondary);
 }
 
 .empty-title {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--text-large-size);
+  line-height: var(--text-large-leading);
+  font-weight: var(--text-large-weight);
 }
 
 .empty-text {
-  margin-bottom: 12px;
-  color: var(--text-2);
-  font-size: 13px;
+  max-width: 360px;
+  margin-bottom: var(--spacing-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
 }
 
-/* Form fields. */
+/* Form fields (astryx Field and TextInput). */
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--spacing-1-5);
 }
 
 .field-label {
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  font-weight: var(--text-label-weight);
 }
 
 .field-hint {
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .input {
   width: 100%;
-  height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text);
+  height: var(--size-element-lg);
+  padding: 0 var(--spacing-3);
+  border: 1px solid var(--color-border-emphasized);
+  border-radius: var(--radius-element);
+  background-color: var(--color-background-surface);
+  color: var(--color-text-primary);
   outline: none;
+  transition-property: border-color, box-shadow;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-standard);
 }
 
 textarea.input {
   height: auto;
-  padding: 10px 12px;
+  padding: var(--spacing-2) var(--spacing-3);
   resize: vertical;
 }
 
-.input:focus {
-  border-color: var(--focus-border);
-  box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
-.form-error {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--error-box);
-  color: var(--error-box-text);
-  font-size: 13px;
-}
-
-/* iOS zooms into a field under 16 px. */
-@media (max-width: 767px) {
-  .input {
-    font-size: 16px;
+@media (hover: hover) {
+  .input:hover:not(:focus, :disabled) {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-border-emphasized) 30%, transparent);
   }
 }
 
-/* ---------- menu button ---------- */
+/* The field's own ring: the accent edge, and the muted accent inside it. */
+.input:focus {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 2px var(--color-accent-muted);
+}
+
+.form-error {
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-container);
+  background-color: var(--color-error-muted);
+  color: var(--color-on-error-muted);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+}
+
+/* A finger needs 44 px. The touch type scale gives the 16 px text that keeps
+   iOS from zooming into the field (tokens.css). */
+@media (max-width: 767px) {
+  .input {
+    height: 44px;
+  }
+}
+
+/* ---------- menu button (astryx DropdownMenu) ---------- */
 .menu {
   position: relative;
   flex: none;
 }
 
+/* A popover floats on its shadow, with no border. */
 .menu-list {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + var(--spacing-1));
   right: 0;
   z-index: 30;
   display: flex;
   flex-direction: column;
+  gap: var(--spacing-0-5);
   min-width: 220px;
-  max-width: calc(100vw - 24px);
-  padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: var(--shadow-pop);
+  max-width: calc(100vw - 2 * var(--spacing-3));
+  padding: var(--spacing-1);
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-popover);
+  box-shadow: var(--shadow-low);
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 12px;
+  gap: var(--spacing-2);
+  min-height: var(--size-element-md);
+  padding: var(--spacing-1-5) var(--spacing-2);
   border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  font-size: 15px;
+  border-radius: calc(var(--radius-container) - var(--spacing-1));
+  background-color: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-leading);
   text-align: left;
   white-space: nowrap;
 }
 
 .menu-item svg {
   flex: none;
-  color: var(--text-2);
+  color: var(--color-icon-secondary);
 }
 
-.menu-item:hover,
+@media (hover: hover) {
+  .menu-item:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
+}
+
+/* The arrow keys move the focus: the row lights up, the ring inside it. */
 .menu-item:focus-visible {
-  background: var(--surface-2);
-  outline: none;
+  background-image: var(--mori-overlay-hover-image);
+  outline-offset: calc(-1 * var(--focus-outline-width));
 }
 
 .menu-item.is-danger,
 .menu-item.is-danger svg {
-  color: var(--danger);
+  color: var(--color-text-error);
 }
 
 .menu-label {
@@ -619,47 +653,47 @@ textarea.input {
 }
 
 .menu-item .menu-check {
-  color: var(--accent-text);
+  color: var(--color-text-accent);
 }
 
-/* ---------- confirm dialog ---------- */
-.btn-danger-fill,
-.btn-danger-fill:hover,
-.btn-danger-fill:disabled:hover {
-  border-color: var(--danger);
-  background: var(--danger);
-  color: var(--on-danger);
+@media (max-width: 767px) {
+  .menu-item {
+    min-height: 44px;
+  }
 }
 
+/* ---------- confirm dialog (astryx AlertDialog) ---------- */
+/* No border: the high shadow lifts it off the scrim. */
 dialog.confirm {
-  width: min(400px, calc(100vw - 32px));
+  width: min(400px, calc(100vw - 2 * var(--spacing-4)));
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--shadow-pop);
+  border: 0;
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-high);
 }
 
 dialog.confirm::backdrop {
-  background: var(--scrim, rgba(28, 27, 25, .32));
+  background-color: var(--color-overlay);
 }
 
 .confirm-box {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 22px 22px 18px;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4);
 }
 
 .confirm-title {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: var(--text-heading-3-size);
+  line-height: var(--text-heading-3-leading);
+  font-weight: var(--text-heading-3-weight);
 }
 
 /* git's own message can hold a long path. */
 .confirm-text {
-  color: var(--text-2);
+  color: var(--color-text-secondary);
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
@@ -667,22 +701,34 @@ dialog.confirm::backdrop {
 .confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-3);
 }
 
-/* ---------- sheet ---------- */
+/* Narrow, the action stands over 취소, each as wide as the box, as astryx's
+   AlertDialog has it up to 640 px; the focus still starts on 취소. */
+@media (max-width: 640px) {
+  .confirm-actions {
+    flex-direction: column-reverse;
+  }
+
+  .confirm-actions .btn {
+    width: 100%;
+  }
+}
+
+/* ---------- sheet (astryx Dialog on a PC, BottomSheet on a phone) ---------- */
 /* A modal panel: in the middle on a PC, from the bottom on a phone. */
 dialog.sheet {
-  width: min(520px, calc(100vw - 32px));
+  width: min(520px, calc(100vw - 2 * var(--spacing-4)));
   max-width: none;
-  max-height: min(720px, calc(100dvh - 64px));
+  max-height: min(720px, calc(100dvh - 2 * var(--spacing-8)));
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--shadow-pop);
+  border: 0;
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-high);
   overflow: hidden;
 }
 
@@ -692,7 +738,7 @@ dialog.sheet[open] {
 }
 
 dialog.sheet::backdrop {
-  background: var(--scrim, rgba(28, 27, 25, .32));
+  background-color: var(--color-overlay);
 }
 
 .sheet-box {
@@ -706,21 +752,22 @@ dialog.sheet::backdrop {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 4px;
+  gap: var(--spacing-1);
   min-height: 56px;
-  padding: 8px 8px 8px 20px;
-  border-bottom: 1px solid var(--border);
+  padding: var(--spacing-2) var(--spacing-2) var(--spacing-2) var(--spacing-5);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .sheet-head.has-back {
-  padding-left: 8px;
+  padding-left: var(--spacing-2);
 }
 
 .sheet-title {
   flex: 1;
   min-width: 0;
-  font-size: 17px;
-  font-weight: 700;
+  font-size: var(--text-heading-3-size);
+  line-height: var(--text-heading-3-leading);
+  font-weight: var(--text-heading-3-weight);
 }
 
 /* It takes the focus when the sheet changes what it shows. */
@@ -732,7 +779,7 @@ dialog.sheet::backdrop {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
-  padding: 12px 16px;
+  padding: var(--spacing-3) var(--spacing-4);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -741,20 +788,22 @@ dialog.sheet::backdrop {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-top: 1px solid var(--color-border);
 }
 
+/* On a phone the sheet rises from the bottom edge: a line along its top,
+   the shadow cast upwards (spec §3 #201), and the grabber. */
 @media (max-width: 767px) {
   dialog.sheet {
     width: 100%;
     max-width: 100%;
     max-height: 85dvh;
     margin: auto 0 0;
-    border-width: 1px 0 0;
-    border-radius: 16px 16px 0 0;
-    box-shadow: var(--shadow-sheet);
+    border-top: 1px solid var(--color-border);
+    border-radius: var(--radius-container) var(--radius-container) 0 0;
+    box-shadow: var(--mori-shadow-sheet);
   }
 
   .sheet-box::before {
@@ -762,9 +811,9 @@ dialog.sheet::backdrop {
     flex: none;
     width: 36px;
     height: 4px;
-    margin: 8px auto 0;
-    border-radius: 2px;
-    background: var(--grabber);
+    margin: var(--spacing-2) auto 0;
+    border-radius: var(--radius-full);
+    background-color: var(--color-border-emphasized);
   }
 
   .sheet-head {
@@ -773,6 +822,69 @@ dialog.sheet::backdrop {
   }
 
   .sheet-foot {
-    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--spacing-3) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* How a dialog comes in (astryx Dialog and BottomSheet): it rises a little
+   and grows into place; on a phone the sheet slides up from the edge. It
+   goes at once, as astryx's do. */
+@keyframes mori-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--spacing-4)) scale(.95);
+  }
+}
+
+@keyframes mori-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes mori-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+dialog.confirm[open],
+dialog.sheet[open] {
+  animation: mori-dialog-in var(--duration-medium-max) var(--ease-standard);
+}
+
+dialog.confirm[open]::backdrop,
+dialog.sheet[open]::backdrop {
+  animation: mori-fade-in var(--duration-medium) var(--ease-standard);
+}
+
+@media (max-width: 767px) {
+  dialog.sheet[open] {
+    animation-name: mori-sheet-in;
+    animation-duration: var(--duration-medium);
+  }
+}
+
+/* Reduced motion, as astryx's layers have it: a short fade on a touch
+   screen, at once with a mouse. */
+@media (prefers-reduced-motion: reduce) {
+  dialog.confirm[open],
+  dialog.sheet[open] {
+    animation-name: mori-fade-in;
+  }
+
+  dialog.confirm[open]::backdrop,
+  dialog.sheet[open]::backdrop {
+    animation-duration: .01ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) and (pointer: coarse) {
+  dialog.confirm[open],
+  dialog.sheet[open],
+  dialog.confirm[open]::backdrop,
+  dialog.sheet[open]::backdrop {
+    animation-duration: var(--duration-fast-max) !important;
+    animation-timing-function: ease-in-out;
   }
 }

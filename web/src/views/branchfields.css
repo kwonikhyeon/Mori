@@ -1,7 +1,7 @@
 /* The name and base of a new branch, and what making it does. */
 .bf-row {
   display: flex;
-  gap: 10px;
+  gap: var(--spacing-2);
 }
 
 .bf-name {
@@ -20,36 +20,37 @@
 }
 
 .bf-select select {
-  padding-right: 32px;
+  padding-right: var(--spacing-8);
   overflow: hidden;
   text-overflow: ellipsis;
   appearance: none;
 }
 
 .bf-select select:disabled {
-  color: var(--text-3);
+  color: var(--color-text-secondary);
 }
 
 .bf-select-icon {
   position: absolute;
   top: 50%;
   right: 10px;
-  color: var(--text-3);
+  color: var(--color-icon-secondary);
   pointer-events: none;
   transform: translateY(-50%);
 }
 
 .bf-hint {
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   overflow-wrap: anywhere;
 }
 
 .bf-hint .mono {
-  color: var(--text);
+  color: var(--color-text-primary);
 }
 
 .bf-hint.is-bad,
 .bf-hint.is-bad .mono {
-  color: var(--danger);
+  color: var(--color-text-error);
 }

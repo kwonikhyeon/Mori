@@ -42,7 +42,7 @@ function server(c: Call): Response | undefined {
 }
 
 const toastTexts = () => toasts.value.map((t) => [t.text, t.kind])
-const toggle = () => screen.getByRole('checkbox', { name: '이 기기에서 알림 받기' }) as HTMLInputElement
+const toggle = () => screen.getByRole('switch', { name: '이 기기에서 알림 받기' }) as HTMLInputElement
 const kind = (name: string) => screen.getByRole('checkbox', { name }) as HTMLInputElement
 const kindsShown = () => ['승인 대기', '입력 대기', '오류', '종료'].filter((n) => kind(n).checked)
 const childrenBox = () => screen.getByRole('switch', { name: '하위 터미널도 알림' }) as HTMLInputElement

@@ -1,4 +1,4 @@
-/* Base rules shared by every screen (B boards: 14px/1.45, Inter). */
+/* Base rules shared by every screen: astryx's body role, Inter (spec §3 #201). */
 *,
 *::before,
 *::after {
@@ -14,11 +14,11 @@ html {
 body {
   margin: 0;
   min-height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.45;
+  background-color: var(--color-background-body);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-body);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
   /* Korean wraps between words, as it is read; a word longer than its line
      still breaks. */
   word-break: keep-all;
@@ -53,22 +53,40 @@ button:disabled {
 }
 
 ::placeholder {
-  color: var(--text-3);
+  color: var(--color-text-secondary);
   opacity: 1;
 }
 
 a {
-  color: var(--accent-text);
+  color: var(--color-text-accent);
   text-decoration: none;
 }
 
-a:hover {
-  color: var(--accent-hover);
+/* A bare link underlines under the pointer; a link styled as a control
+   takes the control's overlay instead. */
+@media (hover: hover) {
+  a:not([class]):hover {
+    text-decoration: underline;
+  }
 }
 
 :focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
+  outline: var(--focus-outline-width) var(--focus-outline-style) var(--focus-outline-color);
+  outline-offset: var(--focus-outline-offset);
+}
+
+/* Press, as astryx's interaction overlay has it: the pressed tint over the
+   control's own fill. A mouse or a pen gets it from :active; a finger from
+   data-press (lib/press.ts), which a scroll takes away, so a list never
+   flashes under a thumb that only scrolls. */
+[data-press] {
+  background-image: var(--mori-overlay-pressed-image);
+}
+
+@media (pointer: fine) {
+  :is(button, [role="button"], a[class], label[class]):not(:disabled, [aria-disabled="true"]):active {
+    background-image: var(--mori-overlay-pressed-image);
+  }
 }
 
 h1,
@@ -104,7 +122,7 @@ code,
 kbd,
 pre,
 .mono {
-  font-family: var(--font-mono);
+  font-family: var(--font-family-code);
 }
 
 /* Read out, not seen. Its box is placed against the nearest positioned one,
@@ -124,11 +142,17 @@ pre,
   display: none !important;
 }
 
+/* Reduced motion stops what moves. A spinner still turns, slowly: it is the
+   only sign that something goes on (astryx Spinner). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: .01ms !important;
     transition-duration: .01ms !important;
+  }
+
+  .spin {
+    animation-duration: 3s !important;
   }
 }

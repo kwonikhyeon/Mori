@@ -12,15 +12,16 @@
 .term-id {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
   min-width: 0;
 }
 
 .term-title {
   min-width: 0;
   overflow: hidden;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--text-heading-4-size);
+  line-height: var(--text-heading-4-leading);
+  font-weight: var(--text-heading-4-weight);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -28,23 +29,25 @@
 .term-sub {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-2);
-  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .term-rename {
-  height: 34px;
+  height: var(--size-element-md);
   max-width: 360px;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  font-weight: var(--font-weight-semibold);
 }
 
-/* iOS zooms into a field under 16 px. */
+/* The phone's target; the touch type scale gives it the 16 px text iOS
+   needs not to zoom. */
 .term-phone .term-rename {
   height: 44px;
-  font-size: 16px;
 }
 
 /* ---------- PC: the toolbar ---------- */
@@ -53,9 +56,9 @@
   flex: none;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 16px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  gap: var(--spacing-2) var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .term-bar .term-id {
@@ -65,14 +68,14 @@
 .term-title-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
   min-width: 0;
 }
 
 .term-tools {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--spacing-1-5);
 }
 
 /* ---------- phone: the header ---------- */
@@ -80,36 +83,23 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 2px;
+  gap: var(--spacing-0-5);
   min-height: 60px;
-  padding: env(safe-area-inset-top, 0px) calc(4px + env(safe-area-inset-right, 0px)) 0 calc(4px + env(safe-area-inset-left, 0px));
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  padding: env(safe-area-inset-top, 0) calc(var(--spacing-1) + env(safe-area-inset-right, 0)) 0 calc(var(--spacing-1) + env(safe-area-inset-left, 0));
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-background-surface);
 }
 
 .term-head .term-id {
   flex: 1;
-  gap: 3px;
-}
-
-.term-head .term-title {
-  font-size: 15px;
+  gap: var(--spacing-1);
 }
 
 .term-sub-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-1-5);
   min-width: 0;
-}
-
-.term-head .term-sub {
-  font-size: 12px;
-}
-
-.term-head .chip {
-  padding: 1px 8px;
-  font-size: 11px;
 }
 
 /* The host the session runs on, when the hub links others. */
@@ -117,13 +107,14 @@
   flex: none;
   max-width: 40%;
   overflow: hidden;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--chip);
-  color: var(--chip-text);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 18px;
+  height: var(--spacing-5);
+  padding: 0 var(--spacing-2);
+  border-radius: var(--radius-full);
+  background-color: var(--color-background-gray);
+  color: var(--color-text-gray);
+  font-size: var(--text-supporting-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -134,24 +125,24 @@
   height: 44px;
 }
 
-a.term-back,
-a.term-back:hover,
-a.term-git,
-a.term-git:hover {
-  color: var(--text);
+/* The way back reads as the header's text, not as a secondary icon. */
+a.term-back {
+  color: var(--color-text-primary);
 }
 
 .term-git {
-  gap: 5px;
+  gap: var(--spacing-1);
   height: 44px;
-  padding: 0 10px;
-  font-size: 13px;
+  padding: 0 var(--spacing-3);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-leading);
 }
 
 .term-banner:not(:empty) {
   flex: none;
-  padding: 8px 12px;
-  background: var(--bg);
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: var(--color-background-body);
 }
 
 /* ---------- the screen ---------- */
@@ -160,28 +151,28 @@ a.term-git:hover {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  background: var(--term-bg);
+  background-color: var(--term-bg);
 }
 
 .term-stage {
   position: relative;
   flex: 1;
   min-height: 0;
-  background: var(--term-bg);
+  background-color: var(--term-bg);
 }
 
 .term-scroll {
   position: absolute;
   inset: 0;
-  padding: 18px 20px;
+  padding: var(--spacing-4) var(--spacing-5);
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-color: rgba(255, 255, 255, .25) transparent;
+  scrollbar-color: var(--term-scrollbar) transparent;
   scrollbar-width: thin;
 }
 
 .term-phone .term-scroll {
-  padding: 14px 14px 18px;
+  padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
 }
 
 /* A terminal wider than the stage scrolls; the font stays (spec §3 #125). */
@@ -193,19 +184,19 @@ a.term-git:hover {
 /* xterm's scrollbar lies over the right of its box: give it its own lane,
    so it never covers the last column. */
 .term-host .xterm-screen {
-  margin-right: 14px;
+  margin-right: var(--spacing-3);
 }
 
 /* xterm types through a field no one sees; under 16 px iOS zooms into it. */
 .term-phone .xterm-helper-textarea {
-  font-size: 16px;
+  font-size: var(--text-body-size);
 }
 
 .term-status {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  left: 12px;
+  top: var(--spacing-3);
+  right: var(--spacing-3);
+  left: var(--spacing-3);
   z-index: 2;
   display: flex;
   justify-content: center;
@@ -215,13 +206,16 @@ a.term-git:hover {
 .term-note {
   align-items: center;
   max-width: 520px;
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-med);
   pointer-events: auto;
 }
 
-/* A quick connect does not flash the note. */
+/* A quick connect does not flash the note: it waits 600 ms before it shows,
+   as astryx's skeletons and tooltips wait. A wait is a behaviour, not a
+   motion, so it is no duration token. */
 .term-note.is-late {
-  animation: term-late 0s .6s both;
+  animation: term-late 0s both;
+  animation-delay: 600ms;
 }
 
 @keyframes term-late {
@@ -234,12 +228,10 @@ a.term-git:hover {
   }
 }
 
-.term-note-link,
-a.term-note-link,
-a.term-note-link:hover {
+.term-note-link {
   flex: none;
   color: inherit;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   text-decoration: underline;
 }
 
@@ -248,7 +240,7 @@ a.term-note-link:hover {
   top: 10px;
   right: 26px;
   z-index: 2;
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-med);
 }
 
 /* The screen scrolled back: its end is one press away (spec §3 #183). */
@@ -257,7 +249,7 @@ a.term-note-link:hover {
   right: 26px;
   bottom: 14px;
   z-index: 2;
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-med);
 }
 
 .term-phone .term-jump {
@@ -267,70 +259,75 @@ a.term-note-link:hover {
 
 .term-drop {
   position: absolute;
-  inset: 8px;
+  inset: var(--spacing-2);
   z-index: 3;
   display: grid;
   place-items: center;
-  border: 2px dashed var(--accent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--term-bg) 82%, transparent);
+  border: 2px dashed var(--color-accent);
+  border-radius: var(--radius-container);
+  background-color: color-mix(in srgb, var(--term-bg) 82%, transparent);
   color: var(--term-fg);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   pointer-events: none;
 }
 
 /* ---------- what a blocked program asks ---------- */
+/* astryx's Banner in the warning tone, with its answers as secondary
+   buttons: a neutral fill that reads on the tint in either theme. */
 .term-ask {
   display: flex;
   flex: none;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 16px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--blocked-border);
-  background: var(--blocked-box);
-  color: var(--blocked-box-text);
+  gap: var(--spacing-2) var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-warning-muted);
+  color: var(--color-on-warning-muted);
 }
 
 .term-ask-text {
   display: flex;
   flex: 1 1 300px;
   align-items: center;
-  gap: 10px;
+  gap: var(--spacing-2);
   min-width: 0;
 }
 
 .term-ask-text svg {
   flex: none;
-  color: var(--blocked-title);
+  color: var(--color-text-warning);
 }
 
 .term-ask-title {
-  color: var(--blocked-title);
-  font-weight: 700;
+  color: var(--color-text-warning);
+  font-weight: var(--font-weight-semibold);
 }
 
 .term-ask-keys {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--spacing-1-5);
 }
 
 .term-ask-key {
   min-width: 40px;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--blocked-key-border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--blocked-key-text);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 500;
+  height: var(--size-element-lg);
+  padding: 0 var(--spacing-3);
+  border: 0;
+  border-radius: var(--radius-element);
+  background-color: var(--color-neutral);
+  color: var(--color-on-warning-muted);
+  font-family: var(--font-family-code);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  font-weight: var(--text-label-weight);
 }
 
-.term-ask-key:hover:not(:disabled) {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .term-ask-key:hover:not(:disabled) {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
 /* An answer is on its way: the keys wait for it (spec §3 #194). */
@@ -344,57 +341,62 @@ a.term-note-link:hover {
 .term-ask-reject {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--blocked-key-border);
-  border-radius: 8px;
-  background: none;
-  color: var(--blocked-title);
-  font-size: 13px;
-  font-weight: 600;
+  gap: var(--spacing-1-5);
+  height: var(--size-element-lg);
+  padding: 0 var(--spacing-3);
+  border: 0;
+  border-radius: var(--radius-element);
+  background-color: var(--color-neutral);
+  color: var(--color-text-warning);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  font-weight: var(--text-label-weight);
 }
 
-.term-ask-reject:hover:not(:disabled) {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .term-ask-reject:hover:not(:disabled) {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
+/* On, as astryx marks a pressed toggle: filled in its tone. */
 .term-ask-reject[aria-pressed='true'] {
-  border-color: var(--blocked-title);
-  background: var(--surface);
+  background-color: var(--color-warning);
+  color: var(--color-on-warning);
 }
 
 .term-phone .term-ask {
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: var(--spacing-2);
   padding: 0;
   border: 0;
-  background: none;
-  color: var(--text);
+  background-color: transparent;
+  color: var(--color-text-primary);
 }
 
 .term-ask-head {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
   min-width: 0;
-  padding: 0 4px;
+  padding: 0 var(--spacing-1);
 }
 
 .term-ask-head h2 {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--blocked-title);
-  font-size: 15px;
-  font-weight: 700;
+  gap: var(--spacing-2);
+  color: var(--color-text-warning);
+  font-size: var(--text-heading-4-size);
+  line-height: var(--text-heading-4-leading);
+  font-weight: var(--text-heading-4-weight);
 }
 
 .term-ask-top {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
   min-width: 0;
 }
 
@@ -407,8 +409,9 @@ a.term-note-link:hover {
 .term-ask-head .term-ask-msg {
   display: -webkit-box;
   overflow: hidden;
-  color: var(--text-2);
-  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -428,40 +431,41 @@ a.term-note-link:hover {
 .term-ask-more {
   flex: none;
   height: 44px;
-  margin: -12px -4px -12px 0;
-  padding: 0 4px;
+  margin: calc(-1 * var(--spacing-3)) calc(-1 * var(--spacing-1)) calc(-1 * var(--spacing-3)) 0;
+  padding: 0 var(--spacing-1);
   border: 0;
-  background: none;
-  color: var(--accent-text);
-  font-size: 13px;
-  font-weight: 600;
+  background-color: transparent;
+  color: var(--color-text-accent);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  font-weight: var(--text-label-weight);
 }
 
 .term-ask-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .term-phone .term-ask-key {
   height: 52px;
-  border-color: var(--blocked-border);
-  border-radius: 12px;
-  background: var(--blocked-box);
-  font-size: 17px;
+  border-radius: var(--radius-container);
+  background-color: var(--color-warning-muted);
+  font-size: var(--text-large-size);
+  line-height: var(--text-large-leading);
 }
 
 .term-phone .term-ask-key.is-word {
-  font-size: 15px;
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-leading);
 }
 
 .term-phone .term-ask-reject {
   grid-column: 1 / -1;
   justify-content: center;
   height: 44px;
-  border-color: var(--blocked-border);
-  border-radius: 12px;
-  font-size: 15px;
+  border-radius: var(--radius-container);
 }
 
 /* ---------- quick keys (phone) ---------- */
@@ -472,9 +476,9 @@ a.term-note-link:hover {
   position: relative;
   display: flex;
   flex: none;
-  gap: 3px;
-  margin: 0 -12px;
-  padding: 0 12px;
+  gap: var(--spacing-1);
+  margin: 0 calc(-1 * var(--spacing-3));
+  padding: 0 var(--spacing-3);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -490,25 +494,25 @@ a.term-note-link:hover {
   justify-content: center;
   height: 44px;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-2);
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  border: 0;
+  border-radius: var(--radius-element);
+  background-color: var(--color-neutral);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-code);
+  font-size: var(--mori-font-size-key);
+  line-height: var(--text-supporting-leading);
 }
 
 /* Ctrl or Alt held for the next key, and held on (spec §3 #186). */
 .term-key.is-mod[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
-  color: var(--accent-text);
-  font-weight: 600;
+  background-color: var(--color-accent-muted);
+  color: var(--color-text-accent);
+  font-weight: var(--font-weight-semibold);
 }
 
 .term-key.is-mod[data-lock] {
-  background: var(--accent);
-  color: var(--on-accent);
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -519,7 +523,8 @@ a.term-note-link:hover {
 .term-key.is-arrow {
   min-width: 0;
   font-family: system-ui, sans-serif;
-  font-size: 15px;
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
 }
 
 .term-key:disabled {
@@ -530,27 +535,27 @@ a.term-note-link:hover {
 .term-compose {
   position: relative; /* the slash list sits above it */
   flex: none;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-background-surface);
 }
 
 /* ---------- slash commands (spec §3 #197) ---------- */
 /* Over the terminal rather than in the column: the terminal keeps its size,
-   so its program does not redraw as the list opens and closes. */
+   so its program does not redraw as the list opens and closes. It is
+   astryx's Menu: a popover with rows nested in its corners. */
 .term-slash {
   position: absolute;
-  right: 16px;
-  bottom: calc(100% + 6px);
-  left: 16px;
+  right: var(--spacing-4);
+  bottom: calc(100% + var(--spacing-1-5));
+  left: var(--spacing-4);
   z-index: 20;
   max-height: min(360px, 45vh);
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: var(--shadow-pop);
+  padding: var(--spacing-1);
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-popover);
+  box-shadow: var(--shadow-low);
 }
 
 .term-slash-list {
@@ -562,33 +567,36 @@ a.term-note-link:hover {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 2px;
+  gap: var(--spacing-0-5);
   min-width: 0;
-  padding: 7px 10px;
-  border-radius: 8px;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: calc(var(--radius-container) - var(--spacing-1));
   cursor: pointer;
 }
 
-.term-slash-row:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .term-slash-row:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
 .term-slash-row[aria-selected="true"] {
-  background: var(--selected);
+  background-color: var(--color-accent-muted);
 }
 
 .term-slash-head {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--spacing-2);
   min-width: 0;
 }
 
 .term-slash-name {
   flex: none;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
+  font-family: var(--font-family-code);
+  font-size: var(--text-code-size);
+  line-height: var(--text-code-leading);
+  font-weight: var(--font-weight-semibold);
 }
 
 .term-slash-alias,
@@ -602,45 +610,50 @@ a.term-note-link:hover {
 
 .term-slash-alias,
 .term-slash-hint {
-  color: var(--text-3);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-code);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .term-slash-src {
   flex: none;
   margin-left: auto;
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .term-slash-menu {
-  margin-right: 6px;
-  padding: 1px 6px;
-  border-radius: 6px;
-  background: var(--chip);
-  color: var(--chip-text);
-  font-size: 11px;
-  font-weight: 600;
+  margin-right: var(--spacing-1-5);
+  padding: 1px var(--spacing-1-5);
+  border-radius: var(--radius-inner);
+  background-color: var(--color-background-gray);
+  color: var(--color-text-gray);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+  font-weight: var(--font-weight-semibold);
 }
 
 .term-slash-desc {
-  color: var(--text-2);
-  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .term-slash-note {
   margin: 0;
-  padding: 8px 10px;
-  color: var(--text-3);
-  font-size: 13px;
+  padding: var(--spacing-2) var(--spacing-3);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .term-send {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
 }
 
 textarea.term-send-input {
@@ -648,9 +661,9 @@ textarea.term-send-input {
   min-width: 0;
   min-height: 62px;
   max-height: 168px;
-  padding: 9px 12px;
-  background: var(--surface-2);
-  line-height: 1.5;
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: var(--color-background-muted);
+  line-height: var(--text-body-leading);
   resize: none;
   field-sizing: content;
 }
@@ -660,11 +673,12 @@ textarea.term-send-input {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 10px;
-  padding: 10px 16px 0;
-  color: var(--blocked-title);
-  font-size: 13px;
-  font-weight: 600;
+  gap: var(--spacing-1-5) var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4) 0;
+  color: var(--color-text-warning);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  font-weight: var(--text-label-weight);
 }
 
 .term-reject svg {
@@ -678,7 +692,7 @@ textarea.term-send-input {
 
 .term-phone .term-compose {
   border: 0;
-  background: none;
+  background-color: transparent;
 }
 
 .term-phone .term-send {
@@ -688,21 +702,20 @@ textarea.term-send-input {
 .term-phone textarea.term-send-input {
   min-height: 44px;
   max-height: 120px;
-  padding: 11px 12px;
-  border-radius: 12px;
-  line-height: 1.45;
+  padding: var(--spacing-3);
+  border-radius: var(--radius-container);
 }
 
 .term-phone .term-send-btn {
   width: 44px;
   height: 44px;
   padding: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
 }
 
 .term-phone .term-held,
 .term-phone .term-reject {
-  padding: 0 4px 8px;
+  padding: 0 var(--spacing-1) var(--spacing-2);
 }
 
 .term-phone .term-slash {
@@ -720,12 +733,13 @@ textarea.term-send-input {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--info-box);
-  color: var(--info-box-text);
-  font-size: 13px;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-info-muted);
+  color: var(--color-on-info-muted);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .term-observe svg {
@@ -739,8 +753,8 @@ textarea.term-send-input {
 
 .term-phone .term-observe {
   border: 0;
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: var(--radius-container);
+  padding: var(--spacing-2) var(--spacing-3);
 }
 
 /* ---------- the program ended ---------- */
@@ -749,34 +763,35 @@ textarea.term-send-input {
   flex: none;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 16px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--surface-2);
-  font-size: 13px;
+  gap: var(--spacing-2) var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-background-muted);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .term-end-text {
   flex: 1 1 260px;
   min-width: 0;
-  color: var(--text-2);
+  color: var(--color-text-secondary);
 }
 
 .term-end-text b {
-  color: var(--text);
-  font-weight: 700;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 .term-end-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--spacing-1-5);
 }
 
 .term-phone .term-end {
   padding: 0;
   border: 0;
-  background: none;
+  background-color: transparent;
 }
 
 .term-phone .term-end-actions {
@@ -793,10 +808,10 @@ textarea.term-send-input {
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px calc(12px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
-  border-radius: 20px 20px 0 0;
-  background: var(--surface);
+  gap: var(--spacing-3);
+  padding: var(--spacing-4) calc(var(--spacing-3) + env(safe-area-inset-right, 0)) calc(var(--spacing-4) + env(safe-area-inset-bottom, 0)) calc(var(--spacing-3) + env(safe-area-inset-left, 0));
+  border-radius: var(--radius-container) var(--radius-container) 0 0;
+  background-color: var(--color-background-surface);
 }
 
 .term-dock:empty {
@@ -815,7 +830,7 @@ textarea.term-send-input {
 }
 
 .kb .term-dock {
-  gap: 8px;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  gap: var(--spacing-2);
+  padding-top: var(--spacing-2);
+  padding-bottom: var(--spacing-2);
 }

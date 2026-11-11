@@ -14,40 +14,36 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
   height: 56px;
-  padding: 0 8px 0 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 0 var(--spacing-2) 0 var(--spacing-4);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .gp-head-icon {
   flex: none;
-  color: var(--text-2);
+  color: var(--color-icon-secondary);
 }
 
 .gp-title {
   flex: none;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-heading-4-size);
+  line-height: var(--text-heading-4-leading);
+  font-weight: var(--text-heading-4-weight);
 }
 
 .gp-folder {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-2);
-  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .gp-head .gp-refresh {
   margin-left: auto;
-}
-
-.gp-head .btn-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
 }
 
 /* The list over the diff takes at most half the height, and scrolls. */
@@ -62,7 +58,7 @@
 
 .gp-top.has-diff {
   max-height: 50%;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .gp-empty {
@@ -70,16 +66,17 @@
 }
 
 .gp-error {
-  padding: 12px 16px;
-  color: var(--danger);
-  font-size: 13px;
+  padding: var(--spacing-3) var(--spacing-4);
+  color: var(--color-text-error);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
 
 .gp .qnote,
 .gs-list .qnote {
-  padding: 12px 16px;
+  padding: var(--spacing-3) var(--spacing-4);
 }
 
 /* ---------- the branch ---------- */
@@ -87,16 +84,16 @@
 .gp-branch {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .gp-branch-main {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
   min-width: 0;
 }
 
@@ -104,7 +101,7 @@
 .gs-branch-line {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--spacing-2);
   min-width: 0;
 }
 
@@ -112,29 +109,32 @@
 .gs-branch-name {
   min-width: 0;
   overflow: hidden;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .gp-branch-name {
-  font-size: 15px;
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
 }
 
 .gp-ab {
   flex: none;
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gp-branch-sub {
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gp-graph {
-  gap: 6px;
-  padding: 0 12px;
+  gap: var(--spacing-1-5);
+  padding: 0 var(--spacing-3);
 }
 
 /* ---------- the worktrees ---------- */
@@ -149,44 +149,46 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .gw-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
 }
 
 .gw-item {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--spacing-0-5);
 }
 
 .gw-row {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 10px;
+  gap: var(--spacing-2);
   min-width: 0;
   border: 0;
-  background: transparent;
-  color: var(--text);
+  background-color: transparent;
+  color: var(--color-text-primary);
   text-align: left;
 }
 
-.gw-row:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .gw-row:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
 .gw-row[aria-current='true'] {
-  background: var(--bg);
+  background-color: var(--color-accent-muted);
 }
 
 .gw-row:disabled {
-  background: transparent;
-  color: var(--text-2);
+  background-color: transparent;
+  color: var(--color-text-secondary);
   cursor: default;
 }
 
@@ -205,23 +207,27 @@
 }
 
 .gw-path {
-  color: var(--text-3);
+  color: var(--color-text-secondary);
 }
 
 .gw-chip {
+  display: inline-flex;
   flex: none;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--selected);
-  color: var(--pressed-text);
-  font-size: 12px;
-  font-weight: 600;
+  align-items: center;
+  height: var(--spacing-5);
+  padding: 0 var(--spacing-2);
+  border-radius: var(--radius-full);
+  background-color: var(--color-background-blue);
+  color: var(--color-text-blue);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+  font-weight: var(--font-weight-medium);
 }
 
 .gw-tag,
 .gw-count {
   flex: none;
-  color: var(--text-2);
+  color: var(--color-text-secondary);
 }
 
 .gw-menu {
@@ -229,102 +235,105 @@
 }
 
 .gw-pc {
-  gap: 2px;
-  padding: 12px 8px;
-  border-bottom: 1px solid var(--border);
+  gap: var(--spacing-0-5);
+  padding: var(--spacing-3) var(--spacing-2);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .gw-pc .gw-head {
-  padding: 0 8px 4px;
+  padding: 0 var(--spacing-2) var(--spacing-1);
 }
 
 .gw-pc .gw-title {
-  color: var(--text-2);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.gw-add {
-  border-radius: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-heading-5-size);
+  line-height: var(--text-heading-5-leading);
+  font-weight: var(--text-heading-5-weight);
 }
 
 .gw-pc .gw-row {
   min-height: 40px;
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius-element);
 }
 
 .gw-pc .gw-branch {
-  font-size: 12px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gw-pc .gw-path,
 .gw-pc .gw-tag,
 .gw-pc .gw-count {
-  font-size: 11px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gw-pc .gw-chip {
-  padding: 0 6px;
-  font-size: 11px;
+  padding: 0 var(--spacing-1-5);
 }
 
 .gw-pc .gw-menu {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: var(--size-element-md);
+  height: var(--size-element-md);
 }
 
 .gw-phone {
-  gap: 4px;
-  padding: 10px 8px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
+  gap: var(--spacing-1);
+  padding: var(--spacing-2) var(--spacing-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-surface);
 }
 
 .gw-phone .gw-head {
-  padding: 0 0 4px 8px;
+  padding: 0 0 var(--spacing-1) var(--spacing-2);
 }
 
 .gw-phone .gw-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-heading-4-size);
+  line-height: var(--text-heading-4-leading);
+  font-weight: var(--text-heading-4-weight);
 }
 
 .gw-add-phone {
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-1-5);
   height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+  padding: 0 var(--spacing-3);
+  border: 0;
+  border-radius: var(--radius-element);
+  background-color: var(--color-neutral);
+  color: var(--color-text-primary);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  font-weight: var(--text-label-weight);
 }
 
-.gw-add-phone:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .gw-add-phone:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
 .gw-phone .gw-row {
   min-height: 56px;
-  padding: 6px 8px;
-  border-radius: 10px;
+  padding: var(--spacing-1-5) var(--spacing-2);
+  border-radius: var(--radius-element);
 }
 
 .gw-phone .gw-branch {
-  font-size: 13px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gw-phone .gw-path,
 .gw-phone .gw-tag,
 .gw-phone .gw-count {
-  font-size: 12px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gw-phone .gw-menu {
@@ -351,8 +360,8 @@
 
 .gc-letter {
   flex: none;
-  font-family: var(--font-mono);
-  font-weight: 500;
+  font-family: var(--font-family-code);
+  font-weight: var(--font-weight-medium);
   text-align: center;
 }
 
@@ -377,7 +386,7 @@
 }
 
 .gc-letter.tone-x {
-  color: var(--danger);
+  color: var(--color-text-error);
 }
 
 /* Positioned, so the word read out stays inside the list as it scrolls
@@ -389,59 +398,65 @@
 }
 
 .gc-sub {
-  color: var(--text-3);
+  color: var(--color-text-secondary);
 }
 
 .gc-empty {
-  gap: 2px;
-  padding: 16px 8px;
+  gap: var(--spacing-0-5);
+  padding: var(--spacing-4) var(--spacing-2);
 }
 
 .gc-empty .empty-title {
-  font-size: 13px;
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-leading);
 }
 
 .gc-empty .empty-text {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gc {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 12px 8px;
+  padding: var(--spacing-3) var(--spacing-2);
 }
 
 .gc-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
-  padding: 0 8px 4px;
+  gap: var(--spacing-2);
+  padding: 0 var(--spacing-2) var(--spacing-1);
 }
 
 .gc-title {
-  color: var(--text-2);
-  font-size: 12px;
-  font-weight: 700;
+  color: var(--color-text-secondary);
+  font-size: var(--text-heading-5-size);
+  line-height: var(--text-heading-5-leading);
+  font-weight: var(--text-heading-5-weight);
 }
 
 .gc-ro {
-  color: var(--text-3);
-  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gc-group {
   margin: 0;
-  padding: 6px 8px 2px;
-  color: var(--text-3);
-  font-size: 11px;
-  font-weight: 500;
+  padding: var(--spacing-1-5) var(--spacing-2) var(--spacing-0-5);
+  color: var(--color-text-secondary);
+  font-size: var(--text-heading-5-size);
+  line-height: var(--text-heading-5-leading);
+  font-weight: var(--text-heading-5-weight);
 }
 
 .gc-head + .gc-group {
-  padding-top: 4px;
+  padding-top: var(--spacing-1);
 }
 
 .gc-list {
@@ -453,25 +468,28 @@
 .gc-file {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
   width: 100%;
   height: 30px;
-  padding: 0 8px;
+  padding: 0 var(--spacing-2);
   border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  border-radius: var(--radius-inner);
+  background-color: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-code);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-align: left;
 }
 
-.gc-file:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .gc-file:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
 .gc-file[aria-current='true'] {
-  background: var(--selected);
+  background-color: var(--color-accent-muted);
 }
 
 .gc-file .gc-letter {
@@ -485,7 +503,7 @@
 }
 
 .gc-file[aria-current='true'] .gc-sub {
-  color: var(--text-2);
+  color: var(--color-text-secondary);
 }
 
 /* ---------- the diff beside the list ---------- */
@@ -502,9 +520,10 @@
   display: flex;
   flex: none;
   align-items: baseline;
-  gap: 8px;
-  padding: 10px 16px;
-  font-size: 12px;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gp-diff-path {
@@ -534,11 +553,12 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  padding: 8px 0;
+  padding: var(--spacing-2) 0;
   overflow: auto;
-  border-top: 1px solid var(--border);
-  background: var(--diff-bg);
-  font-size: 12px;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--diff-bg);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   scrollbar-width: thin;
 }
 
@@ -556,9 +576,9 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 4px;
+  gap: var(--spacing-1);
   min-height: 60px;
-  padding: env(safe-area-inset-top, 0px) calc(4px + env(safe-area-inset-right, 0px)) 0 calc(4px + env(safe-area-inset-left, 0px));
+  padding: env(safe-area-inset-top, 0) calc(var(--spacing-1) + env(safe-area-inset-right, 0)) 0 calc(var(--spacing-1) + env(safe-area-inset-left, 0));
 }
 
 .gs-titles {
@@ -569,14 +589,16 @@
 }
 
 .gs-titles h1 {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: var(--text-heading-3-size);
+  line-height: var(--text-heading-3-leading);
+  font-weight: var(--text-heading-3-weight);
 }
 
 .gs-sub {
   overflow: hidden;
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -589,7 +611,7 @@
 
 .gs-banner:not(:empty) {
   flex: none;
-  padding: 0 16px 8px;
+  padding: 0 var(--spacing-4) var(--spacing-2);
 }
 
 .gs-scroll {
@@ -597,9 +619,9 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacing-3);
   min-height: 0;
-  padding: 4px calc(16px + env(safe-area-inset-right, 0px)) calc(32px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+  padding: var(--spacing-1) calc(var(--spacing-4) + env(safe-area-inset-right, 0)) calc(var(--spacing-8) + env(safe-area-inset-bottom, 0)) calc(var(--spacing-4) + env(safe-area-inset-left, 0));
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -608,84 +630,89 @@
   display: flex;
   flex: none;
   flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-surface);
 }
 
 .gs-card-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-heading-4-size);
+  line-height: var(--text-heading-4-leading);
+  font-weight: var(--text-heading-4-weight);
 }
 
 .gs-pill {
   flex: none;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--chip);
-  color: var(--chip-text);
-  font-size: 12px;
-  font-weight: 600;
+  padding: 1px var(--spacing-2);
+  border-radius: var(--radius-full);
+  background-color: var(--color-background-gray);
+  color: var(--color-text-gray);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+  font-weight: var(--font-weight-medium);
 }
 
 .gs-branch {
-  gap: 8px;
-  padding: 16px;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4);
 }
 
 .gs-branch-line {
-  gap: 10px;
+  gap: var(--spacing-2);
 }
 
 .gs-branch-name {
-  font-size: 20px;
+  font-size: var(--text-heading-2-size);
+  font-weight: var(--text-heading-2-weight);
+  line-height: var(--text-heading-2-leading);
 }
 
 .gs-branch .gp-ab {
-  font-size: 13px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gs-branch-sub {
-  color: var(--text-2);
-  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gs-note {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--bg);
-  color: var(--text-4);
-  font-size: 13px;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-element);
+  background-color: var(--color-background-body);
+  color: var(--color-text-primary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gs-note svg {
   flex: none;
 }
 
-.gs-graph,
-.gs-graph:hover {
-  color: var(--text);
-}
-
 .gs-graph {
+  color: var(--color-text-primary);
   flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: var(--spacing-3);
   min-height: 60px;
-  padding: 10px 14px 10px 16px;
+  padding: var(--spacing-2) var(--spacing-4) var(--spacing-2) var(--spacing-4);
   text-decoration: none;
 }
 
-.gs-graph:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .gs-graph:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
 .gs-graph-icon {
   flex: none;
-  color: var(--accent);
+  color: var(--color-icon-accent);
 }
 
 .gs-graph-text {
@@ -696,66 +723,68 @@
 }
 
 .gs-graph-title {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .gs-graph-sub {
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gs-graph-go {
   flex: none;
-  color: var(--text-3);
+  color: var(--color-icon-secondary);
 }
 
 /* The changes on a phone: each opens its diff under it. */
 .gcc {
-  gap: 4px;
-  padding: 14px 8px 10px;
+  gap: var(--spacing-1);
+  padding: var(--spacing-3) var(--spacing-2) var(--spacing-2);
 }
 
 .gcc-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 0 8px 6px;
+  gap: var(--spacing-2);
+  padding: 0 var(--spacing-2) var(--spacing-1-5);
 }
 
 .gcc-group {
-  padding: 8px 8px 0;
-  color: var(--text-3);
-  font-size: 12px;
-  font-weight: 600;
+  padding: var(--spacing-2) var(--spacing-2) 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-heading-5-size);
+  line-height: var(--text-heading-5-leading);
+  font-weight: var(--text-heading-5-weight);
 }
 
 .gcc-head + .gcc-group {
-  padding-top: 4px;
+  padding-top: var(--spacing-1);
 }
 
 .gcc-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
 }
 
 .gcc-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--spacing-2);
   width: 100%;
   min-height: 48px;
-  padding: 6px 8px;
+  padding: var(--spacing-1-5) var(--spacing-2);
   border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text);
+  border-radius: var(--radius-element);
+  background-color: transparent;
+  color: var(--color-text-primary);
   text-align: left;
 }
 
 .gcc-row[aria-expanded='true'] {
-  background: var(--choice-bg);
+  background-color: var(--color-accent-muted);
 }
 
 .gcc-row .gc-letter {
@@ -775,57 +804,57 @@
 }
 
 .gcc-row .gc-name {
-  font-family: var(--font-mono);
-  font-size: 13px;
+  font-family: var(--font-family-code);
+  font-size: var(--text-code-size);
+  line-height: var(--text-code-leading);
 }
 
 .gcc-row .gc-sub {
-  font-size: 12px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gcc-row[aria-expanded='true'] .gc-sub {
-  color: var(--text-2);
+  color: var(--color-text-secondary);
 }
 
 .gcc-counts {
-  font-size: 12px;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .gcc-chev {
   flex: none;
-  color: var(--text-3);
+  color: var(--color-icon-secondary);
 }
 
 .gcc-box {
-  margin: 2px 0 6px;
+  margin: var(--spacing-0-5) 0 var(--spacing-1-5);
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
 }
 
 .gcc-box .gp-error,
 .gcc-box .qnote {
-  padding: 10px 12px;
+  padding: var(--spacing-2) var(--spacing-3);
 }
 
 .gcc-diff {
   position: relative;
-  padding: 8px 0;
+  padding: var(--spacing-2) 0;
   overflow-x: auto;
-  background: var(--diff-bg);
-  font-size: 11.5px;
+  background-color: var(--diff-bg);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 /* On a PC the screen holds the list on the left and the diff beside it. */
 .gs-pc .gs-head {
-  gap: 8px;
+  gap: var(--spacing-2);
   min-height: 0;
-  padding: 14px 12px 14px 20px;
-  border-bottom: 1px solid var(--border);
-}
-
-.gs-pc .gs-titles h1 {
-  font-size: 16px;
+  padding: var(--spacing-3) var(--spacing-3) var(--spacing-3) var(--spacing-5);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .gs-cols {
@@ -840,7 +869,7 @@
   width: 360px;
   min-height: 0;
   overflow-y: auto;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--color-border);
   scrollbar-width: thin;
 }
 
@@ -849,17 +878,16 @@
 }
 
 .gs-cols .gp-diff-head {
-  padding: 12px 20px;
+  padding: var(--spacing-3) var(--spacing-5);
 }
 
 .gs-cols .gp-diff-body {
-  padding: 10px 0;
-  font-size: 12.5px;
+  padding: var(--spacing-2) 0;
 }
 
 .gs-nodiff {
   flex: 1;
-  background: var(--diff-bg);
+  background-color: var(--diff-bg);
 }
 
 .gs-pc .gp-empty {

@@ -250,6 +250,7 @@ export function PushCards() {
           </span>
           <input
             type="checkbox"
+            role="switch"
             class="st-check"
             checked={isOn}
             disabled={!canPush}

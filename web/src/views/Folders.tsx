@@ -43,7 +43,7 @@ function FolderSection({ g, p }: { g: FolderGroup; p: ListProps }) {
         )}
       </div>
       {g.items.length > 0 ? (
-        <ul class="qrows qrows-joined">
+        <ul class="qrows">
           {g.items.map((t) => (
             <TermRow key={t.address} t={t} p={p} sub={sub(h, t, f)} />
           ))}

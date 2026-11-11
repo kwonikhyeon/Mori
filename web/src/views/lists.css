@@ -1,5 +1,6 @@
-/* 지금 볼 것 and 폴더 (B-Home, B-PC sidebar). The phone draws them roomier:
-   bigger cards, rows joined in one box. */
+/* 지금 볼 것 and 폴더 (B-Home, B-PC sidebar), after astryx Card and List: an
+   alert or a working terminal is a card, the rest are rows joined in one
+   box. The phone draws them roomier. */
 
 .qv,
 .fv {
@@ -9,12 +10,12 @@
 
 .qv-phone,
 .fv-phone {
-  gap: 22px;
+  gap: var(--spacing-6);
 }
 
 .qv-pc,
 .fv-pc {
-  gap: 18px;
+  gap: var(--spacing-4);
 }
 
 /* What the hub last saw of a host it cannot reach now. */
@@ -32,82 +33,81 @@
 }
 
 .qnote {
-  padding: 12px 4px;
-  color: var(--text-3);
-  font-size: 13px;
+  padding: var(--spacing-3) var(--spacing-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .qsec {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.qv-phone .qsec {
-  gap: 10px;
+  gap: var(--spacing-2);
 }
 
 .qsec-title {
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 700;
+  color: var(--color-text-secondary);
+  font-size: var(--text-heading-5-size);
+  line-height: var(--text-heading-5-leading);
+  font-weight: var(--text-heading-5-weight);
 }
 
 .qv-phone .qsec-title {
-  padding: 0 4px;
+  padding: 0 var(--spacing-1);
 }
 
-/* A card: an alert or a working terminal. */
-a.qcard,
-a.qcard:hover,
-a.qrow,
-a.qrow:hover {
-  color: var(--text);
-}
-
+/* A card (astryx Card): an alert or a working terminal. The one open beside
+   the list takes the muted accent, as a selected row does. */
 .qcard {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--spacing-2);
   min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  transition: border-color .12s;
+  padding: var(--spacing-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-card);
+  color: var(--color-text-primary);
+  transition-property: background-color, border-color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-standard);
 }
 
-.qcard:hover {
-  border-color: var(--grabber);
+@media (hover: hover) {
+  .qcard:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
-.qcard.is-selected,
-.qrow.is-selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 .5px var(--accent);
+.qcard.is-selected {
+  border-color: transparent;
+  background-color: var(--color-accent-muted);
 }
 
 .qv-phone .qcard {
-  padding: 16px;
-  border-radius: 16px;
+  padding: var(--spacing-4);
 }
 
+/* An alert on the phone stands up on its shadow instead of the line: one of
+   the two, never both. */
 .qv-phone .qcard-blocked {
-  box-shadow: var(--shadow-card);
+  border-color: transparent;
+  box-shadow: var(--shadow-low);
 }
 
 .qcard-top {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
   min-width: 0;
 }
 
 .qcard-app {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -115,44 +115,39 @@ a.qrow:hover {
 .qcard-go {
   flex: none;
   margin-left: auto;
-  color: var(--text-3);
+  color: var(--color-icon-secondary);
 }
 
 .qcard-seeing {
   flex: none;
   margin-left: auto;
-  color: var(--accent-text);
-  font-size: 12px;
-  font-weight: 600;
+  color: var(--color-text-accent);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+  font-weight: var(--font-weight-medium);
 }
 
 .qcard-title {
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.3;
+  font-size: var(--text-heading-4-size);
+  font-weight: var(--text-heading-4-weight);
+  line-height: var(--text-heading-4-leading);
   overflow-wrap: anywhere;
-}
-
-.qv-phone .qcard-title {
-  font-size: 17px;
 }
 
 .qcard-sub {
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   overflow-wrap: anywhere;
-}
-
-.qv-phone .qcard-sub {
-  font-size: 13px;
 }
 
 .qcard-msg {
   display: -webkit-box;
-  padding: 8px 10px;
+  padding: var(--spacing-2) var(--spacing-3);
   overflow: hidden;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: var(--radius-element);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
   overflow-wrap: anywhere;
   white-space: pre-line;
   -webkit-box-orient: vertical;
@@ -160,140 +155,122 @@ a.qrow:hover {
   line-clamp: 3;
 }
 
-.qv-phone .qcard-msg {
-  padding: 10px 12px;
-  border-radius: 10px;
-}
-
 .qcard-blocked .qcard-msg {
-  background: var(--blocked-box);
-  color: var(--blocked-box-text);
+  background-color: var(--color-warning-muted);
+  color: var(--color-on-warning-muted);
 }
 
 .qcard-error .qcard-msg {
-  background: var(--error-box);
-  color: var(--error-box-text);
+  background-color: var(--color-error-muted);
+  color: var(--color-on-error-muted);
 }
 
 .qcard-foot {
-  color: var(--accent-text);
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--color-text-accent);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  font-weight: var(--text-label-weight);
 }
 
 .qwork {
-  padding: 12px 14px;
+  padding: var(--spacing-3) var(--spacing-4);
 }
 
 .qv-phone .qwork {
-  gap: 10px;
-  padding: 14px 16px;
+  padding: var(--spacing-3) var(--spacing-4);
 }
 
 .qwork-top {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--spacing-3);
   min-width: 0;
 }
 
-/* A one-line terminal: separate cards on PC, one joined box on the phone
-   and on the folder screen. */
+/* One-line terminals (astryx List and Item): rows joined in one box with a
+   line between them, on a PC too. The box clips its corners, so the focus
+   ring goes inside the row. */
 .qrows {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-card);
 }
 
 .qrow {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--spacing-3);
   min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  transition: border-color .12s, background-color .12s;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  transition: background-color var(--duration-fast) var(--ease-standard);
 }
 
-.qrow:hover {
-  border-color: var(--grabber);
-}
-
-.qrows-joined {
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-}
-
-.qv-phone .qrows-joined,
-.fv-phone .qrows-joined {
-  border-radius: 16px;
-}
-
-.qrows-joined .qrow {
-  min-height: 56px;
-  padding: 10px 14px;
-  border: 0;
-  border-bottom: 1px solid var(--divider);
-  border-radius: 0;
-  background: none;
-}
-
-.qv-phone .qrows-joined .qrow,
-.fv-phone .qrows-joined .qrow {
-  min-height: 64px;
-  padding: 10px 16px;
-}
-
-.qrows-joined > li:last-child .qrow {
+.qrows > li:last-child .qrow {
   border-bottom: 0;
 }
 
-.qrows-joined .qrow:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .qrow:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
-.qrows-joined .qrow.is-selected {
-  background: var(--selected);
-  box-shadow: inset 3px 0 0 var(--accent);
+.qrow:focus-visible {
+  outline-offset: calc(-1 * var(--focus-outline-width));
+}
+
+.qrow.is-selected {
+  background-color: var(--color-accent-muted);
+}
+
+.qv-phone .qrow,
+.fv-phone .qrow {
+  min-height: 64px;
+  padding: var(--spacing-2) var(--spacing-4);
 }
 
 .qrow-main {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
   min-width: 0;
 }
 
 .qrow-title {
   overflow: hidden;
-  font-weight: 600;
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
+  font-weight: var(--font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .qrow-sub {
   overflow: hidden;
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .qrow.is-finished .qrow-title {
-  color: var(--text-3);
-  font-weight: 500;
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-normal);
 }
 
 .qrow-end {
   flex: none;
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   white-space: nowrap;
 }
 
@@ -302,13 +279,14 @@ a.qrow:hover {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .qtime {
   flex: none;
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -328,21 +306,23 @@ a.qrow:hover {
   display: inline-block;
   width: 8px;
   height: 8px;
-  margin-right: 6px;
-  border-radius: 50%;
-  background: var(--accent);
+  margin-right: var(--spacing-1-5);
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
   vertical-align: 1px;
 }
 
+/* Like an unread letter: in full ink, and heavier. */
 .qrow.is-unseen .qrow-title {
-  font-weight: 700;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* The folded groups. */
 .qfolds {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacing-1);
 }
 
 .qv-phone .qfolds {
@@ -352,7 +332,7 @@ a.qrow:hover {
 .qfold-sec {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--spacing-1-5);
 }
 
 .qfold-h {
@@ -362,34 +342,38 @@ a.qrow:hover {
 .qfold {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
   width: 100%;
   min-width: 0;
-  height: 40px;
-  padding: 0 6px;
+  height: var(--size-element-lg);
+  padding: 0 var(--spacing-1-5);
   border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 600;
+  border-radius: var(--radius-element);
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  font-weight: var(--text-label-weight);
   text-align: left;
 }
 
 .qv-phone .qfold {
   height: auto;
   min-height: 48px;
-  padding: 0 4px;
-  font-weight: 700;
+  padding: 0 var(--spacing-1);
+  font-weight: var(--font-weight-semibold);
 }
 
-.qfold:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .qfold:hover {
+    background-image: var(--mori-overlay-hover-image);
+    color: var(--color-text-primary);
+  }
 }
 
 .qfold svg {
   flex: none;
-  transition: transform .15s;
+  transition: transform var(--duration-fast) var(--ease-standard);
 }
 
 .qfold[aria-expanded="true"] svg {
@@ -403,8 +387,8 @@ a.qrow:hover {
 .qfold-sub {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-3);
-  font-weight: 400;
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-normal);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -413,20 +397,20 @@ a.qrow:hover {
 .fsec {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--spacing-2);
 }
 
 .fsec-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 10px;
-  padding: 0 4px;
+  gap: var(--spacing-2) var(--spacing-2);
+  padding: 0 var(--spacing-1);
 }
 
 .fsec-icon {
   flex: none;
-  color: var(--text-2);
+  color: var(--color-icon-secondary);
 }
 
 .fsec-name {
@@ -438,25 +422,28 @@ a.qrow:hover {
 
 .fsec-name h2 {
   overflow: hidden;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-heading-4-size);
+  line-height: var(--text-heading-4-leading);
+  font-weight: var(--text-heading-4-weight);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .fsec-path {
   overflow: hidden;
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .fsec-none {
-  padding: 14px 16px;
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-  color: var(--text-3);
-  font-size: 13px;
+  padding: var(--spacing-3) var(--spacing-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-container);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-align: center;
 }

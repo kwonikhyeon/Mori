@@ -4,7 +4,7 @@
 .hostbar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--spacing-2);
   min-width: 0;
 }
 
@@ -15,22 +15,27 @@
 }
 
 /* ---------- PC: the picker ---------- */
+/* astryx's Menu trigger: a secondary button, the host's name in it. */
 .hostpick {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
   max-width: 340px;
-  min-height: 36px;
-  padding: 0 10px 0 12px;
+  min-height: var(--size-element-lg);
+  padding: 0 var(--spacing-3);
   border: 0;
-  border-radius: 999px;
-  background: var(--chip);
-  color: var(--text);
-  font-weight: 600;
+  border-radius: var(--radius-element);
+  background-color: var(--color-neutral);
+  color: var(--color-text-primary);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  font-weight: var(--font-weight-semibold);
 }
 
-.hostpick:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .hostpick:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
 .hostpick-name {
@@ -41,15 +46,16 @@
 
 .hostpick-state {
   flex: none;
-  color: var(--text-2);
-  font-size: 12px;
-  font-weight: 400;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+  font-weight: var(--text-supporting-weight);
 }
 
 .hostpick svg {
   flex: none;
-  color: var(--text-2);
-  transition: transform .15s;
+  color: var(--color-icon-secondary);
+  transition: transform var(--duration-fast) var(--ease-standard);
 }
 
 .hostpick[aria-expanded="true"] svg {
@@ -60,20 +66,22 @@
 .host-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-1-5);
   min-width: 0;
   min-height: 44px;
   padding: 0;
   border: 0;
-  background: transparent;
-  color: var(--text-2);
-  font-size: 14px;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--text-label-leading);
 }
 
 .host-btn .host-name {
   overflow: hidden;
-  color: var(--text);
-  font-weight: 600;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -83,57 +91,53 @@
 }
 
 /* ---------- what waits on another host ---------- */
-.others,
-a.others,
-a.others:hover {
-  color: var(--chip-text);
-}
-
+/* A count in astryx's Badge: as round as the count pill. */
 .others {
   position: relative;
+  display: inline-flex;
   flex: none;
-  min-width: 22px;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--chip);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 22px;
-  text-align: center;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--spacing-5);
+  height: var(--spacing-5);
+  padding: 0 var(--spacing-1-5);
+  border-radius: var(--radius-full);
+  background-color: var(--color-background-gray);
+  color: var(--color-text-gray);
+  font-size: var(--text-supporting-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--text-supporting-leading);
 }
 
 /* 44 px to a finger, the badge as it is. */
 .others::after {
   content: "";
   position: absolute;
-  inset: -11px -8px;
+  inset: -12px -8px;
 }
 
-.others-blocked,
-a.others-blocked,
-a.others-blocked:hover {
-  background: var(--blocked);
-  color: var(--blocked-text);
+.others-blocked {
+  background-color: var(--color-warning);
+  color: var(--color-on-warning);
 }
 
-.others-error,
-a.others-error,
-a.others-error:hover {
-  background: var(--error);
-  color: var(--error-text);
+.others-error {
+  background-color: var(--color-error);
+  color: var(--color-on-error);
 }
 
 /* ---------- phone: the host sheet ---------- */
 .hs-note {
-  margin-bottom: 12px;
-  color: var(--text-2);
-  font-size: 13px;
+  margin-bottom: var(--spacing-3);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .hs-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
   padding: 0;
   list-style: none;
 }
@@ -141,23 +145,25 @@ a.others-error:hover {
 .hs-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--spacing-3);
   width: 100%;
   min-height: 56px;
-  padding: 8px 10px;
+  padding: var(--spacing-2) var(--spacing-3);
   border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text);
+  border-radius: var(--radius-element);
+  background-color: transparent;
+  color: var(--color-text-primary);
   text-align: left;
 }
 
-.hs-row:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .hs-row:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
 }
 
 .hs-row[aria-current="true"] {
-  background: var(--selected);
+  background-color: var(--color-accent-muted);
 }
 
 .hs-main {
@@ -170,25 +176,30 @@ a.others-error:hover {
 
 .hs-name {
   overflow: hidden;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .hs-pill {
-  margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--chip);
-  color: var(--chip-text);
-  font-size: 11px;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  height: var(--spacing-5);
+  margin-left: var(--spacing-1-5);
+  padding: 0 var(--spacing-2);
+  border-radius: var(--radius-full);
+  background-color: var(--color-background-gray);
+  color: var(--color-text-gray);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+  font-weight: var(--font-weight-medium);
 }
 
 .hs-sub {
   overflow: hidden;
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -196,14 +207,15 @@ a.others-error:hover {
 .hs-count {
   flex: none;
   max-width: 45%;
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-align: right;
 }
 
 .hs-check {
   flex: none;
-  color: var(--accent-text);
+  color: var(--color-text-accent);
 }
 
 /* ---------- a host that no longer has the hub's link ---------- */
@@ -220,5 +232,5 @@ a.others-error:hover {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
+  gap: var(--spacing-2);
 }

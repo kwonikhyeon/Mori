@@ -11,28 +11,30 @@
   display: flex;
   flex: none;
   align-items: baseline;
-  gap: 12px;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-5);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .st-head h1 {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--text-heading-3-size);
+  line-height: var(--text-heading-3-leading);
+  font-weight: var(--text-heading-3-weight);
 }
 
 .st-sub {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-2);
-  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .st-sub b {
-  color: var(--text);
-  font-weight: 600;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 .st-scroll {
@@ -41,54 +43,55 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--bg);
+  background-color: var(--color-background-body);
 }
 
 .st-col {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacing-3);
 }
 
 .st-pc .st-col {
-  gap: 16px;
+  gap: var(--spacing-4);
   max-width: 720px;
   margin: 0 auto;
-  padding: 20px 24px 32px;
+  padding: var(--spacing-5) var(--spacing-6) var(--spacing-8);
 }
 
 /* ---------- cards ---------- */
 .st-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacing-3);
   min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
+  padding: var(--spacing-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-surface);
 }
 
 /* A card of rows: the rows reach closer to its edge. */
 .st-card.st-list {
   gap: 0;
-  padding: 8px 8px 12px;
+  padding: var(--spacing-2) var(--spacing-2) var(--spacing-3);
 }
 
 .st-h2 {
   min-width: 0;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-heading-4-size);
+  line-height: var(--text-heading-4-leading);
+  font-weight: var(--text-heading-4-weight);
 }
 
 .st-list > .st-h2 {
-  padding: 8px 8px 4px;
+  padding: var(--spacing-2) var(--spacing-2) var(--spacing-1);
 }
 
 .st-card-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .st-card-head .st-h2 {
@@ -97,38 +100,41 @@
 
 .st-list > .st-card-head {
   min-height: 46px;
-  padding: 4px 8px;
+  padding: var(--spacing-1) var(--spacing-2);
 }
 
 .st-text {
-  color: var(--text-2);
-  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .st-hint {
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .st-list > .st-hint,
 .st-list > .st-none,
 .st-list > .form-error {
-  margin: 4px 8px 0;
+  margin: var(--spacing-1) var(--spacing-2) 0;
 }
 
 .st-none {
-  padding: 10px 0;
-  color: var(--text-2);
-  font-size: 13px;
+  padding: var(--spacing-2) 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 /* ---------- rows ---------- */
 .st-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--spacing-3);
   min-height: 60px;
-  padding: 6px 8px;
+  padding: var(--spacing-1-5) var(--spacing-2);
 }
 
 label.st-row {
@@ -141,7 +147,7 @@ label.st-row:has(input:disabled) {
 
 .st-row-icon {
   flex: none;
-  color: var(--text-2);
+  color: var(--color-icon-secondary);
 }
 
 .st-row-main {
@@ -154,9 +160,9 @@ label.st-row:has(input:disabled) {
 .st-row-name {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-1-5);
   min-width: 0;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .st-name {
@@ -169,8 +175,9 @@ label.st-row:has(input:disabled) {
 .st-row-sub {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -180,57 +187,124 @@ label.st-row:has(input:disabled) {
   white-space: normal;
 }
 
+/* A choice among several is astryx's Checkbox: the native box at 20 px, at
+   least 24 px to a finger. The row it sits in is its target. */
 .st-check {
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   margin: 0;
-  accent-color: var(--accent);
+  accent-color: var(--color-accent);
+}
+
+@media (pointer: coarse) {
+  .st-check {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* A setting that applies at once is astryx's Switch (md): a 40×24 track in
+   the emphasized border's grey, the accent when on, with its thumb 16 px off
+   and 20 px on. */
+input.st-check[role="switch"] {
+  position: relative;
+  width: 40px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-border-emphasized);
+  appearance: none;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+input.st-check[role="switch"]::before {
+  content: "";
+  position: absolute;
+  top: var(--spacing-1);
+  left: var(--spacing-1);
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-background-surface);
+  transition-property: top, width, height, transform;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-standard);
+}
+
+input.st-check[role="switch"]:checked {
+  background-color: var(--color-accent);
+}
+
+input.st-check[role="switch"]:checked::before {
+  top: var(--spacing-0-5);
+  width: 20px;
+  height: 20px;
+  transform: translateX(14px);
+}
+
+input.st-check[role="switch"]:disabled {
+  cursor: default;
+  opacity: .5;
+}
+
+@media (hover: hover) {
+  label.st-row:hover input.st-check[role="switch"]:not(:disabled) {
+    background-image: var(--mori-overlay-hover-image);
+  }
+}
+
+/* The switch's place while its state loads. */
+span.st-check {
+  width: 40px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-neutral);
 }
 
 .st-div {
   flex: none;
   height: 1px;
-  margin: 4px 8px;
-  background: var(--divider);
+  margin: var(--spacing-1) var(--spacing-2);
+  background-color: var(--color-border);
 }
 
 .st-div.is-tight {
-  margin: 0 8px;
+  margin: 0 var(--spacing-2);
 }
 
 .st-acts {
   display: flex;
   flex: none;
-  gap: 2px;
+  gap: var(--spacing-0-5);
 }
 
 .st-pill {
+  display: inline-flex;
   flex: none;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--selected);
-  color: var(--pressed-text);
-  font-size: 11px;
-  font-weight: 700;
+  align-items: center;
+  height: var(--spacing-5);
+  padding: 0 var(--spacing-2);
+  border-radius: var(--radius-full);
+  background-color: var(--color-background-blue);
+  color: var(--color-text-blue);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+  font-weight: var(--font-weight-medium);
   white-space: nowrap;
 }
 
 .st-revoke {
   flex: none;
-  height: 44px;
-  padding: 0 14px;
-  border-radius: 10px;
-  font-size: 13px;
 }
 
 /* ---------- 알림 ---------- */
 .st-preview {
   display: flex;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 14px;
-  background: var(--chip);
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-gray);
 }
 
 .st-preview-icon {
@@ -239,31 +313,33 @@ label.st-row:has(input:disabled) {
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 9px;
-  background: var(--accent);
-  color: var(--on-accent);
+  border-radius: var(--radius-element);
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .st-preview-main {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
   min-width: 0;
 }
 
 .st-preview-app {
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .st-preview-title {
-  font-weight: 700;
+  font-weight: var(--font-weight-semibold);
 }
 
 .st-preview-body {
-  color: var(--text-4);
-  font-size: 13px;
+  color: var(--color-text-primary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .st-kinds {
@@ -274,15 +350,16 @@ label.st-row:has(input:disabled) {
 }
 
 .st-kinds legend {
-  padding: 6px 8px 2px;
-  color: var(--text-3);
-  font-size: 12px;
-  font-weight: 600;
+  padding: var(--spacing-1-5) var(--spacing-2) var(--spacing-0-5);
+  color: var(--color-text-secondary);
+  font-size: var(--text-heading-5-size);
+  line-height: var(--text-heading-5-leading);
+  font-weight: var(--text-heading-5-weight);
 }
 
 .st-kind {
   min-height: 48px;
-  padding: 4px 8px;
+  padding: var(--spacing-1) var(--spacing-2);
 }
 
 .st-kind-name {
@@ -290,90 +367,94 @@ label.st-row:has(input:disabled) {
 }
 
 .st-kinds:disabled .st-kind-name {
-  color: var(--text-3);
+  color: var(--color-text-secondary);
 }
 
 .st-dot {
   flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
 }
 
 .st-dot-blocked {
-  background: var(--dot-blocked);
+  background-color: var(--color-icon-warning);
 }
 
 .st-dot-waiting {
-  background: var(--dot-waiting);
+  background-color: var(--color-icon-secondary);
 }
 
 .st-dot-error {
-  background: var(--dot-error);
+  background-color: var(--color-icon-error);
 }
 
 .st-dot-exited {
-  border: 2px solid var(--dot-exited);
+  border: 2px solid var(--color-icon-secondary);
 }
 
 .st-note {
-  margin: 4px 8px 0;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--surface-2);
-  color: var(--text-2);
-  font-size: 12px;
+  margin: var(--spacing-1) var(--spacing-2) 0;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-element);
+  background-color: var(--color-background-muted);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 /* ---------- 새 기기 페어링 ---------- */
 .st-pair {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--spacing-4);
 }
 
 .qr {
   flex: none;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background-color: var(--mori-qr-paper);
 }
 
 .st-pair-code {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacing-1);
   min-width: 0;
 }
 
 .st-pair-label {
-  color: var(--text-3);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .st-pair-value {
-  font-size: 22px;
-  font-weight: 500;
+  font-size: var(--text-heading-2-size);
+  line-height: var(--text-heading-2-leading);
+  font-weight: var(--font-weight-medium);
   letter-spacing: .06em;
 }
 
 .st-pair-left {
-  color: var(--text-2);
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   font-variant-numeric: tabular-nums;
 }
 
 .st-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--spacing-1-5);
   min-width: 0;
 }
 
 .st-link {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-2);
   min-width: 0;
 }
 
@@ -381,12 +462,12 @@ label.st-row:has(input:disabled) {
 .st-link-text {
   flex: 1;
   min-width: 0;
-  padding: 11px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-2);
-  font-size: 12px;
-  line-height: 1.6;
+  padding: var(--spacing-3) var(--spacing-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background-color: var(--color-background-muted);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
   overflow-wrap: anywhere;
   user-select: all;
 }
@@ -404,7 +485,7 @@ label.st-row:has(input:disabled) {
 /* ---------- 폴더, 연결한 호스트, 프리셋 ---------- */
 .st-rename {
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .st-rename .input {
@@ -415,38 +496,39 @@ label.st-row:has(input:disabled) {
 .st-edit {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 4px 8px 0;
+  gap: var(--spacing-3);
+  padding: var(--spacing-1) var(--spacing-2) 0;
 }
 
 .st-item {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface-2);
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-muted);
 }
 
 .st-item .input {
-  background: var(--surface);
+  background-color: var(--color-background-surface);
 }
 
 .st-item-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: -4px -4px -4px 0;
+  gap: var(--spacing-2);
+  margin: calc(-1 * var(--spacing-1)) calc(-1 * var(--spacing-1)) calc(-1 * var(--spacing-1)) 0;
 }
 
 .st-item-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 700;
+  color: var(--color-text-secondary);
+  font-size: var(--text-heading-5-size);
+  line-height: var(--text-heading-5-leading);
+  font-weight: var(--text-heading-5-weight);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -454,7 +536,7 @@ label.st-row:has(input:disabled) {
 .st-item-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--spacing-3);
 }
 
 .st-pc .st-item-fields.is-pair {
@@ -464,24 +546,18 @@ label.st-row:has(input:disabled) {
 .st-task {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--spacing-2);
   cursor: pointer;
-}
-
-.st-task .st-check {
-  width: 20px;
-  height: 20px;
-  margin-top: 1px;
 }
 
 .st-task-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
 }
 
 .st-task-name {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .st-add {
@@ -491,7 +567,7 @@ label.st-row:has(input:disabled) {
 .st-edit-foot {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 /* ---------- 연결한 호스트, 호스트 연결 ---------- */
@@ -504,18 +580,19 @@ label.st-row:has(input:disabled) {
 /* Under the name, past the row's icon. */
 .st-host-warn,
 .st-host-acts {
-  margin: 0 8px 0 40px;
+  margin: 0 var(--spacing-2) 0 var(--spacing-10);
 }
 
 .st-host-warn {
   display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--error-box);
-  color: var(--error-box-text);
-  font-size: 12px;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-element);
+  background-color: var(--color-error-muted);
+  color: var(--color-on-error-muted);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .st-host-warn svg {
@@ -526,7 +603,7 @@ label.st-row:has(input:disabled) {
 .st-host-warn-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-0-5);
   min-width: 0;
 }
 
@@ -537,14 +614,14 @@ label.st-row:has(input:disabled) {
 .st-host-acts {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding-bottom: 10px;
+  gap: var(--spacing-2);
+  padding-bottom: var(--spacing-2);
 }
 
 .st-hostlink {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacing-3);
 }
 
 .st-hostlink .btn-primary {
@@ -553,27 +630,28 @@ label.st-row:has(input:disabled) {
 
 .st-hub-link {
   align-self: flex-start;
-  margin: 8px 8px 0;
+  margin: var(--spacing-2) var(--spacing-2) 0;
 }
 
 /* ---------- 정보 ---------- */
 .st-facts {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--spacing-2);
   margin: 0;
 }
 
 .st-facts > div {
   display: flex;
-  gap: 12px;
-  font-size: 13px;
+  gap: var(--spacing-3);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .st-facts dt {
   flex: none;
   width: 96px;
-  color: var(--text-2);
+  color: var(--color-text-secondary);
 }
 
 .st-facts dd {
@@ -586,7 +664,7 @@ label.st-row:has(input:disabled) {
 @media (max-width: 767px) {
   .st-btn {
     height: 44px;
-    border-radius: 12px;
+    border-radius: var(--radius-container);
   }
 
   .st-acts .btn-icon {
@@ -601,6 +679,6 @@ label.st-row:has(input:disabled) {
   /* Three buttons fit on a line from the card's edge. */
   .st-host-warn,
   .st-host-acts {
-    margin-left: 8px;
+    margin-left: var(--spacing-2);
   }
 }

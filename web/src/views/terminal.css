@@ -333,7 +333,7 @@ a.term-back {
 /* An answer is on its way: the keys wait for it (spec §3 #194). */
 .term-ask-key:disabled,
 .term-ask-reject:disabled {
-  opacity: .55;
+  opacity: .5;
   cursor: default;
 }
 
@@ -466,6 +466,131 @@ a.term-back {
   justify-content: center;
   height: 44px;
   border-radius: var(--radius-container);
+}
+
+/* ---------- a Claude Code window, read into a panel ---------- */
+/* What the program draws at the bottom of its screen, in the approval bar's
+   place (pickers design §6.5): a title, its list as astryx's List (.qrows,
+   the cursor's row selected) and its keys as secondary buttons. Neutral, as
+   nothing is blocked on it; when the program is, the same list and keys sit
+   in the approval bar. */
+.term-pick {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-background-surface);
+}
+
+.term-pick-title {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The list scrolls inside its cap (usePick); the terminal keeps the rest. */
+.term-pick-body {
+  position: relative;
+  flex: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* In the approval bar on a PC the list takes a line of its own. */
+.term-pc .term-ask > .term-pick-body {
+  flex: 1 1 100%;
+}
+
+/* A button drawn as a row of the list. */
+.term-pick-row {
+  width: 100%;
+  border-width: 0 0 1px;
+  background-color: transparent;
+  text-align: start;
+  font: inherit;
+}
+
+.term-pick-row:disabled {
+  opacity: .5;
+}
+
+/* A disabled row takes no hover, as no astryx control does. */
+@media (hover: hover) {
+  .term-pick-row:disabled:hover {
+    background-image: none;
+  }
+}
+
+/* The item's number as the program shows it, in a column of its own. */
+.term-pick-n {
+  flex: none;
+  min-width: 2ch;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-code);
+  font-size: var(--text-code-size);
+  line-height: var(--text-code-leading);
+  font-weight: var(--text-code-weight);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+/* What the item's tick says: always in words, beside the icon. */
+.term-pick-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+  white-space: nowrap;
+}
+
+.term-pick-mark.is-current,
+.term-pick-mark.is-on {
+  color: var(--color-text-accent);
+}
+
+.term-pick-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+/* In the approval bar on a PC the window's keys join the bar's own row:
+   they wrap one by one, at the height of its keys. */
+.term-ask-keys .term-pick-hints {
+  display: contents;
+}
+
+.term-ask-keys .term-pick-hints .btn {
+  height: var(--size-element-lg);
+}
+
+.term-phone .term-pick {
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+}
+
+.term-phone .term-pick-title {
+  padding: 0 var(--spacing-1);
+}
+
+.term-phone .term-pick-hints .btn {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 767px) {
+  .term-pick-row {
+    min-height: 44px;
+  }
 }
 
 /* ---------- quick keys (phone) ---------- */

@@ -83,6 +83,12 @@ describe('the stylesheets', () => {
     for (const sel of ['.btn', '.btn-sm', '.btn-xs', '.seg-btn', '.toast-close']) expect(phone.get(sel), sel).toMatch(/height: 44px/)
     for (const sel of ['.btn-icon', '.btn-icon.btn-sm', '.toast-close']) expect(phone.get(sel), sel).toMatch(/width: 44px/)
   })
+
+  // A row of a Claude Code window's list is pressed with a thumb (pickers design §6.5);
+  // its keys are .btn-sm, above.
+  it('make a picker row a touch target on a phone', () => {
+    expect(phoneRules(sheets['../views/terminal.css']).get('.term-pick-row')).toMatch(/min-height: 44px/)
+  })
 })
 
 // The astryx guideline (AGENTS.md, spec §3 #201): every value comes from tokens.css.
@@ -168,5 +174,12 @@ describe('the stylesheets, after astryx', () => {
   // A background shorthand would wipe the hover and press overlays (background-image).
   it('set a fill as background-color, never by the shorthand', () => {
     expect(declarations(/^background$/).map(show)).toEqual([])
+  })
+
+  // astryx's disabled state: the control at half its strength, whatever it is.
+  it('dim a disabled control to .5', () => {
+    const off = declarations(/^opacity$/).filter((d) => /:disabled|\[aria-disabled="true"\]/.test(d.sel.replace(/:not\([^)]*\)/g, '')))
+    expect(off.length).toBeGreaterThan(0)
+    expect(off.filter((d) => !/^0?\.5$/.test(d.value)).map(show)).toEqual([])
   })
 })

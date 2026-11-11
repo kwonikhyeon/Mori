@@ -256,19 +256,23 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
 
   // Claude Code's window at the bottom of the screen, read into a panel in
   // the approval bar's place (pickers design §6.5). Its room is the stage and
-  // what stands in that place now, as the panel takes its place.
+  // what stands in that place now, as the panel takes its place; of that, the
+  // panel's title and keys take what its list leaves.
   const pickSizes = () => {
     let total = stage.current?.clientHeight ?? 0
+    let chrome = 0
     root.current?.querySelectorAll<HTMLElement>('.term-ask, .term-pick').forEach((el) => {
       total += el.offsetHeight
+      chrome += el.offsetHeight - (el.querySelector<HTMLElement>('.term-pick-body')?.offsetHeight ?? 0)
     })
-    return { total, cellH: screen.current?.cell()[1] ?? 0, viewH: window.innerHeight }
+    return { total, cellH: screen.current?.cell()[1] ?? 0, viewH: window.innerHeight, chrome }
   }
   const pick = usePick({
     screen,
     ready: link,
     on: !!t && isClaude(t) && pickOn.value && active,
     size: size ? `${size.cols}x${size.rows}` : null,
+    place: blocked,
     measure: pickSizes,
   })
   const seen = pick.seen

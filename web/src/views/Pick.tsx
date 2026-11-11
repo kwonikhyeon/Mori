@@ -6,7 +6,7 @@
 // keys are secondary buttons.
 
 import type { JSX } from 'preact'
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { Icon } from '../components/Icon'
 import { announce } from '../lib/announce'
 import type { Hint } from '../lib/hints'
@@ -27,8 +27,10 @@ export interface PickOptions {
   on: boolean
   /** Changes with the terminal's size. */
   size: unknown
-  /** The heights the list's cap comes from, in px. */
-  measure: () => { total: number; cellH: number; viewH: number }
+  /** Changes when the window moves between its panel and the approval bar, whose own parts differ. */
+  place: unknown
+  /** The heights the list's cap comes from, in px; chrome is the panel's own, its list left out. */
+  measure: () => { total: number; cellH: number; viewH: number; chrome: number }
 }
 
 export interface PickState {
@@ -44,7 +46,7 @@ export interface PickState {
 }
 
 /** Reads the window at the bottom of the terminal as the screen changes. */
-export function usePick({ screen, ready, on, size, measure }: PickOptions): PickState {
+export function usePick({ screen, ready, on, size, place, measure }: PickOptions): PickState {
   const [panel, setPanel] = useState<Panel>(NO_PANEL)
   const [cap, setCap] = useState(MIN_CAP)
   const cur = useRef(panel)
@@ -56,14 +58,8 @@ export function usePick({ screen, ready, on, size, measure }: PickOptions): Pick
     return s ? look(s.shot(DEPTH)) : NOTHING
   }
   const apply = (p: Panel) => {
-    const was = cur.current
-    if (p === was) return
+    if (p === cur.current) return
     cur.current = p
-    // the cap is taken once a window shows, so the panel does not move under a finger
-    if (p.seen && p.seen.id !== was.seen?.id) {
-      const m = sizes.current()
-      setCap(capOf(m.total, m.cellH, p.seen.rows, m.viewH))
-    }
     setPanel(p)
   }
 
@@ -123,6 +119,16 @@ export function usePick({ screen, ready, on, size, measure }: PickOptions): Pick
     })
 
   const shown = on ? panel : NO_PANEL
+  // The cap is taken once the window's panel is drawn, as its title and keys
+  // take their part of the room, and drawn again before the screen shows it;
+  // then it is kept, so the panel does not move under a finger.
+  useLayoutEffect(() => {
+    const seen = shown.seen
+    if (!seen) return
+    const m = sizes.current()
+    setCap(capOf(m.total, m.cellH, seen.rows, m.viewH, m.chrome))
+  }, [shown.seen?.id, place])
+
   return { seen: shown.seen, stale: shown.stale, cap, now, wait }
 }
 

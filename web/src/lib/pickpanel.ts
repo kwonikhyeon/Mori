@@ -51,9 +51,9 @@ export function restart(p: Panel, at: number): Panel {
 
 /**
  * The height of the panel's list: at most half the view, and enough left for
- * the terminal to keep the window's rows and the two of the box, but never
- * under MIN_CAP.
+ * the terminal to keep the window's rows and the two of the box beside the
+ * rest of the panel, its title and keys (chrome), but never under MIN_CAP.
  */
-export function capOf(total: number, cellH: number, rows: number, viewH: number): number {
-  return Math.round(Math.max(MIN_CAP, Math.min(viewH / 2, total - cellH * (rows + 2))))
+export function capOf(total: number, cellH: number, rows: number, viewH: number, chrome: number): number {
+  return Math.round(Math.max(MIN_CAP, Math.min(viewH / 2, total - cellH * (rows + 2) - chrome)))
 }

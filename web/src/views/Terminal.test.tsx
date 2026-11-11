@@ -988,6 +988,18 @@ describe('pickers', () => {
   const hintsOf = (el: HTMLElement) => [...el.querySelectorAll<HTMLButtonElement>('.term-pick-hints button')]
   const titles = (el: HTMLElement) => rowsOf(el).map((r) => r.querySelector('.qrow-title')?.textContent)
   const blockedTerm = () => term({ status: status('blocked', { kind: 'permission', msg: 'Bash(ls)를 실행할까요?' }), ask: ASK })
+  /** Heights a browser would lay out, by class, in px; the record may change as a test goes on. */
+  const layOut = (px: Record<string, number>) => {
+    const of = (el: Element) => Object.entries(px).find(([c]) => el.classList.contains(c))?.[1] ?? 0
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return of(this)
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return of(this)
+    })
+    return px
+  }
+  const capIn = (sel: string) => document.querySelector<HTMLElement>(`${sel} .term-pick-body`)?.style.maxHeight
 
   beforeEach(() => {
     vi.useFakeTimers({
@@ -1021,6 +1033,30 @@ describe('pickers', () => {
     expect(p.querySelector<HTMLElement>('.term-pick-body')?.style.maxHeight).toBe('120px')
     await frame()
     expect(said()).toBe(`고르는 목록: ${TITLE}`)
+  })
+
+  it('caps the list at what the terminal can spare beside the panel\'s title and keys', async () => {
+    layOut({ 'term-stage': 300, 'term-pick': 200, 'term-pick-body': 100 })
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS.model)
+    // the stage and the panel, 300 + 200, less the window's 9 rows and the box's 2 of 17px, less the panel's own 200 − 100
+    expect(capIn('.term-pick')).toBe('213px')
+  })
+
+  it('takes the cap again when the approval bar takes the window', async () => {
+    const px = layOut({ 'term-stage': 300, 'term-pick': 200, 'term-ask': 260, 'term-pick-body': 100 })
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS.permission)
+    // 300 + 200 − 17 × (6 + 2) − (200 − 100)
+    expect(capIn('.term-pick')).toBe('264px')
+    // the approval bar is 60px taller, and the stage gives them up
+    px['term-stage'] = 240
+    act(() => load([blockedTerm()]))
+    await frame()
+    // 240 + 260 − 17 × (6 + 2) − (260 − 100)
+    expect(capIn('.term-ask')).toBe('204px')
   })
 
   it('shows nothing while idle', async () => {

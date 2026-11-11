@@ -269,7 +269,9 @@ const spoken = (seen: Seen) => (seen.title ? `고르는 목록: ${seen.title}` :
  */
 export function PickKept({ seen }: { seen: Seen }): null {
   useEffect(() => {
-    announce(`${spoken(seen)}. 자리가 모자라 터미널에서 고릅니다`)
+    const words = spoken(seen)
+    // a title that ends its own sentence takes no second period
+    announce(`${words}${/[.!?…]$/.test(words) ? '' : '.'} 자리가 모자라 터미널에서 고릅니다`)
   }, [seen.form, seen.title])
   return null
 }

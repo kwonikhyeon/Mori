@@ -1111,14 +1111,29 @@ describe('pickers', () => {
     // a send still closes the window first
     expect(screen.getByRole('button', { name: '닫고 보내기' })).toBeTruthy()
     await frame()
-    // read out once, and that it is answered on the terminal
-    expect(said()).toBe(`고르는 목록: ${TITLE}. 자리가 모자라 터미널에서 고릅니다`)
+    // read out once, and that it is answered on the terminal; the title ends its own sentence
+    expect(said()).toBe(`고르는 목록: ${TITLE} 자리가 모자라 터미널에서 고릅니다`)
     // the view grows, as a phone's keyboard goes down: the panel comes, with its list
     view.h = 400
     await act(() => ws.json({ type: 'size', cols: 80, rows: 30 }))
     await frame()
     // 400 − 17 × (9 + 2) − 40
     expect(capIn('.term-pick')).toBe('173px')
+  })
+
+  it('ends the title of a window the terminal kept with a period', async () => {
+    const view = { h: 200 }
+    layOut({
+      'term-stage': () => view.h - (panel()?.offsetHeight ?? 0),
+      'term-pick': (el) => 40 + (el.querySelector('.term-pick-body') ? 100 : 0),
+      'term-pick-body': 100,
+    })
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS['long-list'])
+    expect(panel()).toBeNull()
+    await frame()
+    expect(said()).toBe('고르는 목록: Pick a color theme. 자리가 모자라 터미널에서 고릅니다')
   })
 
   it('measures a window by its own title and keys after one the terminal kept', async () => {

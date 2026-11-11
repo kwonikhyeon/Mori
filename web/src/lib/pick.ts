@@ -312,10 +312,17 @@ function hinted(texts: string[], cols: number, box: [number, number] | null): Se
   return make(fnv(h.text), fnv('hint\0' + h.text), '', [], 0, texts, r + 1, h)
 }
 
+// a shot is read once, though the picker panel and the band both look at it
+const looks = new WeakMap<Shot, Look>()
+
 /** What the bottom of the screen shows: a window to answer, and the input box. */
 export function look(shot: Shot): Look {
+  const known = looks.get(shot)
+  if (known) return known
   const texts = prepare(shot.lines)
   const b = inputBox(texts, shot.cols)
   const box = b ? { top: shot.top + b[0], rows: b[1] - b[0] + 1 } : null
-  return { seen: listed(texts, shot.cols, b) ?? hinted(texts, shot.cols, b), box }
+  const l = { seen: listed(texts, shot.cols, b) ?? hinted(texts, shot.cols, b), box }
+  looks.set(shot, l)
+  return l
 }

@@ -21,6 +21,9 @@ export class FakeScreen implements Screen {
   app = false
   theme: ITheme | null = null
   focused = 0
+  /** How many shots were built: one a change, however many read it. */
+  builds = 0
+
   /** What a person selected on the screen. */
   selected = ''
   takeSelection(): string {
@@ -78,6 +81,7 @@ export class FakeScreen implements Screen {
   resize(cols: number, rows: number): void {
     this.cols = cols
     this.rows = rows
+    this.gen++
   }
 
   cell(): [number, number] {
@@ -161,7 +165,18 @@ export class FakeScreen implements Screen {
     this.tell(true)
   }
 
+  private gen = 0
+  private last: { gen: number; n: number; shot: Shot } | null = null
+
   shot(n: number): Shot {
+    if (this.last && this.last.gen === this.gen && this.last.n === n) return this.last.shot
+    this.builds++
+    const shot = this.build(n)
+    this.last = { gen: this.gen, n, shot }
+    return shot
+  }
+
+  private build(n: number): Shot {
     const lines = this.shown.length ? this.shown : Array<string>(this.rows).fill('')
     const top = this.rows - Math.min(n, this.rows)
     const last = lines.slice(top)
@@ -187,6 +202,7 @@ export class FakeScreen implements Screen {
   }
 
   private tell(wrote: boolean): void {
+    this.gen++
     for (const fn of this.views) fn(wrote)
   }
 }

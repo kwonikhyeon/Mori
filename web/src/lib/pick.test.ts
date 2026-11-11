@@ -258,6 +258,12 @@ describe('look', () => {
     expect(buttons(s)).toEqual(['고르기', '닫기', 'Tab · switch', 'Ctrl+E · explain'])
   })
 
+  // the panel and the band read one shot a frame: it is read once
+  it('reads a shot once', () => {
+    const s = toShot(SCREENS.model)
+    expect(look(s)).toBe(look(s))
+  })
+
   it('reads nothing on an empty screen', () => {
     expect(look(toShot('\n\n\n'))).toEqual(NOTHING)
     expect(DEPTH).toBe(40)

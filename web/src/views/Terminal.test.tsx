@@ -1987,6 +1987,16 @@ describe('pickers', () => {
       expect(rows.map((r) => r.hidden)).toEqual([false, false, true, true])
     })
 
+    // the picker panel and the band share one shot of the screen a frame
+    it('reads the screen once a frame for the panel and the band', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const before = FakeScreen.last().builds
+      await show(IDLE.replace('ctx 17%', 'ctx 18%'))
+      expect(FakeScreen.last().builds - before).toBe(1)
+    })
+
     it('names a bar with no name for a screen reader', async () => {
       const { ws } = await mount()
       await attach(ws)

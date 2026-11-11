@@ -134,7 +134,11 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
   let size = o.fontSize
   let gone = false
   const views = new Set<(wrote: boolean) => void>()
+  // what the screen shows changes with each notice and resize: a shot is built once between
+  let gen = 0
+  let last: { gen: number; n: number; shot: Shot } | null = null
   const tell = (wrote: boolean) => {
+    gen++
     for (const fn of views) fn(wrote)
   }
   // A wheel, a finger (touchscroll.ts) and the scrollbar scroll through
@@ -160,7 +164,10 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
       tell(false)
     },
     resize: (c, r) => {
-      if (c !== term.cols || r !== term.rows) term.resize(c, r)
+      if (c !== term.cols || r !== term.rows) {
+        term.resize(c, r)
+        gen++
+      }
     },
     cell,
     appCursor: () => term.modes.applicationCursorKeysMode,
@@ -194,7 +201,12 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
         views.delete(fn)
       }
     },
-    shot: (n) => shotOf(term, n),
+    shot: (n) => {
+      if (last && last.gen === gen && last.n === n) return last.shot
+      const shot = shotOf(term, n)
+      last = { gen, n, shot }
+      return shot
+    },
     setFontSize: async (px) => {
       if (px === size || gone) return false
       size = px

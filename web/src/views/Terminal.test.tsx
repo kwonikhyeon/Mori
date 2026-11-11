@@ -6,6 +6,7 @@ import { folder, status, term } from '../../test/fixtures'
 import { inHost, withHost } from '../../test/scopes'
 import { CHAT, cursorAt, SCREENS } from '../../test/screens'
 import { now } from '../lib/clock'
+import { resetBoxPref } from '../lib/coverpref'
 import { resetPickPref, setPickOn } from '../lib/pickpref'
 import { route } from '../lib/router'
 import { resetSeen, seenMarks } from '../lib/seen'
@@ -69,6 +70,7 @@ beforeEach(() => {
   forgetCommands()
   resetTermFont()
   resetPickPref()
+  resetBoxPref()
   FakeWebSocket.reset()
   FakeScreen.reset()
   vi.stubGlobal('WebSocket', FakeWebSocket)
@@ -993,7 +995,7 @@ describe('Terminal on a phone', () => {
     await attach(ws)
     fireEvent.click(screen.getByRole('button', { name: '더 보기' }))
     const menu = screen.getByRole('menu')
-    expect(items(menu)).toEqual(['파일 올리기', '보기 전용', '이름 바꾸기', '중단', '글자 크기', '종료'])
+    expect(items(menu)).toEqual(['파일 올리기', '보기 전용', '터미널 입력칸 보기', '이름 바꾸기', '중단', '글자 크기', '종료'])
     fireEvent.click(within(menu).getByRole('menuitemcheckbox', { name: '보기 전용' }))
     expect(FakeWebSocket.last().query().get('observe')).toBe('1')
     expect(screen.getByText('보기 전용 — 입력과 크기 변경을 보내지 않습니다')).toBeTruthy()
@@ -1859,6 +1861,150 @@ describe('pickers', () => {
       fireEvent.input(box, { target: { value: '' } })
       fireEvent.keyDown(box, { key: 'ArrowUp' })
       await vi.waitFor(() => expect(box.value).toBe('둘째'))
+    })
+  })
+
+  // The input box and what is below it lie under Mori's status band
+  // (claude-input design §3, spec §3 #217, #223).
+  describe('the cover', () => {
+    const IDLE = SCREENS['box-idle']
+    const band = () => screen.queryByRole('region', { name: 'Claude Code 상태' })
+    const withText = (t: string) => IDLE.replace('\n❯ \n', `\n❯ ${t}\n`)
+    const NOTE = '터미널 입력칸에 글이 있습니다 — 보내면 그 뒤에 이어 붙습니다'
+
+    it('covers an empty box with the status band', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const b = band()!
+      expect(b.parentElement?.classList.contains('term-stage')).toBe(true)
+      // the rule over the box: the sample's third line, at the bottom of 24 rows of 17px
+      expect(b.style.top).toBe(`${(24 - 9 + 2) * 17}px`)
+      expect(within(b).getByText('Opus 5.5').classList.contains('chip')).toBe(true)
+      const bars = within(b).getAllByRole('progressbar')
+      expect(bars.map((x) => x.getAttribute('aria-valuenow'))).toEqual(['6', '1'])
+      expect(within(b).getByText('셸 1')).toBeTruthy()
+      // on a PC the mode is a button of the box's row
+      const mode = screen.getByRole('button', { name: '모드: 묻지 않음' })
+      expect(mode.closest('.term-compose')).not.toBeNull()
+    })
+
+    it('sends shift+tab from the mode button', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      fireEvent.click(screen.getByRole('button', { name: '모드: 묻지 않음' }))
+      await vi.waitFor(() => expect(ws.input()).toEqual(['\x1b[Z']))
+    })
+
+    it('reads out a new mode', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      await show(IDLE.replace('⏵⏵ bypass permissions on · 1 shell', '⏸ plan mode on (shift+tab to cycle)'))
+      await frame()
+      expect(said()).toBe('모드: 계획')
+    })
+
+    it('shows the box with text in it, and says so once', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(withText('abc'))
+      expect(band()).toBeNull()
+      expect(document.querySelector('.term-boxnote')?.textContent).toBe(NOTE)
+      await frame()
+      expect(said()).toBe(NOTE)
+      live()!.textContent = ''
+      await show(withText('abcd'))
+      await frame()
+      expect(said()).toBe('')
+    })
+
+    it('keeps the cover while the box sends', async () => {
+      reply = (c) => (c.url.endsWith('/send') ? new Promise<Response>(() => {}) : undefined)
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' })
+      fireEvent.input(box, { target: { value: 'hi' } })
+      fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+      await vi.waitFor(() => expect(sent('/api/terminals/t1/send')).toHaveLength(1))
+      await show(withText('hi'))
+      expect(band()).not.toBeNull()
+      expect(document.querySelector('.term-boxnote')).toBeNull()
+    })
+
+    it('does not cover while only watching', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      fireEvent.click(screen.getByRole('button', { name: '보기 전용' }))
+      await attach(FakeWebSocket.last())
+      await show(IDLE)
+      expect(band()).toBeNull()
+    })
+
+    it('does not cover a terminal of another size', async () => {
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(840)
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(425)
+      const { ws } = await mount()
+      await attach(ws, 120, 40)
+      await show(IDLE)
+      expect(band()).toBeNull()
+    })
+
+    it('does not cover while scrolled back, a window, the setting off, or the classic screen', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      expect(band()).not.toBeNull()
+      act(() => FakeScreen.last().scrollTo(false))
+      await frame()
+      expect(band()).toBeNull()
+      act(() => FakeScreen.last().scrollTo(true))
+      await frame()
+      expect(band()).not.toBeNull()
+      await show(SCREENS.model)
+      expect(band()).toBeNull()
+      // the PC button keeps the last mode
+      expect(screen.getByRole('button', { name: '모드: 묻지 않음' })).toBeTruthy()
+      await show(IDLE)
+      act(() => setPickOn(false))
+      await frame()
+      expect(band()).toBeNull()
+      act(() => setPickOn(true))
+      await show(IDLE)
+      expect(band()).not.toBeNull()
+      act(() => FakeScreen.last().show(IDLE, 'normal'))
+      await frame()
+      expect(band()).toBeNull()
+    })
+
+    it('shows the box with the switch', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const sw = screen.getByRole('button', { name: '터미널 입력칸 보기' })
+      expect(sw.getAttribute('aria-pressed')).toBe('false')
+      fireEvent.click(sw)
+      await frame()
+      expect(band()).toBeNull()
+      expect(sw.getAttribute('aria-pressed')).toBe('true')
+      fireEvent.click(sw)
+      await frame()
+      expect(band()).not.toBeNull()
+    })
+
+    it('puts the mode in the band and the switch in the menu on a phone', async () => {
+      const { ws } = await mount(undefined, { variant: 'phone', back: '#/folders' })
+      await attach(ws)
+      await show(IDLE)
+      expect(within(band()!).getByRole('button', { name: '모드: 묻지 않음' })).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: '더 보기' }))
+      const item = screen.getByRole('menuitemcheckbox', { name: '터미널 입력칸 보기' })
+      expect(item.getAttribute('aria-checked')).toBe('false')
+      fireEvent.click(item)
+      await frame()
+      expect(band()).toBeNull()
     })
   })
 })

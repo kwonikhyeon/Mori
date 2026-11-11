@@ -27,6 +27,7 @@ import { alike } from '../lib/pick'
 import { useChordSubmit } from '../lib/ime'
 import { isMod, namedBytes, NO_MODS, QUICK_KEYS, strayBytes } from '../lib/keys'
 import { choose as chooseItem, closeFor, tap, type Press } from '../lib/pickpress'
+import { boxShown, setBoxShown } from '../lib/coverpref'
 import { pickOn } from '../lib/pickpref'
 import { isApple } from '../lib/platform'
 import { closeNotes, noteTag } from '../lib/push'
@@ -44,7 +45,9 @@ import { toast, toastError } from '../lib/toast'
 import type { TerminalView } from '../lib/types'
 import { openScreen, type Screen } from '../lib/xterm'
 import { gitFrom } from './Git'
+import { ModeButton, StatusBand, useBox } from './Cover'
 import { PickHints, PickKept, PickList, PickPanel, usePick } from './Pick'
+import type { Mode } from '../lib/box'
 import { titleOf, type Variant } from './rows'
 import { useSlash } from './Slash'
 import { TermFontSheet } from './TermFont'
@@ -310,6 +313,39 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   useEffect(() => {
     if (blocked && seen?.partial && cutAsk !== ask) setCutAsk(ask)
   }, [blocked, seen, ask, cutAsk])
+
+  // Claude Code's input box and what is below it lie under Mori's status
+  // band (claude-input design §3, spec §3 #217, #223): while it is empty,
+  // this device sees the end at the terminal's own size, and is not only
+  // watching. While the box sends, its text shows in the terminal's box for
+  // a moment: the cover stays as it was.
+  const claudeOn = !!t && isClaude(t) && pickOn.value && active
+  const reading = useBox({ screen, ready: link, on: claudeOn })
+  const sameSize = !fit || !size || (fit.cols === size.cols && fit.rows === size.rows)
+  const [sending, setSending] = useState(false)
+  const rb = reading.box
+  const boxable = !!rb && !boxShown.value && canType && sameSize && reading.alternate
+  const coverNow = boxable && reading.end && reading.row >= 0 && rb.text === ''
+  const coverWas = useRef(false)
+  if (!sending) coverWas.current = coverNow
+  const covered = coverWas.current && !!rb && !seen
+  // text in the terminal's box: what the next send would follow
+  const boxNote = boxable && rb.text !== '' && !sending
+  useEffect(() => {
+    if (boxNote) announce(BOX_NOTE)
+  }, [boxNote])
+  // a new mode is read out once
+  const modeSaid = useRef<string | null>(null)
+  useEffect(() => {
+    const label = reading.mode?.label ?? null
+    if (label !== null && modeSaid.current !== null && label !== modeSaid.current) announce(`모드: ${label}`)
+    if (label !== null) modeSaid.current = label
+  }, [reading.mode?.label])
+  const coverTop = () => {
+    const sc = scroll.current
+    const pad = sc ? parseFloat(getComputedStyle(sc).paddingTop) || 0 : 0
+    return pad + reading.row * (screen.current?.cell()[1] ?? 0)
+  }
 
   // A question that went or changed takes its rejection with it.
   useEffect(() => {
@@ -657,6 +693,14 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       />
     ))
   // the window a send closes first: the panel's, or one its own cut keeps out of it
+  // Shift+Tab moves Claude Code to its next mode (claude-input design §3.3)
+  const nextMode = () => {
+    sendKeys(['shift+tab'], false).catch(fail('키를 보내지 못했습니다'))
+  }
+  const focusBox = () => document.getElementById(id + '-send')?.focus()
+  const band = covered && rb && (
+    <StatusBand box={rb} top={coverTop()} phone={phone} mode={reading.mode} onMode={nextMode} onFocus={() => !phone && focusBox()} />
+  )
   const toClose = seen ?? pick.held
   const observeBar = observing && active && <ObserveBar onOff={() => observe(false)} />
   const endBar = finished && <EndBar t={t} ended={ended} onRemove={() => void remove()} />
@@ -673,6 +717,10 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       claude={!!t && isClaude(t)}
       closeFirst={toClose && !blocked ? () => closeFor(press, toClose) : undefined}
       onPickKey={seen && !blocked ? pickKey : undefined}
+      mode={!phone && claudeOn ? reading.mode : null}
+      onMode={nextMode}
+      boxNote={boxNote}
+      onSending={setSending}
     />
   )
 
@@ -697,6 +745,12 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
               <button type="button" class="btn btn-sm" onClick={pickFile}>
                 <Icon name="paperclip" size={15} />
                 파일 올리기
+              </button>
+            )}
+            {claudeOn && (
+              <button type="button" class="btn btn-sm" aria-pressed={boxShown.value} onClick={() => setBoxShown(!boxShown.value)}>
+                <Icon name="monitor" size={15} />
+                터미널 입력칸 보기
               </button>
             )}
             {active && (
@@ -731,7 +785,12 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
             )}
           </div>
         </header>
-        {stageWith(!askBar && pickPanel)}
+        {stageWith(
+          <>
+            {!askBar && pickPanel}
+            {band}
+          </>,
+        )}
         {askBar}
         {observeBar}
         {endBar}
@@ -746,6 +805,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   if (active) {
     if (canType) items.push({ label: '파일 올리기', icon: 'paperclip', onSelect: pickFile })
     items.push({ label: '보기 전용', icon: 'eye', checked: observing, onSelect: () => observe(!observing) })
+    if (claudeOn) items.push({ label: '터미널 입력칸 보기', icon: 'monitor', checked: boxShown.value, onSelect: () => setBoxShown(!boxShown.value) })
     if (t) items.push({ label: '이름 바꾸기', icon: 'pencil', onSelect: () => setRenaming(true) })
     items.push({ label: '중단', icon: 'stop', onSelect: interrupt })
     if (differs) items.push({ label: '이 화면에 맞추기', icon: 'monitor', onSelect: () => link?.fitNow() })
@@ -789,7 +849,12 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       </header>
       <ConnBanner class="term-banner" />
       <div class="term-body">
-        {stageWith(!askBar && pickPanel)}
+        {stageWith(
+          <>
+            {!askBar && pickPanel}
+            {band}
+          </>,
+        )}
         <div class="term-dock">
           {askBar}
           {observeBar}
@@ -1044,7 +1109,17 @@ interface ComposerProps {
   closeFirst?: () => Promise<boolean>
   /** A window shows: ↑, ↓ and Enter in an empty box go to it; true when one went (pickers design §14 #45). */
   onPickKey?: (k: PickKey) => boolean
+  /** Claude Code's mode, on a PC: a button of the box's row sends Shift+Tab (claude-input design §3.3). */
+  mode?: Mode | null
+  onMode?: () => void
+  /** The terminal's own box holds text: the next send follows it (claude-input design §3.2). */
+  boxNote?: boolean
+  /** Hears when the box sends and stops. */
+  onSending?: (busy: boolean) => void
 }
+
+/** What the box says when the terminal's own box holds text (claude-input design §3.2). */
+const BOX_NOTE = '터미널 입력칸에 글이 있습니다 — 보내면 그 뒤에 이어 붙습니다'
 
 /** What the box says when the window would not close, and nothing went. */
 const STUCK = '창이 닫히지 않아 보내지 않았습니다'
@@ -1055,11 +1130,12 @@ const STUCK = '창이 닫히지 않아 보내지 않았습니다'
  * question, it presses Esc first and sends once the question is gone; over a
  * window Mori knows, it closes the window first in the same way (design §6.8).
  */
-function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, closeFirst, onPickKey }: ComposerProps) {
+function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, closeFirst, onPickKey, mode, onMode, boxNote, onSending }: ComposerProps) {
   const h = useHost()
   const draft = draftKey(h.id, addr)
   const [text, setText] = useState(() => loadDraft(draft))
   const [busy, setBusy] = useState(false)
+  useEffect(() => onSending?.(busy), [busy])
   const [held, setHeld] = useState(false)
   const [stuck, setStuck] = useState(false)
   const [caret, setCaret] = useState<number | null>(null) // null: the box does not have the focus
@@ -1223,6 +1299,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
         </div>
       )}
       {stuck && <p class="term-held">{STUCK}</p>}
+      {boxNote && <p class="term-held term-boxnote">{BOX_NOTE}</p>}
       <form
         class="term-send"
         onSubmit={(e) => {
@@ -1230,6 +1307,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
           void submit(text, rejecting)
         }}
       >
+        {mode && onMode && <ModeButton mode={mode} onPress={onMode} class="btn term-mode" />}
         <label class="sr-only" for={field}>
           {rejecting ? '거절하고 대신 보낼 글' : '터미널에 여러 줄 보내기'}
         </label>

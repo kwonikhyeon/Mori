@@ -97,6 +97,20 @@ describe('the stylesheets', () => {
     expect(phoneRules(sheets['../views/terminal.css']).get('.term-pick-row')).toMatch(/min-height: 44px/)
   })
 
+  // Claude Code's status band lies over the terminal's rows it stands for,
+  // at the picker panel's layer (claude-input design §3.3, spec §3 #223).
+  it('lay the status band over the terminal', () => {
+    const css = new Map(rules(sheets['../views/terminal.css']).map(([sel, body]) => [sel, body]))
+    expect(css.get('.term-cover')).toMatch(/position: absolute;/)
+    expect(css.get('.term-cover')).toMatch(/z-index: 4;/)
+    expect(css.get('.term-cover')).toMatch(/background-color: var\(--color-background-surface\);/)
+    // a row of chips scrolls sideways rather than wrap into the rows below
+    expect(css.get('.term-cover-row')).toMatch(/overflow-x: auto;/)
+    expect(css.get('.term-cover-row')).toMatch(/white-space: nowrap;/)
+    // the phone's mode button is a finger's height
+    expect(phoneRules(sheets['../views/terminal.css']).get('.term-cover-mode')).toMatch(/min-height: 44px/)
+  })
+
   // The send box starts at the height of its button and grows with its text,
   // the button staying at its foot (spec §3 #222).
   it('start the send box at the height of its button', () => {

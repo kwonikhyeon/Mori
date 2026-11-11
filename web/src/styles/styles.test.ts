@@ -97,6 +97,18 @@ describe('the stylesheets', () => {
     expect(phoneRules(sheets['../views/terminal.css']).get('.term-pick-row')).toMatch(/min-height: 44px/)
   })
 
+  // A row's label and the line below it wrap, where a list's row elsewhere
+  // ends in "…": a permission's scope must read whole on a phone (pickers design §14 #41).
+  it("let a picker row's label wrap, so a permission's scope shows whole", () => {
+    const css = new Map<string, string>()
+    for (const [sel, body] of rules(sheets['../views/terminal.css']))
+      for (const one of sel.split(',')) css.set(one.trim(), (css.get(one.trim()) ?? '') + body)
+    for (const sel of ['.term-pick-row .qrow-title', '.term-pick-row .qrow-sub']) {
+      expect(css.get(sel), sel).toMatch(/white-space: normal;/)
+      expect(css.get(sel), sel).toMatch(/overflow-wrap: anywhere;/)
+    }
+  })
+
   // With a window's list in a phone's approval bar, Esc is the one key left of
   // four: it shares the row of 거절하고 지시, at a finger's height.
   it("give Esc the row of 거절하고 지시 when a phone's approval bar holds a list", () => {

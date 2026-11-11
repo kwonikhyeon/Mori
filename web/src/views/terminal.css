@@ -530,6 +530,17 @@ a.term-back {
   font: inherit;
 }
 
+/* A row's label and the line below it wrap, where a list's row elsewhere
+   ends in "…": a permission's scope, a path, reads whole on a phone (pickers
+   design §14 #41). */
+.term-pick-row .qrow-title,
+.term-pick-row .qrow-sub {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .term-pick-row:disabled {
   opacity: .5;
 }

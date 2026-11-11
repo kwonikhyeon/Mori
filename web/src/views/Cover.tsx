@@ -26,6 +26,9 @@ export interface BoxReading {
 
 const NONE: BoxReading = { box: null, row: -1, alternate: false, end: true, mode: null }
 
+/** A box with no mode line under it: Claude Code's default mode (pickers design §9.5). */
+const DEFAULT_MODE: Mode = { name: '', label: '기본', extras: [] }
+
 /** Reads Claude Code's input box at the bottom of the screen as it changes. */
 export function useBox({ screen, ready, on }: { screen: { current: Screen | null }; ready: unknown; on: boolean }): BoxReading {
   const [reading, setReading] = useState(NONE)
@@ -43,7 +46,8 @@ export function useBox({ screen, ready, on }: { screen: { current: Screen | null
       frame = null
       const shot = s.shot(DEPTH)
       const box = readBox(shot)
-      if (box?.mode) mode.current = box.mode
+      // a box read with no mode line is the default mode; with no box the last one stays
+      if (box) mode.current = box.mode ?? DEFAULT_MODE
       const next: BoxReading = {
         box,
         row: box ? box.top - shot.view : -1,
@@ -141,7 +145,7 @@ export function StatusBand({
         ) : p.kind === 'bar' ? (
           <div key={i} class="term-cover-row term-cover-meter">
             <span class="term-cover-name">{p.name}</span>
-            <span class="bar" role="progressbar" aria-label={p.name} aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.percent}>
+            <span class="bar" role="progressbar" aria-label={p.name || '상태 막대'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.percent}>
               <span style={{ width: `${p.percent}%` }} />
             </span>
             <span class="term-cover-pct">{p.percent}%</span>

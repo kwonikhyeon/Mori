@@ -85,8 +85,7 @@ export function readBox(shot: Shot): BoxLook | null {
   const inks: string[] = []
   for (let y = top + 1; y < bottom; y++) {
     const cells = shot.lines[y]
-    let from = y === top + 1 ? cells.indexOf('❯') + 2 : 2
-    if (from < 0) from = 0
+    const from = y === top + 1 ? cells.indexOf('❯') + 2 : 2
     lines.push(cells.slice(from).join('').trimEnd())
     cells.forEach((c, x) => {
       if (x >= from && c !== ' ' && c !== '') inks.push(shot.ink[y]?.[x] ?? '')

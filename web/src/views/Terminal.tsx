@@ -1177,6 +1177,12 @@ interface ComposerProps {
 /** What the box says when the terminal's own box holds text (claude-input design §3.2). */
 const BOX_NOTE = '터미널 입력칸에 글이 있습니다 — 보내면 그 뒤에 이어 붙습니다'
 
+/** A prompt's start as read out: its first line, up to 60 letters. */
+function brief(text: string): string {
+  const line = text.split('\n')[0]
+  return line.length > 60 || line !== text ? `${line.slice(0, 60)}…` : line
+}
+
 /** What the box says when the window would not close, and nothing went. */
 const STUCK = '창이 닫히지 않아 보내지 않았습니다'
 
@@ -1330,8 +1336,8 @@ function Composer({
     setStuck(false)
     moveTo.current = v.length
     setCaret(v.length)
-    // the empty box come back to says nothing
-    if (v) announce(v)
+    // the empty box come back to says nothing; a long prompt is read out by its start
+    if (v) announce(brief(v))
   }
   const paste = (e: ClipboardEvent) => {
     const cd = e.clipboardData

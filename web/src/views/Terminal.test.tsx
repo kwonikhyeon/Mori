@@ -1836,6 +1836,19 @@ describe('pickers', () => {
       expect(sent('/api/terminals/t1/prompts', 'GET')).toEqual([])
     })
 
+    // a long prompt, or one of many lines, is read out by its start
+    it('reads out the start of a long recalled prompt', async () => {
+      const long = '가'.repeat(70)
+      record([`${long}\n둘째 줄`])
+      const { ws } = await mount()
+      await attach(ws)
+      const box = textbox()
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      await vi.waitFor(() => expect(box.value).toBe(`${long}\n둘째 줄`))
+      await frame()
+      expect(said()).toBe(`${'가'.repeat(60)}…`)
+    })
+
     it('falls back to what was sent here', async () => {
       record([], 'none')
       const { ws } = await mount()
@@ -1887,6 +1900,21 @@ describe('pickers', () => {
       // on a PC the mode is a button of the box's row
       const mode = screen.getByRole('button', { name: '모드: 묻지 않음' })
       expect(mode.closest('.term-compose')).not.toBeNull()
+    })
+
+    // with no mode line the mode is the default one (pickers design §9.5)
+    it('reads a box with no mode line as the default mode', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE.replace('  ⏵⏵ bypass permissions on · 1 shell\n', ''))
+      expect(screen.getByRole('button', { name: '모드: 기본' })).toBeTruthy()
+    })
+
+    it('names a bar with no name for a screen reader', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE.replace('  current ○○○○○○○○○○   6% ⟳ 4:00오전', '  ○○○○○○○○○○   6%'))
+      expect(within(band()!).getAllByRole('progressbar')[0].getAttribute('aria-label')).toBe('상태 막대')
     })
 
     it('sends shift+tab from the mode button', async () => {

@@ -4,7 +4,7 @@ import { FakeScreen } from '../../test/fakeScreen'
 import { FakeWebSocket } from '../../test/fakeWs'
 import { folder, status, term } from '../../test/fixtures'
 import { inHost, withHost } from '../../test/scopes'
-import { SCREENS } from '../../test/screens'
+import { cursorAt, SCREENS } from '../../test/screens'
 import { now } from '../lib/clock'
 import { resetPickPref, setPickOn } from '../lib/pickpref'
 import { route } from '../lib/router'
@@ -1149,5 +1149,136 @@ describe('pickers', () => {
     const p = screen.getByRole('region', { name: TITLE })
     expect(p.parentElement?.classList.contains('term-dock')).toBe(true)
     expect(p.parentElement?.firstElementChild).toBe(p)
+  })
+
+  describe('pressing a window', () => {
+    const DOWN = '\x1b[B'
+    const BTW =
+      '/btw 빗금 목록은 어디서 읽어?\n\n빗금 목록은 서버가 주는 명령 목록을 읽습니다.\n' +
+      '입력창에서 빗금을 치면 그 목록에서 고릅니다.\n고른 명령은 입력창에 들어갑니다.'
+    const keys = () => sent('/api/terminals/t1/keys').map((c) => c.body)
+    const toasted = () => toasts.value.map((t) => [t.text, t.kind])
+    const bar = () => screen.getByRole('region', { name: '승인 대기 — 골라서 응답' })
+    const clipboard = (writeText: (text: string) => Promise<void>) => {
+      vi.stubGlobal('isSecureContext', true)
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true })
+    }
+
+    afterEach(() => {
+      delete (navigator as { clipboard?: unknown }).clipboard
+      delete (document as { execCommand?: unknown }).execCommand
+    })
+
+    it('blocked: a number carries expect', async () => {
+      const { ws } = await mount(blockedTerm())
+      await attach(ws)
+      await show(SCREENS.permission)
+      fireEvent.click(rowsOf(bar())[1])
+      await vi.waitFor(() => expect(keys()).toEqual([{ keys: ['2'], expect: ASK }]))
+      // not down the stream, where it could land on the next question
+      expect(ws.input()).toEqual([])
+    })
+
+    it('blocked: moves go without expect', async () => {
+      const { ws } = await mount(blockedTerm())
+      await attach(ws)
+      await show(SCREENS['long-list'])
+      fireEvent.click(within(bar()).getByRole('button', { name: '아래 화살표' }))
+      await vi.waitFor(() => expect(keys()).toEqual([{ keys: ['down'] }]))
+      expect(ws.input()).toEqual([])
+    })
+
+    it('blocked: item 10 moves, sees, then Enter', async () => {
+      const { ws } = await mount(blockedTerm())
+      await attach(ws)
+      await show(SCREENS['long-list'])
+      fireEvent.click(rowsOf(bar())[9])
+      await vi.waitFor(() => expect(keys()).toEqual([{ keys: Array(9).fill('down') }]))
+      // no Enter until the cursor shows on it
+      await frame()
+      expect(keys()).toHaveLength(1)
+      await show(cursorAt(SCREENS['long-list'], 10))
+      await vi.waitFor(() => expect(keys()).toEqual([{ keys: Array(9).fill('down') }, { keys: ['enter'], expect: ASK }]))
+      expect(ws.input()).toEqual([])
+    })
+
+    it('not blocked: arrows, then Enter once the cursor lands', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      fireEvent.click(rowsOf(panel()!)[2])
+      await vi.waitFor(() => expect(ws.input()).toEqual([DOWN + DOWN]))
+      // one press at a time: the buttons are off until it ends
+      await frame()
+      expect(rowsOf(panel()!).every((b) => b.disabled)).toBe(true)
+      await show(cursorAt(SCREENS.model, 3))
+      await vi.waitFor(() => expect(ws.input()).toEqual([DOWN + DOWN, '\r']))
+      expect(keys()).toEqual([])
+      await vi.waitFor(() => expect(rowsOf(panel()!).every((b) => !b.disabled)).toBe(true))
+      expect(toasted()).toEqual([])
+    })
+
+    it('not blocked: a hint sends its key down the stream', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      fireEvent.click(within(panel()!).getByRole('button', { name: '노력 높이기' }))
+      await vi.waitFor(() => expect(ws.input()).toEqual(['\x1b[C']))
+      await vi.waitFor(() => expect(hintsOf(panel()!).every((b) => !b.disabled)).toBe(true))
+      fireEvent.click(within(panel()!).getByRole('button', { name: '닫기' }))
+      await vi.waitFor(() => expect(ws.input()).toEqual(['\x1b[C', '\x1b']))
+      expect(keys()).toEqual([])
+    })
+
+    it('sends nothing when the list changed', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      const rows = rowsOf(panel()!)
+      // the screen moved on, and the panel has not drawn it yet
+      act(() => FakeScreen.last().show(cursorAt(SCREENS.model, 2)))
+      fireEvent.click(rows[2])
+      await vi.waitFor(() => expect(toasted()).toEqual([['목록이 바뀌어 고르지 않았습니다', 'error']]))
+      expect(ws.input()).toEqual([])
+      expect(keys()).toEqual([])
+    })
+
+    it('no landing, no Enter', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.model)
+      fireEvent.click(rowsOf(panel()!)[2])
+      await vi.waitFor(() => expect(ws.input()).toEqual([DOWN + DOWN]))
+      // the cursor never shows on item 3
+      await frame(1500) // SEE_MS
+      await vi.waitFor(() => expect(toasted()).toEqual([['목록이 바뀌어 고르지 않았습니다', 'error']]))
+      expect(ws.input()).toEqual([DOWN + DOWN])
+    })
+
+    it('copies what the screen shows', async () => {
+      const writeText = vi.fn(async (_text: string) => undefined)
+      clipboard(writeText)
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.btw)
+      fireEvent.click(within(panel()!).getByRole('button', { name: '복사' }))
+      await vi.waitFor(() => expect(toasted()).toEqual([['화면에 보이는 부분만 복사했습니다', 'info']]))
+      expect(writeText.mock.calls).toEqual([[BTW]])
+      // Mori copies it: no key goes to the terminal
+      expect(ws.input()).toEqual([])
+      expect(keys()).toEqual([])
+    })
+
+    it('says when it could not copy', async () => {
+      clipboard(async () => {
+        throw new Error('refused')
+      })
+      Object.defineProperty(document, 'execCommand', { value: () => false, configurable: true })
+      const { ws } = await mount()
+      await attach(ws)
+      await show(SCREENS.btw)
+      fireEvent.click(within(panel()!).getByRole('button', { name: '복사' }))
+      await vi.waitFor(() => expect(toasted()).toEqual([['복사하지 못했습니다', 'error']]))
+    })
   })
 })

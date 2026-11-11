@@ -16,12 +16,15 @@ import { Menu, type MenuItem } from '../components/Menu'
 import { ApiError } from '../lib/api'
 import type { Closed, Size } from '../lib/attach'
 import { now } from '../lib/clock'
+import { copyText } from '../lib/copy'
 import { draftKey, loadDraft, saveDraft } from '../lib/drafts'
 import { fitSize } from '../lib/fit'
 import { watchFocus } from '../lib/focus'
 import { appName, askText, chip, endText, place, type EndFacts } from '../lib/format'
+import type { Hint } from '../lib/hints'
 import { useChordSubmit } from '../lib/ime'
-import { isMod, NO_MODS, QUICK_KEYS, strayBytes } from '../lib/keys'
+import { isMod, namedBytes, NO_MODS, QUICK_KEYS, strayBytes } from '../lib/keys'
+import { choose as chooseItem, tap, type Press } from '../lib/pickpress'
 import { pickOn } from '../lib/pickpref'
 import { isApple } from '../lib/platform'
 import { closeNotes, noteTag } from '../lib/push'
@@ -489,9 +492,61 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     />
   )
 
-  // A choice and a hint's key are sent from the panel's next step (plan Task 6).
-  const choose = () => {}
-  const hint = () => {}
+  // A press on the window's list or its hint keys (pickers design §6.5).
+  // While the server names the question, every key goes through it, in
+  // order: the keys that answer carry expect, the keys that move do not
+  // (spec §3 #194). Otherwise they go down the stream, as typing does.
+  const sendKeys = async (names: string[], final: boolean) => {
+    if (ask) {
+      await h.api.terminals.keys(addr, names, final ? ask : undefined)
+      return
+    }
+    const app = screen.current?.appCursor() ?? false
+    const bytes = names.map((n) => namedBytes(n, app))
+    if (bytes.every((b) => b !== null) && link?.send(bytes.join(''))) return
+    await h.api.terminals.keys(addr, names)
+  }
+  const press: Press = {
+    now: pick.now,
+    wait: pick.wait,
+    move: (names) => sendKeys(names, false),
+    answer: (name) => sendKeys([name], true),
+  }
+  // One press at a time, as with the approval bar's keys.
+  const run = (go: () => Promise<boolean>) => {
+    if (answering) return
+    setAnswering(true)
+    go()
+      .then((ok) => {
+        if (!ok) toast('목록이 바뀌어 고르지 않았습니다', 'error')
+      }, fail('키를 보내지 못했습니다'))
+      .finally(() => {
+        setAnswering(false)
+        toEnd()
+      })
+  }
+  const choose = (n: number) => {
+    if (seen) run(() => chooseItem(press, seen, n, blocked))
+  }
+  // k, not h: h is the host
+  const hint = (k: Hint) => {
+    if (!seen) return
+    if (!k.copy) {
+      run(() => tap(press, seen, k))
+      return
+    }
+    // Mori copies what the window shows at the press, read off the screen (design §6.7).
+    const l = pick.now()
+    const body = l.seen?.id === seen.id ? l.seen.body : null
+    if (body === null) {
+      toast('복사하지 못했습니다', 'error')
+      return
+    }
+    void copyText(body).then((ok) => {
+      if (ok) toast('화면에 보이는 부분만 복사했습니다')
+      else toast('복사하지 못했습니다', 'error')
+    })
+  }
   const askBar = blocked && t && (
     <AskBar
       t={t}
@@ -516,7 +571,9 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     />
   )
   // A window the program is not blocked on stands where the approval bar would.
-  const pickPanel = seen && <PickPanel id={id} seen={seen} cap={pick.cap} disabled={observing || pick.stale} onChoose={choose} onHint={hint} />
+  const pickPanel = seen && (
+    <PickPanel id={id} seen={seen} cap={pick.cap} disabled={observing || pick.stale || answering} onChoose={choose} onHint={hint} />
+  )
   const observeBar = observing && active && <ObserveBar onOff={() => observe(false)} />
   const endBar = finished && <EndBar t={t} ended={ended} onRemove={() => void remove()} />
   const composer = canType && (

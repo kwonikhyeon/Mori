@@ -41,12 +41,28 @@ describe('shotOf', () => {
     expect(s.top).toBe(t.buffer.active.baseY + 2)
   })
 
-  it('gives fewer lines than asked', async () => {
+  it('gives fewer lines than asked, and none of the blank rows below', async () => {
     const t = term(20, 4)
     await write(t, 'one\r\ntwo')
     const s = shotOf(t, 40)
-    expect(s.lines).toHaveLength(4)
+    expect(s.lines).toHaveLength(2)
     expect(s.top).toBe(t.buffer.active.baseY)
     expect(s.lines[1].join('').trimEnd()).toBe('two')
+  })
+
+  it('ends at the last line written, as a program that draws from the top leaves the rows below blank', async () => {
+    const t = term(20, 60)
+    await write(t, Array.from({ length: 8 }, (_, i) => `line ${i}`).join('\r\n'))
+    const s = shotOf(t, 5)
+    expect(s.lines.map((l) => l.join('').trimEnd())).toEqual(['line 3', 'line 4', 'line 5', 'line 6', 'line 7'])
+    expect(s.top).toBe(t.buffer.active.baseY + 3)
+  })
+
+  it('reads a blank screen as blank, from the live top', async () => {
+    const t = term(20, 4)
+    await write(t, '')
+    const s = shotOf(t, 40)
+    expect(s.top).toBe(t.buffer.active.baseY)
+    expect(s.lines.every((l) => l.join('').trim() === '')).toBe(true)
   })
 })

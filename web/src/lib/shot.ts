@@ -16,11 +16,16 @@ export interface Shot {
   lines: string[][]
 }
 
-/** The last n lines of the live screen, whatever the view is scrolled to. */
+/**
+ * The last n lines of the live screen up to its last written line, whatever
+ * the view is scrolled to. A program that draws from the top of a tall screen
+ * (Claude Code, fresh or after /clear) leaves the rows below it blank.
+ */
 export function shotOf(term: Pick<Terminal, 'buffer' | 'rows' | 'cols'>, n: number): Shot {
   const b = term.buffer.active
-  const top = b.baseY + Math.max(0, term.rows - n)
-  const end = b.baseY + term.rows
+  let end = b.baseY + term.rows
+  while (end > b.baseY + 1 && !b.getLine(end - 1)?.translateToString(true).trim()) end--
+  const top = Math.max(b.baseY, end - n)
   const lines: string[][] = []
   let cell: IBufferCell | undefined
   for (let y = top; y < end; y++) {

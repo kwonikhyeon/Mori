@@ -24,6 +24,12 @@ export interface Screen {
   setTheme(t: ITheme): void
   /** Whether keys typed into the screen reach the program. */
   setInput(on: boolean): void
+  /**
+   * Whether a touch on the screen may bring up the device's keyboard. xterm
+   * takes a touch's focus itself; off, its field asks for no keyboard
+   * (inputmode="none"), so the view, and the terminal, keep their size.
+   */
+  setKeyboard(on: boolean): void
   focus(): void
   /** Shows the end of the output, where the cursor is. */
   scrollToBottom(): void
@@ -158,6 +164,10 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     appCursor: () => term.modes.applicationCursorKeysMode,
     setTheme: (t) => {
       term.options.theme = t
+    },
+    setKeyboard: (on) => {
+      if (on) term.textarea?.removeAttribute('inputmode')
+      else term.textarea?.setAttribute('inputmode', 'none')
     },
     setInput: (on) => {
       term.options.disableStdin = !on

@@ -21,6 +21,8 @@ export class FakeScreen implements Screen {
   app = false
   theme: ITheme | null = null
   focused = 0
+  /** Whether a touch on the screen may bring up the device's keyboard. */
+  keyboard = true
   /** How often the screen was moved to its end. */
   bottoms = 0
   /** Whether the end of the output is on screen. */
@@ -84,6 +86,10 @@ export class FakeScreen implements Screen {
 
   setInput(on: boolean): void {
     this.input = on
+  }
+
+  setKeyboard(on: boolean): void {
+    this.keyboard = on
   }
 
   focus(): void {

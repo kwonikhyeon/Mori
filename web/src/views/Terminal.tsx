@@ -715,6 +715,10 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   }
   const focusBox = () => document.getElementById(id + '-send')?.focus()
   focusRef.current = focusBox
+  // On a phone a touch on the covered terminal brings up no keyboard (claude-input design §4.1)
+  useEffect(() => {
+    screen.current?.setKeyboard(!(covered && phone))
+  }, [covered, phone, link])
   // On a PC the box takes the focus as the cover comes, from the page or the terminal
   useEffect(() => {
     if (!covered || phone) return

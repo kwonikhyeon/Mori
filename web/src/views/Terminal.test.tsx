@@ -2036,6 +2036,11 @@ describe('pickers', () => {
       fireEvent.click(stage())
       expect(FakeScreen.last().focused).toBe(xterm)
       expect(document.activeElement).not.toBe(textbox())
+      // xterm takes a touch's focus itself: its keyboard stays down, so the terminal keeps its size
+      expect(FakeScreen.last().keyboard).toBe(false)
+      act(() => setBoxShown(true))
+      await frame()
+      expect(FakeScreen.last().keyboard).toBe(true)
     })
 
     it('sends a letter typed on the page to the box, not the terminal', async () => {

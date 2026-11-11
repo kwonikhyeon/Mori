@@ -1788,4 +1788,77 @@ describe('pickers', () => {
       expect(sent('/api/terminals/t1/keys')).toEqual([])
     })
   })
+
+  // ↑ and ↓ call back what was sent in the folder, from Claude Code's record
+  // through the server (claude-input design §5.2, spec §3 #224).
+  describe('the box recalls', () => {
+    const textbox = () => {
+      const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+      box.focus()
+      return box
+    }
+    const record = (texts: string[], source = 'claude') =>
+      (reply = (c) => (c.url.includes('/prompts') ? Response.json({ prompts: texts.map((text, i) => ({ text, at: texts.length - i })), source }) : undefined))
+
+    it('calls back what was sent with ↑, and goes forward with ↓ to what was being written', async () => {
+      record(['둘째', '첫째'])
+      const { ws } = await mount()
+      await attach(ws)
+      const box = textbox()
+      expect(fireEvent.keyDown(box, { key: 'ArrowUp' })).toBe(false)
+      await vi.waitFor(() => expect(box.value).toBe('둘째'))
+      expect(box.selectionStart).toBe(2)
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      await vi.waitFor(() => expect(box.value).toBe('첫째'))
+      fireEvent.keyDown(box, { key: 'ArrowDown' })
+      await vi.waitFor(() => expect(box.value).toBe('둘째'))
+      fireEvent.keyDown(box, { key: 'ArrowDown' })
+      await vi.waitFor(() => expect(box.value).toBe(''))
+      expect(sent('/api/terminals/t1/prompts', 'GET')).toHaveLength(1)
+      await frame()
+      expect(said()).toBe('둘째')
+    })
+
+    it('leaves ↑ to the text, and to a window', async () => {
+      record(['둘째'])
+      const { ws } = await mount()
+      await attach(ws)
+      const box = textbox()
+      fireEvent.input(box, { target: { value: 'a\nb' } })
+      box.setSelectionRange(3, 3)
+      expect(fireEvent.keyDown(box, { key: 'ArrowUp' })).toBe(true)
+      fireEvent.input(box, { target: { value: '' } })
+      await show(SCREENS.model)
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      expect(ws.input()).toEqual(['\x1b[A'])
+      expect(sent('/api/terminals/t1/prompts', 'GET')).toEqual([])
+    })
+
+    it('falls back to what was sent here', async () => {
+      record([], 'none')
+      const { ws } = await mount()
+      await attach(ws)
+      const box = textbox()
+      fireEvent.input(box, { target: { value: '여기서 보낸 글' } })
+      fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+      await vi.waitFor(() => expect(box.value).toBe(''))
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      await vi.waitFor(() => expect(box.value).toBe('여기서 보낸 글'))
+    })
+
+    it('an edit leaves the walk', async () => {
+      record(['둘째', '첫째'])
+      const { ws } = await mount()
+      await attach(ws)
+      const box = textbox()
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      await vi.waitFor(() => expect(box.value).toBe('둘째'))
+      fireEvent.input(box, { target: { value: '둘째!' } })
+      // ↓ no longer walks: the edited send is what is being written
+      expect(fireEvent.keyDown(box, { key: 'ArrowDown' })).toBe(true)
+      fireEvent.input(box, { target: { value: '' } })
+      fireEvent.keyDown(box, { key: 'ArrowUp' })
+      await vi.waitFor(() => expect(box.value).toBe('둘째'))
+    })
+  })
 })

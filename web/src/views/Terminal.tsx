@@ -7,7 +7,7 @@
 // close (#190, #191). An answer names the question it is for (#194), and a
 // question can be turned down with what to do instead (#195).
 import type { ComponentChildren } from 'preact'
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { Chip } from '../components/Chip'
 import { Confirm } from '../components/Confirm'
 import { ConnBanner } from '../components/ConnBanner'
@@ -37,6 +37,7 @@ import { DEFAULT_FONT, fontFor, termFont, type Layout } from '../lib/termfont'
 import { TermLink } from '../lib/termlink'
 import { attachNote, BLOCKED_KEYS, quotePath, type AnswerKey, type AttachNote } from '../lib/termview'
 import { effectiveTheme, terminalTheme } from '../lib/theme'
+import { Recall, rememberSent, sentHere } from '../lib/recall'
 import { isClaude, note as noteSlash } from '../lib/slash'
 import { relTime } from '../lib/time'
 import { toast, toastError } from '../lib/toast'
@@ -1117,6 +1118,8 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
       if (against) await h.api.terminals.reject(addr, value, against)
       else await h.api.terminals.send(addr, value)
       if (claude) noteSlash(value)
+      rememberSent(h.id, addr, value)
+      recall.refresh()
       edit('')
       onReject(null)
       onSent()
@@ -1131,6 +1134,32 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
   // An image pasted into the box goes up beside the terminal, and its path
   // goes where the caret was, for Claude Code to read (spec §3 #220). A paste
   // with text is the text's: a spreadsheet's cells come with a picture too.
+  // ↑ and ↓ call back what was sent in the folder: Claude Code's record, or
+  // else what this device sent (claude-input design §5.2, spec §3 #224)
+  const recall = useMemo(
+    () =>
+      new Recall(async () => {
+        if (claude) {
+          try {
+            const r = await h.api.terminals.prompts(addr)
+            if (r.source === 'claude' && r.prompts.length) return r.prompts.map((p) => p.text)
+          } catch {
+            // what this device sent stands in
+          }
+        }
+        return sentHere(h.id, addr)
+      }),
+    [h, addr, claude],
+  )
+  const recalled = (v: string) => {
+    edit(v)
+    setHeld(false)
+    setStuck(false)
+    moveTo.current = v.length
+    setCaret(v.length)
+    // the empty box come back to says nothing
+    if (v) announce(v)
+  }
   const paste = (e: ClipboardEvent) => {
     const cd = e.clipboardData
     const files = Array.from(cd?.files ?? [])
@@ -1219,6 +1248,7 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
           aria-keyshortcuts={apple ? 'Meta+Enter' : 'Control+Enter'}
           onInput={(e) => {
             edit(e.currentTarget.value)
+            recall.reset()
             setHeld(false)
             setStuck(false)
             track(e)
@@ -1244,6 +1274,25 @@ function Composer({ addr, phone, id, onSent, ask, rejecting, onReject, claude, c
             if (k && onPickKey && free && !e.isComposing && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && onPickKey(k)) {
               e.preventDefault()
               return
+            }
+            // ↑ on the first line calls back an older send; ↓ on the last, while walking, a newer one
+            if (!busy && !e.isComposing && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+              const el = e.currentTarget as HTMLTextAreaElement
+              const c = el.selectionStart
+              const flat = c === el.selectionEnd
+              if (e.key === 'ArrowUp' && flat && !el.value.slice(0, c).includes('\n')) {
+                e.preventDefault()
+                void recall.older(el.value).then((v) => {
+                  if (v !== null) recalled(v)
+                })
+                return
+              }
+              if (e.key === 'ArrowDown' && recall.browsing && flat && !el.value.slice(c).includes('\n')) {
+                e.preventDefault()
+                const v = recall.newer()
+                if (v !== null) recalled(v)
+                return
+              }
             }
             chord.onKeyDown(e)
           }}

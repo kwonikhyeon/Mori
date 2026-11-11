@@ -67,6 +67,7 @@ var proxied = []string{
 	"POST /api/terminals/{t}/files",
 	"GET /api/terminals/{t}/text",
 	"GET /api/terminals/{t}/commands",
+	"GET /api/terminals/{t}/prompts",
 	"GET /api/presets",
 	"PUT /api/presets",
 	"GET /api/push/settings",

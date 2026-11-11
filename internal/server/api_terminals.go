@@ -21,6 +21,7 @@ import (
 	"github.com/kwonikhyeon/mori/internal/commands"
 	"github.com/kwonikhyeon/mori/internal/core"
 	"github.com/kwonikhyeon/mori/internal/hc"
+	"github.com/kwonikhyeon/mori/internal/history"
 	"github.com/kwonikhyeon/mori/internal/store"
 )
 
@@ -396,6 +397,43 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, s.d.Commands.List(r.Context(), cwd))
+}
+
+// handlePrompts gives what was sent to Claude Code in the terminal's folder,
+// newest first, from Claude Code's own record, for the box's ↑ (claude-input
+// design §5.1, spec §3 #226). Nothing read is no error: source "none" tells
+// the browser to use what it sent itself. It does not ask whether Claude
+// Code runs there, as the commands do not: the browser asks for a Claude
+// Code terminal only.
+func (s *Server) handlePrompts(w http.ResponseWriter, r *http.Request) {
+	limit, err := queryInt(r, "limit", 200)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	t, err := s.terminal(r.Context(), terminalParam(r))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	cwd := t.Cwd
+	if t.Foreground != nil && t.Foreground.Cwd != "" {
+		cwd = t.Foreground.Cwd
+	}
+	none := map[string]any{"prompts": []history.Prompt{}, "source": "none"}
+	if strings.Contains(t.Address, "/") || !filepath.IsAbs(cwd) {
+		writeJSON(w, http.StatusOK, none)
+		return
+	}
+	ps, err := history.Read(s.d.ClaudeConfig, cwd, limit)
+	if err != nil {
+		s.log.Warn("Claude Code 기록을 읽지 못함", "err", err)
+	}
+	if len(ps) == 0 {
+		writeJSON(w, http.StatusOK, none)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"prompts": ps, "source": "claude"})
 }
 
 // handleUpload hands one file to the core, which places it beside the

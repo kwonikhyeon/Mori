@@ -59,6 +59,10 @@ type Deps struct {
 	// folder (spec §3 #197). New makes one over Claude Code's config
 	// folder when it is nil.
 	Commands *commands.Lister
+	// ClaudeConfig is Claude Code's config folder, whose history.jsonl the
+	// box's ↑ reads (spec §3 #226). Empty takes $CLAUDE_CONFIG_DIR or
+	// ~/.claude.
+	ClaudeConfig string
 }
 
 // Server routes requests. Build it with New and serve Handler().
@@ -97,6 +101,9 @@ func New(d Deps) *Server {
 	}
 	if d.Commands == nil {
 		d.Commands = commands.New(commands.ConfigDir())
+	}
+	if d.ClaudeConfig == "" {
+		d.ClaudeConfig = commands.ConfigDir()
 	}
 	if d.Names == nil {
 		d.Names = func() []string { return []string{d.PublicURL()} }
@@ -154,6 +161,7 @@ func (s *Server) routes() {
 	api.HandleFunc("POST /api/terminals/{t}/files", s.handleUpload)
 	api.HandleFunc("GET /api/terminals/{t}/text", s.handleText)
 	api.HandleFunc("GET /api/terminals/{t}/commands", s.handleCommands)
+	api.HandleFunc("GET /api/terminals/{t}/prompts", s.handlePrompts)
 	api.HandleFunc("GET /api/presets", s.handleGetPresets)
 	api.HandleFunc("PUT /api/presets", s.handlePutPresets)
 	api.HandleFunc("GET /api/hosts", s.handleGetHosts)

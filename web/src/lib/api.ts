@@ -3,7 +3,7 @@
 // carries the server's message for the screen.
 
 import type {
-  Branches, CommandList, Commit, Device, Diff, FolderView, FsListing, GitStatus, GitSummary, Graph, Hello,
+  Branches, CommandList, Commit, PromptList, Device, Diff, FolderView, FsListing, GitStatus, GitSummary, Graph, Hello,
   Host, Overview, PairCode, Preset, PushKind, PushSettings, PushSubscriptionView, ScreenText, SendResult,
   TerminalView, Upload, Worktree,
 } from './types'
@@ -221,6 +221,8 @@ export function apiFor(prefix: string, onHostError?: (kind: HostError) => void) 
       text: (addr: string, lines?: number) => get<ScreenText>(termPath(addr) + '/text' + query({ lines })),
       /** The slash commands Claude Code takes there (spec §3 #197). */
       commands: (addr: string) => get<CommandList>(termPath(addr) + '/commands'),
+      /** What was sent to Claude Code in the terminal's folder, newest first (spec §3 #226). */
+      prompts: (addr: string, limit?: number) => get<PromptList>(termPath(addr) + '/prompts' + query({ limit })),
     },
 
     presets: {

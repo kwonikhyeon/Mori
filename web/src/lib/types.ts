@@ -268,6 +268,12 @@ export interface SendResult {
   wait?: unknown
 }
 
+/** What was sent in a terminal's folder (spec §3 #226); source "none" when Claude Code's record gave nothing. */
+export interface PromptList {
+  prompts: { text: string; at: number }[]
+  source: 'claude' | 'none'
+}
+
 export interface Upload {
   path: string
   bytes: number

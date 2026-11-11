@@ -24,6 +24,11 @@ describe('hints', () => {
     ])
   })
 
+  // Claude Code's /model: Enter picks the model for new sessions as well.
+  it('names Enter that sets the default', () => {
+    expect(labels('Enter to set as default · s to use this session only · Esc to cancel')).toEqual(['기본으로 정하기', '이 세션만', '닫기'])
+  })
+
   it('leaves out amend and notes', () => {
     expect(labels('Esc to cancel · Tab to amend')).toEqual(['닫기'])
   })

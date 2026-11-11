@@ -254,22 +254,24 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   // With other hosts about, the header says which one the session runs on.
   const hostTag = others.value.length > 0 ? nameOf(h) : ''
 
-  // Claude Code's window at the bottom of the screen, read into a panel in
-  // the approval bar's place (pickers design §6.5). Its room is the stage,
-  // less the scroll box's padding, where no cells go (measure), and what
-  // stands in that place now, as the panel takes its place; of that, the
-  // panel's title and keys take what its list leaves.
+  // Claude Code's window at the bottom of the screen, read into a panel
+  // laid over the terminal (pickers design §6.5, §14 #44), or into the
+  // approval bar under it. The panel's room is the stage. The bar's is the
+  // stage, less the scroll box's padding, where no cells go (measure), and
+  // the bar, as it takes its rows from the terminal. Of either, the title
+  // and keys take what the list leaves.
   const pickSizes = () => {
     const sc = scroll.current
     const cs = sc && getComputedStyle(sc)
     const px = (v: string | undefined) => parseFloat(v ?? '') || 0
-    let total = (stage.current?.clientHeight ?? 0) - px(cs?.paddingTop) - px(cs?.paddingBottom)
+    const whole = stage.current?.clientHeight ?? 0
+    let total = whole - px(cs?.paddingTop) - px(cs?.paddingBottom)
     let chrome = 0
     root.current?.querySelectorAll<HTMLElement>('.term-ask, .term-pick').forEach((el) => {
-      total += el.offsetHeight
+      if (el.classList.contains('term-ask')) total += el.offsetHeight
       chrome += el.offsetHeight - (el.querySelector<HTMLElement>('.term-pick-body')?.offsetHeight ?? 0)
     })
-    return { total, cellH: screen.current?.cell()[1] ?? 0, viewH: window.innerHeight, chrome }
+    return { total, stage: whole, cellH: screen.current?.cell()[1] ?? 0, viewH: window.innerHeight, chrome }
   }
   const pick = usePick({
     screen,
@@ -277,9 +279,17 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     on: !!t && isClaude(t) && pickOn.value && active,
     size: size ? `${size.cols}x${size.rows}` : null,
     place: blocked,
+    over: !blocked,
     measure: pickSizes,
   })
   const seen = pick.seen
+  // A blocked list Claude Code drew cut short stays out of the bar for the
+  // rest of its question: the bar's rows would make it draw whole, then cut
+  // again (design §14 #44).
+  const [cutAsk, setCutAsk] = useState<string | null>(null)
+  useEffect(() => {
+    if (blocked && seen?.partial && cutAsk !== ask) setCutAsk(ask)
+  }, [blocked, seen, ask, cutAsk])
 
   // A question that went or changed takes its rejection with it.
   useEffect(() => {
@@ -388,7 +398,9 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       <h1 class="term-title">{title}</h1>
     )
 
-  const stageEl = (
+  // A window's panel lies over the bottom of the terminal, which keeps its
+  // size (pickers design §14 #44).
+  const stageWith = (over: ComponentChildren) => (
     <div
       ref={stage}
       class={'term-stage' + (drop ? ' is-drop' : '')}
@@ -471,6 +483,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
           여기에 놓으면 올립니다
         </div>
       )}
+      {over}
     </div>
   )
 
@@ -566,8 +579,8 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       rejecting={rejecting !== null}
       onReject={ask ? reject : undefined}
       pick={
-        // a list the terminal cannot spare the room for is left there: the bar answers by its own keys
-        seen && seen.options.length > 0 && pick.cap > 0
+        // a list the terminal cannot spare the room for, or drew cut short, is left there: the bar answers by its own keys
+        seen && seen.options.length > 0 && pick.cap > 0 && !seen.partial && cutAsk !== ask
           ? {
               list: (
                 <div class="term-pick-body" style={{ maxHeight: `${pick.cap}px` }}>
@@ -580,11 +593,11 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       }
     />
   )
-  // A window the program is not blocked on stands where the approval bar
-  // would; where its title and keys alone would cut it, the terminal keeps it.
+  // A window the program is not blocked on lies over the terminal; where its
+  // list cannot show, or the terminal drew it cut short, the terminal keeps it.
   const pickPanel =
     seen &&
-    (pick.cap < 0 ? (
+    (pick.cap < 0 || seen.partial ? (
       <PickKept seen={seen} />
     ) : (
       <PickPanel id={id} seen={seen} cap={pick.cap} disabled={observing || pick.stale || answering} onChoose={choose} onHint={hint} />
@@ -663,8 +676,8 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
             )}
           </div>
         </header>
-        {stageEl}
-        {askBar || pickPanel}
+        {stageWith(!askBar && pickPanel)}
+        {askBar}
         {observeBar}
         {endBar}
         {composer}
@@ -721,9 +734,9 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       </header>
       <ConnBanner class="term-banner" />
       <div class="term-body">
-        {stageEl}
+        {stageWith(!askBar && pickPanel)}
         <div class="term-dock">
-          {askBar || pickPanel}
+          {askBar}
           {observeBar}
           {endBar}
           {canType && <QuickKeys link={link} open={open} />}

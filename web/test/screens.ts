@@ -1,6 +1,8 @@
 // Screens made by hand for the window reader (pickers design §6.3): each file
 // in screens/ is what the bottom of a terminal shows, one line a row, with no
 // text from a real conversation. They are 80 cells wide; narrow-40 is 40.
+// Vitest keeps this module, the list of files with it, in its module cache
+// (node_modules/.vitest-cache): a new file shows after `npx vitest --clearCache`.
 
 import type { Shot } from '../src/lib/shot'
 import { toCells } from './cells'

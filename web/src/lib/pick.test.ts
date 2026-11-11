@@ -52,6 +52,41 @@ describe('look', () => {
     expect(buttons(SCREENS.model)).toEqual(['고르기', '노력 낮추기', '노력 높이기', '이 세션만', '닫기'])
   })
 
+  // Claude Code's own /model: a rule of ▔ over it, a row without a number
+  // below its items (More models), and lines between them and its hint line.
+  it("reads Claude Code's model window", () => {
+    const s = seen(SCREENS['model-cc'])!
+    expect(s.title).toBe('Select model Switch between Claude models. Your pick becomes the default for new sessions.')
+    expect(s.options.map((o) => o.label)).toEqual(['Default (recommended)', 'Opus 5.5', 'Fable 5.2', 'Sonnet 5.5', 'Haiku 5.5'])
+    expect(s.cursor).toBe(2)
+    expect(s.options[1].mark).toBe('current')
+    // the row without a number below them is no item's description
+    expect(s.options[4].desc).toBe('Fastest for quick answers')
+    expect(s.partial).toBe(false)
+    expect(buttons(SCREENS['model-cc'])).toEqual(['기본으로 정하기', '이 세션만', '닫기'])
+    // from its title, not the rule over it, to its hint line
+    expect(s.rows).toBe(15)
+  })
+
+  // On a terminal too short for the whole list, Claude Code shows some of its
+  // items and how many more there are, and scrolls them with ↑ and ↓ beside
+  // the numbers: the window is read, and known to show part of its list.
+  it('knows a list Claude Code cut short', () => {
+    const s = seen(SCREENS['model-cc-short'])!
+    expect(s.options.map((o) => o.n)).toEqual([1, 2])
+    expect(s.partial).toBe(true)
+    const t = seen(SCREENS['model-cc-scrolled'])!
+    expect(t.options).toEqual([])
+    expect(t.partial).toBe(true)
+    expect(t.hints.map((h) => h.label)).toEqual(['기본으로 정하기', '이 세션만', '닫기'])
+  })
+
+  it('does not take what an answer folds above a window for a list cut short', () => {
+    const above = '⏺ Bash(ls)\n  ⎿  a\n     … +12 lines (ctrl+o to expand)\n\n'
+    expect(seen(above + join(lines(SCREENS['model-cc']).slice(2)))!.partial).toBe(false)
+    expect(seen(SCREENS.model)!.partial).toBe(false)
+  })
+
   it('reads a long list', () => {
     const s = seen(SCREENS['long-list'])!
     expect(s.title).toBe('Pick a color theme')
@@ -239,6 +274,6 @@ describe('look', () => {
       expect(shotOf(t, rows).lines, name).toEqual(toShot(text, cols, 'normal').lines)
       t.dispose()
     }
-    expect(Object.keys(SCREENS)).toHaveLength(12)
+    expect(Object.keys(SCREENS)).toHaveLength(15)
   })
 })

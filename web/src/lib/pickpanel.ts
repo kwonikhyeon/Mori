@@ -74,3 +74,19 @@ export function capOf(total: number, cellH: number, rows: number, viewH: number,
   const room = Math.min(viewH / 2, left)
   return room < MIN_CAP ? 0 : Math.round(room)
 }
+
+/**
+ * The height of the list of a panel laid over the terminal, which keeps its
+ * size (design §14 #44): what the stage holds beside the panel's title and
+ * keys (chrome), at most half the view. A list that cannot show MIN_CAP of
+ * itself shows no panel (NO_ROOM), as a panel without its list would hide
+ * the window it stands for; the terminal shows it. A window with no list
+ * takes 0 while its title and keys fit. MIN_CAP while nothing was measured.
+ */
+export function overCap(stage: number, viewH: number, chrome: number, listed: boolean): number {
+  if (stage <= 0) return MIN_CAP
+  const left = stage - chrome
+  if (!listed) return left < 0 ? NO_ROOM : 0
+  const room = Math.min(viewH / 2, left)
+  return room < MIN_CAP ? NO_ROOM : Math.round(room)
+}

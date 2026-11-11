@@ -1034,20 +1034,20 @@ describe('pickers', () => {
     expect(rows[1].querySelector('.term-pick-mark')).toBeNull()
     expect(hintsOf(p).map((b) => b.textContent)).toEqual(['고르기', '노력 낮추기', '노력 높이기', '이 세션만', '닫기'])
     expect([...rows, ...hintsOf(p)].every((b) => !b.disabled)).toBe(true)
-    // in the approval bar's place, under the terminal, and scrolled inside its cap
-    expect(p.previousElementSibling?.classList.contains('term-stage')).toBe(true)
+    // laid over the bottom of the terminal, which keeps its size, and scrolled inside its cap
+    expect(p.parentElement?.classList.contains('term-stage')).toBe(true)
     expect(p.querySelector<HTMLElement>('.term-pick-body')?.style.maxHeight).toBe('120px')
     await frame()
     expect(said()).toBe(`고르는 목록: ${TITLE}`)
   })
 
-  it('caps the list at what the terminal can spare beside the panel\'s title and keys', async () => {
+  it("caps the list at what the stage holds beside the panel's title and keys", async () => {
     layOut({ 'term-stage': 300, 'term-pick': 200, 'term-pick-body': 100 })
     const { ws } = await mount()
     await attach(ws)
     await show(SCREENS.model)
-    // the stage and the panel, 300 + 200, less the window's 9 rows and the box's 2 of 17px, less the panel's own 200 − 100
-    expect(capIn('.term-pick')).toBe('213px')
+    // the stage, less the panel's own 200 − 100: the terminal keeps its rows under the panel
+    expect(capIn('.term-pick')).toBe('200px')
   })
 
   it('takes the cap again when the approval bar takes the window', async () => {
@@ -1055,8 +1055,8 @@ describe('pickers', () => {
     const { ws } = await mount()
     await attach(ws)
     await show(SCREENS.permission)
-    // 300 + 200 − 17 × (6 + 2) − (200 − 100)
-    expect(capIn('.term-pick')).toBe('264px')
+    // 300 − (200 − 100)
+    expect(capIn('.term-pick')).toBe('200px')
     // the approval bar is 60px taller, and the stage gives them up
     px['term-stage'] = 240
     act(() => load([blockedTerm()]))
@@ -1065,20 +1065,26 @@ describe('pickers', () => {
     expect(capIn('.term-ask')).toBe('204px')
   })
 
-  it('leaves the list out when the terminal cannot spare its room', async () => {
+  // A panel without its list would hide the window it stands for: where the
+  // list cannot show, no panel shows, and the terminal shows the window.
+  it('shows no panel where its list cannot show, and comes as the stage grows', async () => {
     const px = layOut({ 'term-stage': 150, 'term-pick': 140, 'term-pick-body': 100 })
     const { ws } = await mount()
     await attach(ws)
     await show(SCREENS.model)
-    // 150 + 140 − 17 × (9 + 2) − (140 − 100) is under MIN_CAP: the keys alone, and the list on the terminal
-    const p = screen.getByRole('region', { name: TITLE })
-    expect(p.querySelector('.term-pick-body')).toBeNull()
-    expect(hintsOf(p).map((b) => b.textContent)).toEqual(['고르기', '노력 낮추기', '노력 높이기', '이 세션만', '닫기'])
-    // the terminal grows, as a phone's keyboard goes down: the list comes back
+    // 150 − (140 − 100) is under MIN_CAP
+    expect(panel()).toBeNull()
+    // a send still closes the window first
+    expect(screen.getByRole('button', { name: '닫고 보내기' })).toBeTruthy()
+    await frame()
+    // read out once, and that it is answered on the terminal
+    expect(said()).toBe(`고르는 목록: ${TITLE} 자리가 모자라 터미널에서 고릅니다`)
+    // the stage grows, as a phone's keyboard goes down: the panel comes, with its list
     px['term-stage'] = 400
     await act(() => ws.json({ type: 'size', cols: 80, rows: 30 }))
     await frame()
-    expect(capIn('.term-pick')).toBe('213px')
+    // 400 − 40
+    expect(capIn('.term-pick')).toBe('360px')
   })
 
   it('answers a blocked list by the keys when the terminal cannot spare its room', async () => {
@@ -1092,39 +1098,9 @@ describe('pickers', () => {
     expect(document.querySelector('.term-pick, .term-pick-row')).toBeNull()
   })
 
-  // The panel's title and keys take their room from the terminal too, list or
-  // no list: where they alone would cut the window, no panel shows, and the
-  // window stays whole on the terminal (design §6.4).
-  it('shows no panel where its title and keys alone would cut the window', async () => {
-    const view = { h: 200 }
-    layOut({
-      // the stage has what the panel leaves of the view
-      'term-stage': () => view.h - (panel()?.offsetHeight ?? 0),
-      'term-pick': (el) => 40 + (el.querySelector('.term-pick-body') ? 100 : 0),
-      'term-pick-body': 100,
-    })
-    const { ws } = await mount()
-    await attach(ws)
-    await show(SCREENS.model)
-    // 200 − 17 × (9 + 2) − 40 is under 0
-    expect(panel()).toBeNull()
-    // a send still closes the window first
-    expect(screen.getByRole('button', { name: '닫고 보내기' })).toBeTruthy()
-    await frame()
-    // read out once, and that it is answered on the terminal; the title ends its own sentence
-    expect(said()).toBe(`고르는 목록: ${TITLE} 자리가 모자라 터미널에서 고릅니다`)
-    // the view grows, as a phone's keyboard goes down: the panel comes, with its list
-    view.h = 400
-    await act(() => ws.json({ type: 'size', cols: 80, rows: 30 }))
-    await frame()
-    // 400 − 17 × (9 + 2) − 40
-    expect(capIn('.term-pick')).toBe('173px')
-  })
-
   it('ends the title of a window the terminal kept with a period', async () => {
-    const view = { h: 200 }
     layOut({
-      'term-stage': () => view.h - (panel()?.offsetHeight ?? 0),
+      'term-stage': 100,
       'term-pick': (el) => 40 + (el.querySelector('.term-pick-body') ? 100 : 0),
       'term-pick-body': 100,
     })
@@ -1137,9 +1113,8 @@ describe('pickers', () => {
   })
 
   it('measures a window by its own title and keys after one the terminal kept', async () => {
-    const view = { h: 240 }
     layOut({
-      'term-stage': () => view.h - (panel()?.offsetHeight ?? 0),
+      'term-stage': 200,
       // 20px for the title, and 20px for each key
       'term-pick': (el) => 20 + 20 * el.querySelectorAll('.term-pick-hints button').length + (el.querySelector('.term-pick-body') ? 100 : 0),
       'term-pick-body': 100,
@@ -1147,28 +1122,61 @@ describe('pickers', () => {
     const { ws } = await mount()
     await attach(ws)
     await show(SCREENS.model)
-    // /model's five keys: 240 − 17 × (9 + 2) − 120 is under 0
+    // /model's five keys: 200 − 120 is under MIN_CAP
     expect(panel()).toBeNull()
     await show(SCREENS.idle)
     await show(SCREENS.permission)
-    // its own two keys, not /model's five: 240 − 17 × (6 + 2) − 60 leaves room for its title and keys, though not for its list
-    const p = panel()!
-    expect(p).not.toBeNull()
-    expect(p.querySelector('.term-pick-body')).toBeNull()
-    expect(hintsOf(p).map((b) => b.textContent)).toEqual(['닫기', 'Ctrl+E · explain'])
+    // its own two keys, not /model's five: 200 − 60
+    expect(capIn('.term-pick')).toBe('140px')
+    expect(hintsOf(panel()!).map((b) => b.textContent)).toEqual(['닫기', 'Ctrl+E · explain'])
   })
 
-  // The screen's cells sit inside the scroll box's padding: it is no room for the window's rows.
-  it('leaves the terminal its padding beside the window', async () => {
-    layOut({ 'term-stage': 300, 'term-pick': 200, 'term-pick-body': 100 })
-    const { ws } = await mount()
+  // The bar stands under the terminal, which gives it rows; the screen's
+  // cells sit inside the scroll box's padding, which is no room for the
+  // window's rows.
+  it('leaves the terminal its padding beside a blocked window', async () => {
+    layOut({ 'term-stage': 300, 'term-ask': 260, 'term-pick-body': 100 })
+    const { ws } = await mount(blockedTerm())
     await attach(ws)
     const sc = document.querySelector<HTMLElement>('.term-scroll')!
     sc.style.paddingTop = '12px'
     sc.style.paddingBottom = '16px'
-    await show(SCREENS.model)
-    // 300 + 200 − (12 + 16) − 17 × (9 + 2) − (200 − 100)
-    expect(capIn('.term-pick')).toBe('185px')
+    await show(SCREENS.permission)
+    // 300 − (12 + 16) + 260 − 17 × (6 + 2) − (260 − 100)
+    expect(capIn('.term-ask')).toBe('236px')
+  })
+
+  // Claude Code draws only part of a list on a terminal too short for it
+  // (… +4 models): a panel would show that part, over the terminal's.
+  it('shows no panel for a list Claude Code cut short', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    await show(SCREENS['model-cc-short'])
+    expect(panel()).toBeNull()
+    expect(screen.getByRole('button', { name: '닫고 보내기' })).toBeTruthy()
+    await frame()
+    expect(said()).toBe('고르는 목록: Select model Switch between Claude models. Your pick becomes the default for new sessions. 자리가 모자라 터미널에서 고릅니다')
+    // drawn whole, it shows
+    await show(SCREENS['model-cc'])
+    expect(titles(panel()!)).toEqual(['Default (recommended)', 'Opus 5.5', 'Fable 5.2', 'Sonnet 5.5', 'Haiku 5.5'])
+  })
+
+  // The bar takes rows from the terminal, where Claude Code may draw the list
+  // again cut short: the bar answers by its own keys for the rest of the
+  // question, so that its height does not go back and forth.
+  it('keeps a blocked list cut short out of the bar for its question', async () => {
+    const { ws } = await mount(blockedTerm())
+    await attach(ws)
+    await show(SCREENS['model-cc'])
+    expect(document.querySelectorAll('.term-ask .term-pick-row')).toHaveLength(5)
+    await show(SCREENS['model-cc-short'])
+    expect(screen.getByRole('region', { name: '승인 대기 — 키로 응답' })).toBeTruthy()
+    await show(SCREENS['model-cc'])
+    expect(document.querySelector('.term-ask .term-pick-row')).toBeNull()
+    // another question takes its list again
+    act(() => load([term({ status: status('blocked', { kind: 'permission', msg: '다른 질문' }), ask: '4.0badc0de' })]))
+    await frame()
+    expect(document.querySelectorAll('.term-ask .term-pick-row')).toHaveLength(5)
   })
 
   it('shows nothing while idle', async () => {
@@ -1199,13 +1207,13 @@ describe('pickers', () => {
     expect(panel()).not.toBeNull()
   })
 
-  it('does not flap through its own resize', async () => {
+  it('does not flap through a redraw', async () => {
     const { ws } = await mount()
     await attach(ws)
     await show(SCREENS.model)
     await frame()
     expect(said()).toBe(`고르는 목록: ${TITLE}`)
-    // the panel took rows from the terminal, which redraws smaller and shows no window for a moment
+    // the terminal redraws at a new size and shows no window for a moment
     await act(() => ws.json({ type: 'size', cols: 80, rows: 20 }))
     await show(half)
     const p = screen.getByRole('region', { name: TITLE })
@@ -1219,28 +1227,43 @@ describe('pickers', () => {
     expect(said()).toBe('')
   })
 
-  it('holds a lasting cut until the box shows', async () => {
+  // The panel lies over the terminal and resizes nothing: a window lost
+  // after a resize is not its doing, and shows again when drawn again.
+  it('does not hold a window lost after a resize', async () => {
     const { ws } = await mount()
     await attach(ws)
     await show(SCREENS.model)
-    // shown a while: only the panel's own resize makes the loss its doing
     await frame(2000)
     await act(() => ws.json({ type: 'size', cols: 80, rows: 20 }))
     await show(half)
-    expect(panel()).not.toBeNull()
     await frame(1000) // SETTLE_MS
     expect(panel()).toBeNull()
-    // the same window again would only be cut once more
-    await show(SCREENS.model)
-    expect(panel()).toBeNull()
-    // the input box ends the hold
-    await show(SCREENS.idle)
     await show(SCREENS.model)
     expect(screen.getByRole('region', { name: TITLE })).toBeTruthy()
   })
 
-  // The panel cut the terminal, which redraws the window from its top down
-  // with its title cut off: the window is the same (design §6.4).
+  // The approval bar takes rows from the terminal: a list lost after its
+  // resize is likely its doing, and stays out of it until the box shows.
+  it("holds a blocked list lost after the bar's resize until the box shows", async () => {
+    const { ws } = await mount(blockedTerm())
+    await attach(ws)
+    await show(SCREENS.permission)
+    const rows = () => document.querySelectorAll('.term-ask .term-pick-row').length
+    expect(rows()).toBe(3)
+    await frame(2000)
+    await act(() => ws.json({ type: 'size', cols: 80, rows: 20 }))
+    await show(SCREENS.permission.split('\n').slice(0, 3).join('\n') + '\n')
+    await frame(1000) // SETTLE_MS
+    expect(rows()).toBe(0)
+    await show(SCREENS.permission)
+    expect(rows()).toBe(0)
+    await show(SCREENS.idle)
+    await show(SCREENS.permission)
+    expect(rows()).toBe(3)
+  })
+
+  // A resize redraws the window from its top down,
+  // its title cut off for a moment: the window is the same (design §6.4).
   it('keeps the title of a window its redraw cuts', async () => {
     const { ws } = await mount()
     await attach(ws)
@@ -1350,13 +1373,13 @@ describe('pickers', () => {
     expect(document.querySelector('.term-pick, .term-pick-row')).toBeNull()
   })
 
-  it('puts the panel at the top of the dock on a phone', async () => {
+  it('lays the panel over the terminal on a phone', async () => {
     const { ws } = await mount(undefined, { variant: 'phone', back: '#/folders' })
     await attach(ws)
     await show(SCREENS.model)
     const p = screen.getByRole('region', { name: TITLE })
-    expect(p.parentElement?.classList.contains('term-dock')).toBe(true)
-    expect(p.parentElement?.firstElementChild).toBe(p)
+    expect(p.parentElement?.classList.contains('term-stage')).toBe(true)
+    expect(document.querySelector('.term-dock .term-pick')).toBeNull()
   })
 
   describe('pressing a window', () => {
@@ -1532,9 +1555,8 @@ describe('pickers', () => {
     it('closes a window held out of the panel before it sends', async () => {
       const { ws } = await mount()
       await attach(ws)
+      // lost as soon as it showed: held
       await show(SCREENS.model)
-      await frame(2000)
-      await act(() => ws.json({ type: 'size', cols: 80, rows: 20 }))
       await show(half)
       await frame(1000) // SETTLE_MS
       await show(SCREENS.model)

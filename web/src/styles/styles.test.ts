@@ -97,6 +97,17 @@ describe('the stylesheets', () => {
     expect(phoneRules(sheets['../views/terminal.css']).get('.term-pick-row')).toMatch(/min-height: 44px/)
   })
 
+  // A Claude Code window's panel lies over the terminal: one that took the
+  // terminal's rows would have Claude Code draw its list cut short (pickers
+  // design §14 #44). Its place in the z-index ladder is 4.
+  it('lay the picker panel over the terminal, which keeps its size', () => {
+    const css = new Map(rules(sheets['../views/terminal.css']).map(([sel, body]) => [sel, body]))
+    expect(css.get('.term-pick')).toMatch(/position: absolute;/)
+    expect(css.get('.term-pick')).toMatch(/z-index: 4;/)
+    expect(css.get('.term-pick')).toMatch(/background-color: var\(--color-background-surface\);/)
+    for (const [sel, body] of css) if (/\.term-pick$/.test(sel) && sel !== '.term-pick') expect(body, sel).not.toMatch(/position: (?:static|relative)|background-color: transparent/)
+  })
+
   // A row's label and the line below it wrap, where a list's row elsewhere
   // ends in "…": a permission's scope must read whole on a phone (pickers design §14 #41).
   it("let a picker row's label wrap, so a permission's scope shows whole", () => {

@@ -37,6 +37,12 @@ export interface Seen {
   body: string
   /** From the window's first line to its hint line. */
   rows: number
+  /**
+   * The terminal is too short for the whole list: Claude Code shows some of
+   * its items, how many more there are ("… +4 models"), and scrolls them with
+   * ↑ and ↓ beside the numbers. The options are what it shows.
+   */
+  partial: boolean
 }
 
 export interface Box {
@@ -70,6 +76,8 @@ const LAST = 3
 const ITEM = /^(\s*)(❯\s+)?(\d{1,2})\.\s+(\S.*)$/
 const ENDS = '─╭╮╰╯┌┐└┘├┤'
 const TAB = /^[←☐☒☑✔◯]/
+// A list cut short: how many items more, or ↑ and ↓ where the cursor goes
+const CUT = /^\s*(?:…\s*\+\d+\s|[↑↓]\s+\d{1,2}\.\s)/
 
 /**
  * Each line's letters: a box drawn from the middle of the screen (a
@@ -106,6 +114,12 @@ function isRule(t: string, cols: number): boolean {
   if (!s || !ENDS.includes(s[0]) || !ENDS.includes(s[s.length - 1])) return false
   const dashes = [...s].filter((c) => c === '─').length
   return dashes >= 20 && dashes >= cols / 2
+}
+
+/** The rule of ▔ that Claude Code draws over a window filling the screen's width. */
+function isTop(t: string, cols: number): boolean {
+  const s = t.trim()
+  return s.length >= 20 && s.length >= cols / 2 && /^▔+$/.test(s)
 }
 
 /** The input box: a rule, a line that starts with ❯, and the next rule below. */
@@ -220,7 +234,7 @@ function titleAt(texts: string[], first: number, cols: number): { text: string; 
   let top = first
   for (; i >= 0 && got.length < TITLE; i--) {
     const t = texts[i].trim()
-    if (!t || isRule(texts[i], cols) || TAB.test(t)) break
+    if (!t || isRule(texts[i], cols) || isTop(texts[i], cols) || TAB.test(t)) break
     got.unshift(t.replace(/[│╭╮╰╯─]/g, '').trim())
     top = i
   }
@@ -250,6 +264,7 @@ function fnv(s: string): string {
 }
 
 function make(id: string, form: string, title: string, options: Option[], cursor: number, texts: string[], top: number, h: HintBlock): Seen {
+  const drawn = texts.slice(top, h.s)
   return {
     id,
     form,
@@ -260,6 +275,7 @@ function make(id: string, form: string, title: string, options: Option[], cursor
     hints: readHints(h.parts),
     body: clean(texts.slice(top, h.s)),
     rows: h.e - top + 1,
+    partial: drawn.some((t) => CUT.test(t)),
   }
 }
 
@@ -291,7 +307,7 @@ function hinted(texts: string[], cols: number, box: [number, number] | null): Se
   const h = hintAt(texts, 0, lit[Math.max(0, lit.length - LAST)])
   if (!h) return null
   let r = h.s - 1
-  while (r >= 0 && !isRule(texts[r], cols)) r--
+  while (r >= 0 && !isRule(texts[r], cols) && !isTop(texts[r], cols)) r--
   if (r < 0) return null
   return make(fnv(h.text), fnv('hint\0' + h.text), '', [], 0, texts, r + 1, h)
 }

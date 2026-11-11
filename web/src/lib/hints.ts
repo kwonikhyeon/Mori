@@ -98,6 +98,7 @@ const SELECT = /^(?:select|confirm|choose|submit)\b/
 const CLOSE = /^(?:cancel|exit|close|dismiss)\b/
 const COPY = /^copy\b/
 const SESSION = /\bthis session only\b/
+const DEFAULT = /^set as (?:the )?default\b/
 const DANGER = /^(?:delete|remove|clear|discard)\b/
 const NAVIGATE = /^navigate\b/
 const SCROLL = /^scroll\b/
@@ -127,6 +128,8 @@ export function readHints(parts: HintPart[]): Hint[] {
     else if (CLOSE.test(a)) out.push(button('닫기', keys.includes('esc') ? 'esc' : keys[0]))
     else if (COPY.test(a)) out.push({ ...button('복사', keys[0]), copy: true })
     else if (SESSION.test(a)) out.push(button('이 세션만', keys[0]))
+    // Claude Code's /model: Enter picks the model for new sessions as well
+    else if (DEFAULT.test(a) && keys.includes('enter')) out.push(button('기본으로 정하기', 'enter'))
     else if (DANGER.test(a)) last.push(...keys.map((k) => ({ ...button(`${shown(k)} · ${action}`, k), danger: true })))
     else out.push(...keys.map((k) => each(k, a, action)))
   }

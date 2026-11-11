@@ -1,6 +1,6 @@
 // The panel of a Claude Code window (pickers design §6.4, §6.5): the
-// numbered list and the hint line's keys as buttons, in the approval bar's
-// place under the terminal. It reads the screen, never the bytes, and sends
+// numbered list and the hint line's keys as buttons, laid over the bottom of
+// the terminal, which keeps its size (§14 #44), or in the approval bar. It reads the screen, never the bytes, and sends
 // nothing itself: a choice and a key go to the hooks of the terminal view.
 // The list is astryx's List and Item in Mori's joined rows (.qrows); the
 // keys are secondary buttons.
@@ -11,7 +11,7 @@ import { Icon } from '../components/Icon'
 import { announce } from '../lib/announce'
 import type { Hint } from '../lib/hints'
 import { DEPTH, look, NOTHING, type Look, type Option, type Seen } from '../lib/pick'
-import { capOf, MIN_CAP, next, NO_PANEL, restart, SETTLE_MS, type Panel } from '../lib/pickpanel'
+import { capOf, MIN_CAP, next, NO_PANEL, overCap, restart, SETTLE_MS, type Panel } from '../lib/pickpanel'
 import { reach } from '../lib/pickpress'
 import type { Screen } from '../lib/xterm'
 import './lists.css'
@@ -30,8 +30,14 @@ export interface PickOptions {
   size: unknown
   /** Changes when the window moves between its panel and the approval bar, whose own parts differ. */
   place: unknown
-  /** The heights the list's cap comes from, in px; chrome is the panel's own, its list left out. */
-  measure: () => { total: number; cellH: number; viewH: number; chrome: number }
+  /** The window's panel lies over the terminal, which keeps its size; the approval bar takes its rows. */
+  over: boolean
+  /**
+   * The heights the list's cap comes from, in px: total is the terminal's and
+   * the bar's, stage the stage the panel lies over, and chrome the panel's or
+   * the bar's own, its list left out.
+   */
+  measure: () => { total: number; stage: number; cellH: number; viewH: number; chrome: number }
 }
 
 export interface PickState {
@@ -53,13 +59,15 @@ export interface PickState {
 }
 
 /** Reads the window at the bottom of the terminal as the screen changes. */
-export function usePick({ screen, ready, on, size, place, measure }: PickOptions): PickState {
+export function usePick({ screen, ready, on, size, place, over, measure }: PickOptions): PickState {
   const [panel, setPanel] = useState<Panel>(NO_PANEL)
   // the cap, and the window and place it was taken for
   const [fit, setFit] = useState({ cap: MIN_CAP, of: '' })
   const cur = useRef(panel)
   const sizes = useRef(measure)
   sizes.current = measure
+  const lying = useRef(over)
+  lying.current = over
   // the title and keys last measured, for a window drawn with none
   const chrome = useRef(0)
 
@@ -103,9 +111,9 @@ export function usePick({ screen, ready, on, size, place, measure }: PickOptions
     }
   }, [ready, on])
 
-  // the panel's height resized the terminal: a window that goes now may be its doing
+  // the bar's height resized the terminal: a window that goes now may be its doing; a panel over it resizes nothing
   useEffect(() => {
-    apply(restart(cur.current, Date.now()))
+    if (!lying.current) apply(restart(cur.current, Date.now()))
   }, [size])
 
   const wait = (test: (l: Look) => boolean, ms: number) =>
@@ -139,7 +147,7 @@ export function usePick({ screen, ready, on, size, place, measure }: PickOptions
     const m = sizes.current()
     // with no panel drawn, its title and keys as they were last
     if (m.chrome > 0) chrome.current = m.chrome
-    const c = capOf(m.total, m.cellH, seen.rows, m.viewH, chrome.current)
+    const c = lying.current ? overCap(m.stage, m.viewH, chrome.current, seen.options.length > 0) : capOf(m.total, m.cellH, seen.rows, m.viewH, chrome.current)
     setFit((f) => (f.cap === c && f.of === of ? f : { cap: c, of }))
   }
   // The cap is taken once the window's panel is drawn, as its title and keys
@@ -299,7 +307,8 @@ export function PickPanel({
     announce(spoken(seen))
   }, [seen.form, seen.title])
   return (
-    <section class="term-pick" aria-labelledby={head}>
+    // a press stays in the panel: the stage under it would give the terminal the focus, and a phone its keyboard
+    <section class="term-pick" aria-labelledby={head} onClick={(e) => e.stopPropagation()}>
       <h2 id={head} class="term-pick-title">
         {title}
       </h2>

@@ -483,17 +483,25 @@ a.term-back {
 }
 
 /* ---------- a Claude Code window, read into a panel ---------- */
-/* What the program draws at the bottom of its screen, in the approval bar's
-   place (pickers design §6.5): a title, its list as astryx's List (.qrows,
-   the cursor's row selected) and its keys as secondary buttons. Neutral, as
+/* What the program draws at the bottom of its screen (pickers design §6.5):
+   a title, its list as astryx's List (.qrows, the cursor's row selected) and
+   its keys as secondary buttons. It lies over the bottom of the terminal,
+   which keeps its size, as Claude Code draws a list cut short on a terminal
+   made shorter (§14 #44); it covers the window it stands for. Neutral, as
    nothing is blocked on it; when the program is, the same list and keys sit
-   in the approval bar. */
+   in the approval bar. Above the terminal's own parts (2–3) and under the
+   slash list (20). */
 .term-pick {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 4;
   display: flex;
-  flex: none;
   flex-direction: column;
   gap: var(--spacing-2);
+  max-height: 100%;
   padding: var(--spacing-3) var(--spacing-4);
+  overflow-y: auto;
   border-top: 1px solid var(--color-border);
   background-color: var(--color-background-surface);
 }
@@ -508,7 +516,7 @@ a.term-back {
   white-space: nowrap;
 }
 
-/* The list scrolls inside its cap (usePick); the terminal keeps the rest. */
+/* The list scrolls inside its cap (usePick): the stage beside the title and keys. */
 .term-pick-body {
   position: relative;
   flex: none;
@@ -599,9 +607,7 @@ a.term-back {
 }
 
 .term-phone .term-pick {
-  padding: 0;
-  border: 0;
-  background-color: transparent;
+  padding: var(--spacing-3);
 }
 
 .term-phone .term-pick-title {

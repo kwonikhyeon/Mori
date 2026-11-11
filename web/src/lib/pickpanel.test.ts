@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cursorAt, SCREENS, toShot } from '../../test/screens'
 import { look, NOTHING, type Look } from './pick'
-import { capOf, MIN_CAP, next, NO_PANEL, NO_ROOM, restart, SETTLE_MS, type Panel } from './pickpanel'
+import { capOf, MIN_CAP, next, NO_PANEL, NO_ROOM, overCap, restart, SETTLE_MS, type Panel } from './pickpanel'
 
 const at = (name: string): Look => look(toShot(SCREENS[name]))
 const model = at('model')
@@ -191,5 +191,27 @@ describe('capOf', () => {
     // the title and keys leave the terminal the window's rows and the box's two, to the pixel
     expect(capOf(17 * 12 + 100, 17, 10, 900, 100)).toBe(0)
     expect(capOf(17 * 12 + 99, 17, 10, 900, 100)).toBe(NO_ROOM)
+  })
+})
+
+// The panel lies over the terminal, which keeps its size (pickers design
+// §14 #44): a redraw at a size of its own would cut Claude Code's list.
+describe('overCap', () => {
+  it('gives the list what the stage holds beside the title and keys, at most half the view', () => {
+    // nothing measured yet
+    expect(overCap(0, 768, 0, true)).toBe(MIN_CAP)
+    expect(overCap(300, 768, 100, true)).toBe(200)
+    expect(overCap(1000, 600, 100, true)).toBe(300)
+  })
+
+  // A panel without its list would hide the window it stands for: the terminal shows it.
+  it('shows no panel where the list cannot show', () => {
+    expect(overCap(150, 768, 40, true)).toBe(NO_ROOM)
+    expect(overCap(160, 768, 40, true)).toBe(MIN_CAP)
+  })
+
+  it('lays a window with no list over the stage while its title and keys fit', () => {
+    expect(overCap(100, 768, 40, false)).toBe(0)
+    expect(overCap(30, 768, 40, false)).toBe(NO_ROOM)
   })
 })

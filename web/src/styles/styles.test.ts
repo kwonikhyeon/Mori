@@ -89,6 +89,32 @@ describe('the stylesheets', () => {
   it('make a picker row a touch target on a phone', () => {
     expect(phoneRules(sheets['../views/terminal.css']).get('.term-pick-row')).toMatch(/min-height: 44px/)
   })
+
+  // With a window's list in a phone's approval bar, Esc is the one key left of
+  // four: it shares the row of 거절하고 지시, at a finger's height.
+  it("give Esc the row of 거절하고 지시 when a phone's approval bar holds a list", () => {
+    const css = new Map(rules(sheets['../views/terminal.css']).map(([sel, body]) => [sel, body]))
+    expect(css.get('.term-ask-grid.is-pick .term-ask-reject')).toMatch(/grid-column: 2 \/ -1;/)
+    expect(css.get('.term-ask-grid.is-pick .term-ask-key')).toMatch(/height: var\(--mori-size-touch\);/)
+  })
+
+  // A column that wraps is as wide as its widest part (a row's title that does
+  // not wrap, say), and its stretched parts run past its edge: a rule that turns
+  // a wrapping row into a column says flex-wrap itself (the phone's approval bar).
+  it('keep a row they turn into a column from wrapping, so its parts stay inside it', () => {
+    const all = Object.entries(sheets).flatMap(([file, css]) => rules(css).map(([sel, body]) => ({ file, sel, body })))
+    const wraps = all.filter((r) => /flex-wrap:\s*wrap/.test(r.body)).flatMap((r) => r.sel.split(',').map((s) => ({ s: s.trim(), r })))
+    const loose = all.flatMap((r) =>
+      /flex-direction:\s*column/.test(r.body) && !/flex-wrap:/.test(r.body)
+        ? r.sel
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => wraps.some((w) => w.r !== r && (s === w.s || s.endsWith(' ' + w.s))))
+            .map((s) => `${r.file} ${s}`)
+        : [],
+    )
+    expect(loose).toEqual([])
+  })
 })
 
 // The astryx guideline (AGENTS.md, spec §3 #201): every value comes from tokens.css.

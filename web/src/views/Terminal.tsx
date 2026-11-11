@@ -848,7 +848,7 @@ function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick }: AskBar
           </p>
         </div>
         {pick?.list}
-        <div class="term-ask-grid">{keys}</div>
+        <div class={'term-ask-grid' + (pick ? ' is-pick' : '')}>{keys}</div>
         {pick?.hints}
       </section>
     )

@@ -1169,6 +1169,18 @@ describe('pickers', () => {
     expect(panel()).toBeNull()
   })
 
+  // A phone's bar has four keys a row, 1, 2, 3 and Esc; with the list in the
+  // bar, Esc is the one left, and takes the row of 거절하고 지시.
+  it("puts Esc on the row of 거절하고 지시 when a phone's bar holds the list", async () => {
+    const { ws } = await mount(blockedTerm(), { variant: 'phone', back: '#/folders' })
+    await attach(ws)
+    await show(SCREENS.permission)
+    const ask = screen.getByRole('region', { name: '승인 대기 — 골라서 응답' })
+    const grid = ask.querySelector('.term-ask-grid')!
+    expect([...grid.children].map((b) => b.textContent)).toEqual(['Esc', '거절하고 지시'])
+    expect(grid.classList.contains('is-pick')).toBe(true)
+  })
+
   it('keeps the keys for a blocked hint-only window', async () => {
     const { ws } = await mount(blockedTerm())
     await attach(ws)

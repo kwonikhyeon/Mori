@@ -365,8 +365,11 @@ a.term-back {
   color: var(--color-on-warning);
 }
 
+/* One column, as wide as the bar: wrapping, it would take the width of its
+   widest part, a list row's title that does not wrap. */
 .term-phone .term-ask {
   flex-direction: column;
+  flex-wrap: nowrap;
   align-items: stretch;
   gap: var(--spacing-2);
   padding: 0;
@@ -466,6 +469,17 @@ a.term-back {
   justify-content: center;
   height: 44px;
   border-radius: var(--radius-container);
+}
+
+/* With a window's list in the bar, Esc is the one key left of the four: it
+   takes the row of 거절하고 지시, at a finger's height, not a quarter row of
+   its own. */
+.term-ask-grid.is-pick .term-ask-key {
+  height: var(--mori-size-touch);
+}
+
+.term-ask-grid.is-pick .term-ask-reject {
+  grid-column: 2 / -1;
 }
 
 /* ---------- a Claude Code window, read into a panel ---------- */

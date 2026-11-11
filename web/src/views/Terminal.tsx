@@ -347,7 +347,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   coverRef.current = covered
   const focusRef = useRef(() => {})
   // the box's own insertion, for a path uploaded while the cover is up
-  const pathTo = useRef<((text: string) => void) | null>(null)
+  const pathTo = useRef<((text: string, word?: boolean) => void) | null>(null)
   // text in the terminal's box: what the next send would follow
   const boxNote = boxable && rb.text !== '' && !holding
   useEffect(() => {
@@ -510,7 +510,18 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       }}
       onPasteCapture={(e) => {
         const fs = Array.from(e.clipboardData?.files ?? [])
-        if (!canType || fs.length === 0) return
+        if (!canType) return
+        // with the cover, text pasted on the terminal (xterm holding the focus) goes to the box
+        if (covered && fs.length === 0) {
+          const text = e.clipboardData?.getData('text/plain') ?? ''
+          if (!text) return
+          e.preventDefault()
+          e.stopPropagation()
+          pathTo.current?.(text, false)
+          focusBox()
+          return
+        }
+        if (fs.length === 0) return
         e.preventDefault()
         e.stopPropagation()
         void upload(fs)
@@ -1184,7 +1195,7 @@ interface ComposerProps {
   /** With the cover on a PC: an empty box's Esc and Ctrl+letter go to the terminal; true when one went. */
   onTermKey?: (e: KeyboardEvent) => boolean
   /** Takes the box's insertion of text where the caret is, for paths uploaded with the cover up. */
-  bind?: { current: ((text: string) => void) | null }
+  bind?: { current: ((text: string, word?: boolean) => void) | null }
   /** The grey hint of the terminal's empty box: the box's placeholder, and Tab takes it (claude-input design §6). */
   hint?: string
   /** Where this device keeps what it sends to this terminal: host, address and start. */
@@ -1326,10 +1337,19 @@ function Composer({
     setCaret(a + put.length)
   }
   if (bind) {
-    bind.current = (text) => {
+    // a path goes in as a word; pasted text as it is
+    bind.current = (text, word = true) => {
       const el = box.current
-      const n = latest.current.length
-      insert(text, el?.selectionStart ?? n, el?.selectionEnd ?? n)
+      const cur = latest.current
+      const at = Math.min(el?.selectionStart ?? cur.length, cur.length)
+      const end = Math.min(el?.selectionEnd ?? cur.length, cur.length)
+      if (word) {
+        insert(text, at, end)
+        return
+      }
+      edit(cur.slice(0, at) + text + cur.slice(end))
+      moveTo.current = at + text.length
+      setCaret(at + text.length)
     }
   }
   // An image pasted into the box goes up beside the terminal, and its path

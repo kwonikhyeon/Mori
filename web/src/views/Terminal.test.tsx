@@ -2245,6 +2245,18 @@ describe('pickers', () => {
       expect(ws.input()).toEqual([])
     })
 
+    // xterm may hold the focus (a drag to select): text pasted there goes to the box
+    it('puts text pasted on the terminal into the box', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const getData = (t: string) => (t === 'text/plain' ? '붙인 글' : '')
+      expect(fireEvent.paste(stage(), { clipboardData: { files: [], types: ['text/plain'], getData } })).toBe(false)
+      expect(textbox().value).toBe('붙인 글')
+      expect(document.activeElement).toBe(textbox())
+      expect(ws.input()).toEqual([])
+    })
+
     it('puts the path of a file pasted on the terminal into the box', async () => {
       reply = (c) => (c.url.endsWith('/files') ? Response.json({ path: '/Users/me/dev/Mori/.mori/up/a.png', bytes: 3 }) : undefined)
       const { ws } = await mount()

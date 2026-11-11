@@ -128,11 +128,14 @@ pre,
 /* Read out, not seen. Its box is placed against the nearest positioned one,
    where it would stand unscrolled. So every box that scrolls, and every pane
    that clips, is positioned: one outside would grow, and scroll the whole
-   page when the text is reached (styles.test.ts keeps the scrolling ones). */
+   page when the text is reached (styles.test.ts keeps the scrolling ones).
+   Its margin takes its pixel back: the page's own regions stand below the
+   app, and would make the page a pixel taller than the view. */
 .sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
+  margin: -1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;

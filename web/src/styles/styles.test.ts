@@ -77,6 +77,13 @@ describe('the stylesheets', () => {
     expect(loose).toEqual([])
   })
 
+  // A text read out stands where it would, below the app for the page's own
+  // regions: its 1 px box takes its pixel back, or the page grows a pixel past
+  // the view and scrolls, and WebKit draws a scroll bar beside the app.
+  it('keep a text read out from growing the page by its pixel', () => {
+    expect(rules(sheets['./base.css']).find(([sel]) => sel === '.sr-only')?.[1]).toMatch(/margin: -1px;/)
+  })
+
   // A finger needs 44 px on a phone (the plan's touch targets).
   it('give the small buttons, the segments and the toast close 44 px on a phone', () => {
     const phone = phoneRules(sheets['./ui.css'])

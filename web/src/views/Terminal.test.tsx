@@ -6,7 +6,7 @@ import { folder, status, term } from '../../test/fixtures'
 import { inHost, withHost } from '../../test/scopes'
 import { CHAT, cursorAt, SCREENS } from '../../test/screens'
 import { now } from '../lib/clock'
-import { resetBoxPref } from '../lib/coverpref'
+import { resetBoxPref, setBoxShown } from '../lib/coverpref'
 import { resetPickPref, setPickOn } from '../lib/pickpref'
 import { route } from '../lib/router'
 import { resetSeen, seenMarks } from '../lib/seen'
@@ -2086,6 +2086,48 @@ describe('pickers', () => {
       fireEvent.paste(stage(), { clipboardData: { files, types: ['Files'], getData: () => '' } })
       await vi.waitFor(() => expect(textbox().value).toBe('/Users/me/dev/Mori/.mori/up/a.png '))
       expect(ws.input()).toEqual([])
+    })
+  })
+
+  // The grey hint of the terminal's empty box shows in Mori's box, and Tab
+  // takes it (claude-input design §6, spec §3 #225).
+  describe('the hint', () => {
+    const IDLE = SCREENS['box-idle']
+    const HINT = 'describe a task for a new session'
+    const textbox = () => screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+    // the sample's ❯ line (its fourth) with the hint in grey after "❯ "
+    const hinted = async () => {
+      act(() => FakeScreen.last().show(IDLE.replace('\n❯ \n', `\n❯ ${HINT}\n`), 'alternate', (y, x) => (y === 3 && x >= 2 ? 'rgb:153,153,153' : '')))
+      await frame()
+    }
+
+    it('shows the hint in the box, and Tab takes it', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const plain = textbox().placeholder
+      expect(plain).toMatch(/^여러 줄로 보내기 · /)
+      await hinted()
+      const box = textbox()
+      expect(box.placeholder).toBe(`${HINT} · Tab`)
+      // still covered: a hint is no text
+      expect(screen.queryByRole('region', { name: 'Claude Code 상태' })).not.toBeNull()
+      box.focus()
+      expect(fireEvent.keyDown(box, { key: 'Tab' })).toBe(false)
+      expect(box.value).toBe(HINT)
+      expect(box.selectionStart).toBe(HINT.length)
+      // with text Tab is the box's own, and the hint goes from the placeholder
+      expect(fireEvent.keyDown(box, { key: 'Tab' })).toBe(true)
+      await show(IDLE)
+      expect(textbox().placeholder).toBe(plain)
+    })
+
+    it('shows the hint while the terminal shows its own box', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      act(() => setBoxShown(true))
+      await hinted()
+      expect(textbox().placeholder).toBe(`${HINT} · Tab`)
     })
   })
 })

@@ -755,6 +755,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       onSending={setSending}
       onTermKey={covered && !phone ? termKey : undefined}
       bind={pathTo}
+      hint={claudeOn && rb && rb.text === '' ? rb.hint : ''}
     />
   )
 
@@ -1154,6 +1155,8 @@ interface ComposerProps {
   onTermKey?: (e: KeyboardEvent) => boolean
   /** Takes the box's insertion of text where the caret is, for paths uploaded with the cover up. */
   bind?: { current: ((text: string) => void) | null }
+  /** The grey hint of the terminal's empty box: the box's placeholder, and Tab takes it (claude-input design §6). */
+  hint?: string
 }
 
 /** What the box says when the terminal's own box holds text (claude-input design §3.2). */
@@ -1185,6 +1188,7 @@ function Composer({
   onSending,
   onTermKey,
   bind,
+  hint,
 }: ComposerProps) {
   const h = useHost()
   const draft = draftKey(h.id, addr)
@@ -1387,7 +1391,13 @@ function Composer({
           readOnly={busy}
           {...slash.aria}
           placeholder={
-            rejecting ? '대신 할 일을 적으세요' : phone ? '여러 줄로 보내기' : `여러 줄로 보내기 · ${apple ? '⌘Enter' : 'Ctrl+Enter'}`
+            rejecting
+              ? '대신 할 일을 적으세요'
+              : hint
+                ? `${hint} · Tab`
+                : phone
+                  ? '여러 줄로 보내기'
+                  : `여러 줄로 보내기 · ${apple ? '⌘Enter' : 'Ctrl+Enter'}`
           }
           aria-keyshortcuts={apple ? 'Meta+Enter' : 'Control+Enter'}
           onInput={(e) => {
@@ -1421,6 +1431,12 @@ function Composer({
             }
             if (onTermKey && text === '' && !e.isComposing && onTermKey(e)) {
               e.preventDefault()
+              return
+            }
+            // Tab in an empty box takes the terminal's hint (claude-input design §6)
+            if (e.key === 'Tab' && hint && text === '' && !busy && !e.isComposing && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+              e.preventDefault()
+              recalled(hint)
               return
             }
             // ↑ on the first line calls back an older send; ↓ on the last, while walking, a newer one

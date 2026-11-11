@@ -109,7 +109,7 @@ function prepare(lines: string[][]): string[] {
 
 const indent = (t: string) => t.length - t.trimStart().length
 
-function isRule(t: string, cols: number): boolean {
+export function isRule(t: string, cols: number): boolean {
   const s = t.trim()
   if (!s || !ENDS.includes(s[0]) || !ENDS.includes(s[s.length - 1])) return false
   const dashes = [...s].filter((c) => c === '─').length
@@ -123,7 +123,7 @@ function isTop(t: string, cols: number): boolean {
 }
 
 /** The input box: a rule, a line that starts with ❯, and the next rule below. */
-function inputBox(texts: string[], cols: number): [number, number] | null {
+export function inputBox(texts: string[], cols: number): [number, number] | null {
   for (let i = texts.length - 2; i >= 0; i--) {
     if (!isRule(texts[i], cols) || !texts[i + 1].startsWith('❯')) continue
     for (let j = i + 2; j < texts.length; j++) if (isRule(texts[j], cols)) return [i, j]

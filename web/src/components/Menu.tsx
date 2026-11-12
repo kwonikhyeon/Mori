@@ -1,7 +1,7 @@
 // A button that opens a list of actions (the WAI-ARIA menu button): the
 // arrows move between the items, Escape and the back key close and give
 // the focus back, Tab and a press elsewhere close.
-import type { ComponentChildren } from 'preact'
+import { Fragment, type ComponentChildren } from 'preact'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Icon, type IconName } from './Icon'
 import { useLayer } from './useLayer'
@@ -14,7 +14,20 @@ export interface MenuItem {
   danger?: boolean
   /** Makes the item a checkbox that says whether it is on, or one choice of the radio items. */
   checked?: boolean
+  /** The heading of the run of items it belongs to (astryx DropdownMenuGroup); a line parts the runs. */
+  group?: string
   onSelect: () => void
+}
+
+/** Items in runs of one group, in their order. */
+function runs(items: MenuItem[]): { group?: string; items: MenuItem[] }[] {
+  const out: { group?: string; items: MenuItem[] }[] = []
+  for (const it of items) {
+    const last = out.at(-1)
+    if (last && last.group === it.group) last.items.push(it)
+    else out.push({ group: it.group, items: [it] })
+  }
+  return out
 }
 
 export interface MenuProps {
@@ -89,6 +102,22 @@ export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass =
     it.onSelect()
   }
 
+  const row = (it: MenuItem) => (
+    <button
+      key={it.key ?? it.label}
+      type="button"
+      tabIndex={-1}
+      role={it.checked === undefined ? 'menuitem' : radio ? 'menuitemradio' : 'menuitemcheckbox'}
+      aria-checked={it.checked}
+      class={'menu-item' + (it.danger ? ' is-danger' : '')}
+      onClick={() => pick(it)}
+    >
+      {it.icon && <Icon name={it.icon} size={18} />}
+      <span class="menu-label">{it.label}</span>
+      {it.checked && <Icon name="check" size={16} class="menu-check" />}
+    </button>
+  )
+
   return (
     <div class="menu" ref={box}>
       <button
@@ -96,6 +125,7 @@ export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass =
         type="button"
         class={buttonClass}
         aria-label={label}
+        title={label}
         aria-haspopup="menu"
         aria-expanded={!!open}
         aria-controls={open ? id : undefined}
@@ -106,20 +136,21 @@ export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass =
       </button>
       {open && (
         <div id={id} ref={list} role="menu" aria-label={label} class="menu-list" onKeyDown={onListKey}>
-          {items.map((it) => (
-            <button
-              key={it.key ?? it.label}
-              type="button"
-              tabIndex={-1}
-              role={it.checked === undefined ? 'menuitem' : radio ? 'menuitemradio' : 'menuitemcheckbox'}
-              aria-checked={it.checked}
-              class={'menu-item' + (it.danger ? ' is-danger' : '')}
-              onClick={() => pick(it)}
-            >
-              {it.icon && <Icon name={it.icon} size={18} />}
-              <span class="menu-label">{it.label}</span>
-              {it.checked && <Icon name="check" size={16} class="menu-check" />}
-            </button>
+          {/* A titled run is a group its heading names; the heading and the line are no stops for the arrows. */}
+          {runs(items).map((r, i) => (
+            <Fragment key={`${i}:${r.group ?? ''}`}>
+              {i > 0 && <div role="separator" class="menu-sep" />}
+              {r.group ? (
+                <div role="group" aria-labelledby={`${id}-g${i}`} class="menu-group">
+                  <div id={`${id}-g${i}`} class="menu-heading">
+                    {r.group}
+                  </div>
+                  {r.items.map(row)}
+                </div>
+              ) : (
+                r.items.map(row)
+              )}
+            </Fragment>
           ))}
         </div>
       )}

@@ -656,6 +656,32 @@ textarea.input {
   color: var(--color-text-accent);
 }
 
+/* A titled run of items (astryx DropdownMenuGroup): its heading is plain
+   text the arrows skip. */
+.menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-0-5);
+}
+
+.menu-heading {
+  padding: var(--spacing-1) var(--spacing-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  font-weight: var(--text-supporting-weight);
+  line-height: var(--text-supporting-leading);
+  user-select: none;
+}
+
+/* astryx DropdownMenuDivider: a hairline 4 px clear of the runs, the list's
+   gap and its own margin together. */
+.menu-sep {
+  flex: none;
+  height: 1px;
+  margin: var(--spacing-0-5) 0;
+  background-color: var(--color-border);
+}
+
 @media (max-width: 767px) {
   .menu-item {
     min-height: 44px;

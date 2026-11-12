@@ -51,13 +51,14 @@
 }
 
 /* ---------- PC: the toolbar ---------- */
+/* The name and its line over the tools as icons, 8 px clear (spec §3 #234). */
 .term-bar {
   display: flex;
   flex: none;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-2) var(--spacing-4);
-  padding: var(--spacing-3) var(--spacing-4);
+  padding: var(--spacing-2) var(--spacing-4);
   border-bottom: 1px solid var(--color-border);
 }
 

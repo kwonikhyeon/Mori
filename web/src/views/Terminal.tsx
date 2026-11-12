@@ -843,6 +843,13 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   )
 
   if (!phone) {
+    // The tools used most are icons in the bar; the rest wait in 더 보기, a
+    // run for the view and one for the session (spec §3 #234).
+    const more: MenuItem[] = []
+    if (claudeOn) more.push({ label: '터미널 입력칸 보기', icon: 'monitor', group: '보기', checked: boxShown.value, onSelect: () => setBoxShown(!boxShown.value) })
+    if (active) more.push({ label: '보기 전용', icon: 'eye', group: '보기', checked: observing, onSelect: () => observe(!observing) })
+    if (t) more.push({ label: '이름 바꾸기', icon: 'pencil', group: '세션', onSelect: () => setRenaming(true) })
+    if (active) more.push({ label: '중단', icon: 'stop', group: '세션', onSelect: interrupt })
     return (
       <div ref={root} class="term term-pc">
         <header class="term-bar">
@@ -850,57 +857,34 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
             <div class="term-title-row">
               {titleEl}
               {t && !renaming && <Chip info={chip(t)} />}
-              {t && !renaming && (
-                <button type="button" class="btn btn-icon btn-sm btn-ghost" aria-label="이름 바꾸기" title="이름 바꾸기" onClick={() => setRenaming(true)}>
-                  <Icon name="pencil" size={15} />
-                </button>
-              )}
             </div>
             {sub && <p class="term-sub">{hostTag ? `${hostTag} · ${sub}` : sub}</p>}
           </div>
           <div class="term-tools">
             {canType && (
-              <button type="button" class="btn btn-sm" onClick={pickFile}>
-                <Icon name="paperclip" size={15} />
-                파일 올리기
-              </button>
-            )}
-            {claudeOn && (
-              <button type="button" class="btn btn-sm" aria-pressed={boxShown.value} onClick={() => setBoxShown(!boxShown.value)}>
-                <Icon name="monitor" size={15} />
-                터미널 입력칸 보기
-              </button>
-            )}
-            {active && (
-              <button type="button" class="btn btn-sm" aria-pressed={observing} onClick={() => observe(!observing)}>
-                <Icon name="eye" size={15} />
-                보기 전용
+              <button type="button" class="btn btn-icon btn-sm" aria-label="파일 올리기" title="파일 올리기" onClick={pickFile}>
+                <Icon name="paperclip" size={18} />
               </button>
             )}
             {repo && (
               <button
                 type="button"
-                class="btn btn-sm"
+                class="btn btn-icon btn-sm"
+                aria-label="Git"
+                title={git ? 'Git 닫기' : 'Git'}
                 aria-pressed={git}
                 aria-controls={git ? 'pc-aside' : undefined}
                 onClick={() => h.go({ name: 'terminal', addr, git: !git })}
               >
-                <Icon name="git" size={15} />
-                Git
+                <Icon name="git" size={18} />
               </button>
             )}
             {active && (
-              <button type="button" class="btn btn-sm" onClick={interrupt}>
-                <Icon name="stop" size={15} />
-                중단
+              <button type="button" class="btn btn-icon btn-sm btn-danger" aria-label="종료" title="종료" onClick={() => setKilling(true)}>
+                <Icon name="power" size={18} />
               </button>
             )}
-            {active && (
-              <button type="button" class="btn btn-sm btn-danger" onClick={() => setKilling(true)}>
-                <Icon name="power" size={15} />
-                종료
-              </button>
-            )}
+            {more.length > 0 && !renaming && <Menu label="더 보기" items={more} buttonClass="btn btn-icon btn-sm" iconSize={18} />}
           </div>
         </header>
         {stageWith(

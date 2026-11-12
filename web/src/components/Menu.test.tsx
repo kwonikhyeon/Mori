@@ -111,6 +111,42 @@ describe('Menu', () => {
     ])
     expect(screen.getByRole('menuitem', { name: '호스트 관리' })).toBeTruthy()
   })
+
+  // astryx DropdownMenuGroup and DropdownMenuDivider: a run is a group its
+  // heading names, a line parts the runs, and the arrows step over both.
+  it('puts the items of one group under its heading', () => {
+    const none = () => {}
+    render(
+      <Menu
+        label="더 보기"
+        items={[
+          { label: '터미널 입력칸 보기', group: '보기', checked: false, onSelect: none },
+          { label: '보기 전용', group: '보기', checked: true, onSelect: none },
+          { label: '이름 바꾸기', group: '세션', onSelect: none },
+          { label: '중단', group: '세션', onSelect: none },
+        ]}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }))
+    const list = screen.getByRole('menu', { name: '더 보기' })
+    const names = (g: HTMLElement) => [...g.querySelectorAll('[role^="menuitem"]')].map((i) => i.textContent)
+    expect(names(screen.getByRole('group', { name: '보기' }))).toEqual(['터미널 입력칸 보기', '보기 전용'])
+    expect(names(screen.getByRole('group', { name: '세션' }))).toEqual(['이름 바꾸기', '중단'])
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
+    expect(focused()).toBe('터미널 입력칸 보기')
+    fireEvent.keyDown(list, { key: 'ArrowDown' })
+    fireEvent.keyDown(list, { key: 'ArrowDown' })
+    expect(focused()).toBe('이름 바꾸기')
+    fireEvent.keyDown(list, { key: 'ArrowUp' })
+    expect(focused()).toBe('보기 전용')
+  })
+
+  it('draws no heading and no line without groups', () => {
+    menu()
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }))
+    expect(screen.queryByRole('group')).toBeNull()
+    expect(screen.queryByRole('separator')).toBeNull()
+  })
 })
 
 describe('Confirm', () => {

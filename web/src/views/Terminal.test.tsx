@@ -63,6 +63,12 @@ async function attach(ws: FakeWebSocket, cols = 80, rows = 24) {
 /** The names of a menu's items, plain and checkable. */
 const items = (menu: HTMLElement) => [...menu.querySelectorAll('[role^="menuitem"]')].map((i) => i.textContent)
 
+/** Opens 더 보기 and gives its item: where a PC keeps the tools it uses less (spec §3 #234). */
+const more = (role: 'menuitem' | 'menuitemcheckbox', name: string) => {
+  fireEvent.click(screen.getByRole('button', { name: '더 보기' }))
+  return screen.getByRole(role, { name })
+}
+
 const sent = (path: string, method = 'POST') => calls.filter((c) => c.url === path && c.method === method)
 
 beforeEach(() => {
@@ -108,8 +114,15 @@ describe('Terminal on a PC', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Claude Code' })).toBeTruthy()
     expect(screen.getByText('입력 대기')).toBeTruthy()
     expect(screen.getByText('claude · Mori / main')).toBeTruthy()
-    for (const name of ['파일 올리기', '보기 전용', 'Git', '중단', '종료']) expect(screen.getByRole('button', { name })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '보기 전용' }).getAttribute('aria-pressed')).toBe('false')
+    // The tools used most are icons; the rest wait in 더 보기, by the view and by the session.
+    for (const name of ['파일 올리기', 'Git', '종료', '더 보기']) expect(screen.getByRole('button', { name })).toBeTruthy()
+    for (const name of ['보기 전용', '중단', '이름 바꾸기']) expect(screen.queryByRole('button', { name })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }))
+    const menu = screen.getByRole('menu', { name: '더 보기' })
+    expect(items(within(menu).getByRole('group', { name: '보기' }))).toEqual(['터미널 입력칸 보기', '보기 전용'])
+    expect(items(within(menu).getByRole('group', { name: '세션' }))).toEqual(['이름 바꾸기', '중단'])
+    expect(within(menu).getByRole('menuitemcheckbox', { name: '보기 전용' }).getAttribute('aria-checked')).toBe('false')
+    fireEvent.keyDown(menu, { key: 'Escape' })
     expect(ws.query().get('t')).toBe('t1')
     // The view draws on the screen it opened, and the screen takes the keys.
     await attach(ws)
@@ -176,7 +189,7 @@ describe('Terminal on a PC', () => {
     fireEvent.click(screen.getByRole('button', { name: '보내기' }))
     await vi.waitFor(() => expect(box.value).toBe(''))
     expect(FakeScreen.last().bottoms).toBe(1)
-    fireEvent.click(screen.getByRole('button', { name: '중단' }))
+    fireEvent.click(more('menuitem', '중단'))
     await vi.waitFor(() => expect(FakeScreen.last().bottoms).toBe(2))
   })
 
@@ -327,9 +340,9 @@ describe('Terminal on a PC', () => {
     await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
-  it('interrupts with one press', async () => {
+  it('interrupts from 더 보기', async () => {
     await mount()
-    fireEvent.click(screen.getByRole('button', { name: '중단' }))
+    fireEvent.click(more('menuitem', '중단'))
     await vi.waitFor(() => expect(sent('/api/terminals/t1/interrupt')).toHaveLength(1))
   })
 
@@ -356,7 +369,7 @@ describe('Terminal on a PC', () => {
 
   it('renames in place: Enter keeps it, Escape does not', async () => {
     await mount()
-    fireEvent.click(screen.getByRole('button', { name: '이름 바꾸기' }))
+    fireEvent.click(more('menuitem', '이름 바꾸기'))
     let field = screen.getByRole('textbox', { name: '세션 이름' }) as HTMLInputElement
     expect(field.value).toBe('Claude Code')
     expect(document.activeElement).toBe(field)
@@ -365,7 +378,7 @@ describe('Terminal on a PC', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Claude Code' })).toBeTruthy()
     expect(calls.filter((c) => c.method === 'PATCH')).toEqual([])
 
-    fireEvent.click(screen.getByRole('button', { name: '이름 바꾸기' }))
+    fireEvent.click(more('menuitem', '이름 바꾸기'))
     field = screen.getByRole('textbox', { name: '세션 이름' }) as HTMLInputElement
     fireEvent.input(field, { target: { value: '  리뷰  ' } })
     fireEvent.keyDown(field, { key: 'Enter' })
@@ -443,14 +456,15 @@ describe('Terminal on a PC', () => {
   it('only watches: attaches again as an observer and stops typing', async () => {
     const { ws } = await mount()
     await attach(ws)
-    fireEvent.click(screen.getByRole('button', { name: '보기 전용' }))
+    fireEvent.click(more('menuitemcheckbox', '보기 전용'))
     const watch = FakeWebSocket.last()
     expect(watch).not.toBe(ws)
     expect(ws.closedWith).not.toBeNull()
     expect(watch.query().get('observe')).toBe('1')
     expect(watch.query().get('cols')).toBeNull()
     await attach(watch)
-    expect(screen.getByRole('button', { name: '보기 전용' }).getAttribute('aria-pressed')).toBe('true')
+    expect(more('menuitemcheckbox', '보기 전용').getAttribute('aria-checked')).toBe('true')
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
     expect(screen.getByText('보기 전용 — 입력과 크기 변경을 보내지 않습니다')).toBeTruthy()
     expect(screen.queryByRole('textbox', { name: '터미널에 여러 줄 보내기' })).toBeNull()
     expect(screen.queryByRole('button', { name: '파일 올리기' })).toBeNull()
@@ -510,11 +524,11 @@ describe('Terminal on a PC', () => {
     fireEvent.keyDown(document.body, { key: 'Escape' })
     fireEvent.keyDown(document.body, { key: 'r', metaKey: true })
     // A button keeps the keys that press it; a letter still types.
-    const stop = screen.getByRole('button', { name: '중단' })
-    stop.focus()
-    fireEvent.keyDown(stop, { key: 'Enter' })
-    fireEvent.keyDown(stop, { key: ' ' })
-    fireEvent.keyDown(stop, { key: 'n' })
+    const upload = screen.getByRole('button', { name: '파일 올리기' })
+    upload.focus()
+    fireEvent.keyDown(upload, { key: 'Enter' })
+    fireEvent.keyDown(upload, { key: ' ' })
+    fireEvent.keyDown(upload, { key: 'n' })
     expect(ws.input()).toEqual(['y', '\r', 'n'])
     // A field keeps its keys.
     const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' })
@@ -529,7 +543,7 @@ describe('Terminal on a PC', () => {
   it('takes no stray keys while only watching', async () => {
     const { ws } = await mount()
     await attach(ws)
-    fireEvent.click(screen.getByRole('button', { name: '보기 전용' }))
+    fireEvent.click(more('menuitemcheckbox', '보기 전용'))
     const watch = FakeWebSocket.last()
     await attach(watch)
     fireEvent.keyDown(document.body, { key: 'y' })
@@ -1379,7 +1393,7 @@ describe('pickers', () => {
   it("shows an observed terminal's list with its buttons off", async () => {
     const { ws } = await mount()
     await attach(ws)
-    fireEvent.click(screen.getByRole('button', { name: '보기 전용' }))
+    fireEvent.click(more('menuitemcheckbox', '보기 전용'))
     const watch = FakeWebSocket.last()
     await attach(watch)
     await show(SCREENS.model)
@@ -2119,7 +2133,7 @@ describe('pickers', () => {
     it('does not cover while only watching', async () => {
       const { ws } = await mount()
       await attach(ws)
-      fireEvent.click(screen.getByRole('button', { name: '보기 전용' }))
+      fireEvent.click(more('menuitemcheckbox', '보기 전용'))
       await attach(FakeWebSocket.last())
       await show(IDLE)
       expect(band()).toBeNull()
@@ -2165,12 +2179,14 @@ describe('pickers', () => {
       const { ws } = await mount()
       await attach(ws)
       await show(IDLE)
-      const sw = screen.getByRole('button', { name: '터미널 입력칸 보기' })
-      expect(sw.getAttribute('aria-pressed')).toBe('false')
+      let sw = more('menuitemcheckbox', '터미널 입력칸 보기')
+      expect(sw.getAttribute('aria-checked')).toBe('false')
+      expect(within(screen.getByRole('group', { name: '보기' })).getByRole('menuitemcheckbox', { name: '터미널 입력칸 보기' })).toBe(sw)
       fireEvent.click(sw)
       await frame()
       expect(band()).toBeNull()
-      expect(sw.getAttribute('aria-pressed')).toBe('true')
+      sw = more('menuitemcheckbox', '터미널 입력칸 보기')
+      expect(sw.getAttribute('aria-checked')).toBe('true')
       fireEvent.click(sw)
       await frame()
       expect(band()).not.toBeNull()

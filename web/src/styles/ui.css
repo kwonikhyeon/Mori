@@ -609,6 +609,19 @@ textarea.input {
   box-shadow: var(--shadow-low);
 }
 
+/* The context menu (astryx ContextMenu, spec §3 #242): the same list, at
+   the pointer; components/ContextMenu.tsx places it inside the window, the
+   margin away from its edges. Above the title bar, it takes the presses. */
+.ctx-menu {
+  --ctx-margin: var(--spacing-2);
+  position: fixed;
+  right: auto;
+  max-height: calc(100vh - 2 * var(--ctx-margin));
+  overflow-y: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 .menu-item {
   display: flex;
   align-items: center;

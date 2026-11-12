@@ -31,6 +31,16 @@ export class FakeScreen implements Screen {
     this.selected = ''
     return s
   }
+  selection(): string {
+    return this.selected
+  }
+  selectAll(): void {
+    this.selected = this.text
+  }
+  /** Reaches the program as typing does, while keys do. */
+  paste(text: string): void {
+    if (this.input) for (const fn of this.data) fn(text)
+  }
 
   /** Whether a touch on the screen may bring up the device's keyboard. */
   keyboard = true

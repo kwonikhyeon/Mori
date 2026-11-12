@@ -3,7 +3,9 @@
 // cards that open a file's diff under it, one at a time, on a phone.
 import { Fragment } from 'preact'
 import { useId, useState } from 'preact/hooks'
+import { onContext } from '../components/ContextMenu'
 import { Icon } from '../components/Icon'
+import { copyAndTell } from '../lib/copy'
 import { totals } from '../lib/diff'
 import { fileParts, type ChangeGroup, type ChangeItem } from '../lib/format'
 import { DiffView } from './Diff'
@@ -31,6 +33,14 @@ export function FileLabel({ it }: { it: ChangeItem }) {
       </span>
     </>
   )
+}
+
+/** A right-click on a file's row (spec §3 #242): its diff, its path. */
+export function fileContext(it: ChangeItem, onSel: (key: string) => void) {
+  return onContext(it.path, () => [
+    { label: 'diff 보기', icon: 'eye', onSelect: () => onSel(it.key) },
+    { label: '경로 복사', icon: 'copy', onSelect: () => void copyAndTell(it.path, '경로를 복사했습니다') },
+  ])
 }
 
 function Clean() {
@@ -69,7 +79,7 @@ export function ChangeList({ groups, count, sel, onSel }: ChangeListProps) {
             <ul class="gc-list">
               {g.items.map((it) => (
                 <li key={it.key}>
-                  <button type="button" class="gc-file" aria-current={it.key === sel ? 'true' : undefined} title={it.path} onClick={() => onSel(it.key)}>
+                  <button type="button" class="gc-file" aria-current={it.key === sel ? 'true' : undefined} title={it.path} onClick={() => onSel(it.key)} onContextMenu={fileContext(it, onSel)}>
                     <FileLabel it={it} />
                   </button>
                 </li>

@@ -1,7 +1,8 @@
 // A button that opens a list of actions (the WAI-ARIA menu button): the
 // arrows move between the items, Escape and the back key close and give
-// the focus back, Tab and a press elsewhere close.
-import { Fragment, type ComponentChildren } from 'preact'
+// the focus back, Tab and a press elsewhere close. ContextMenu opens the
+// same list at the pointer.
+import { Fragment, type ComponentChildren, type JSX, type Ref } from 'preact'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { Icon, type IconName } from './Icon'
 import { useLayer } from './useLayer'
@@ -16,6 +17,8 @@ export interface MenuItem {
   checked?: boolean
   /** The heading of the run of items it belongs to (astryx DropdownMenuGroup); a line parts the runs. */
   group?: string
+  /** Starts a run with no heading: a line before it (astryx DropdownMenuDivider). */
+  sep?: boolean
   onSelect: () => void
 }
 
@@ -24,54 +27,41 @@ function runs(items: MenuItem[]): { group?: string; items: MenuItem[] }[] {
   const out: { group?: string; items: MenuItem[] }[] = []
   for (const it of items) {
     const last = out.at(-1)
-    if (last && last.group === it.group) last.items.push(it)
+    if (last && last.group === it.group && !it.sep) last.items.push(it)
     else out.push({ group: it.group, items: [it] })
   }
   return out
 }
 
-export interface MenuProps {
+export interface MenuListProps {
+  id: string
   label: string
   items: MenuItem[]
-  icon?: IconName
-  iconSize?: number
-  buttonClass?: string
-  /** What the button shows in place of the icon; label still names it. */
-  trigger?: ComponentChildren
   /** The checked items are one choice of many, not each on or off. */
   radio?: boolean
+  /** The item the focus starts on. */
+  start: 'first' | 'last'
+  /** Closes it; back says whether the focus goes back to where the menu came from. */
+  onClose: (back: boolean) => void
+  class?: string
+  style?: JSX.CSSProperties
+  listRef?: Ref<HTMLDivElement>
 }
 
-export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass = 'btn btn-icon btn-ghost', trigger, radio = false }: MenuProps) {
-  const [open, setOpen] = useState<'first' | 'last' | null>(null)
-  const id = useId()
-  const box = useRef<HTMLDivElement>(null)
-  const btn = useRef<HTMLButtonElement>(null)
-  const list = useRef<HTMLDivElement>(null)
-  const entries = () => [...(list.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])]
+/**
+ * The open list of a menu, its button's (Menu) or the pointer's
+ * (ContextMenu): the arrows move between the items, Escape and the back key
+ * close it and give the focus back, Tab closes it.
+ */
+export function MenuList({ id, label, items, radio = false, start, onClose, class: cls = 'menu-list', style, listRef }: MenuListProps) {
+  const own = useRef<HTMLDivElement | null>(null)
+  const entries = () => [...(own.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])]
 
   useEffect(() => {
-    if (!open) return
     const all = entries()
-    ;(open === 'last' ? all.at(-1) : all[0])?.focus()
-    const away = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(null)
-    }
-    document.addEventListener('pointerdown', away)
-    return () => document.removeEventListener('pointerdown', away)
-  }, [open])
-
-  const close = () => {
-    setOpen(null)
-    btn.current?.focus()
-  }
-  useLayer(!!open, close, false)
-
-  const onButtonKey = (e: KeyboardEvent) => {
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
-    e.preventDefault()
-    setOpen(e.key === 'ArrowUp' ? 'last' : 'first')
-  }
+    ;(start === 'last' ? all.at(-1) : all[0])?.focus()
+  }, [])
+  useLayer(true, () => onClose(true), false)
 
   const onListKey = (e: KeyboardEvent) => {
     const all = entries()
@@ -84,10 +74,10 @@ export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass =
       case 'End': next = all.length - 1; break
       case 'Escape':
         e.preventDefault()
-        close()
+        onClose(true)
         return
       case 'Tab':
-        setOpen(null)
+        onClose(false)
         return
       default:
         return
@@ -98,7 +88,7 @@ export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass =
 
   // The focus goes back first, so an item may move it on (a field, a dialog).
   const pick = (it: MenuItem) => {
-    close()
+    onClose(true)
     it.onSelect()
   }
 
@@ -119,6 +109,78 @@ export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass =
   )
 
   return (
+    <div
+      id={id}
+      ref={(el) => {
+        own.current = el
+        if (typeof listRef === 'function') listRef(el)
+        else if (listRef) listRef.current = el
+      }}
+      role="menu"
+      aria-label={label}
+      class={cls}
+      style={style}
+      onKeyDown={onListKey}
+    >
+      {/* A titled run is a group its heading names; the heading and the line are no stops for the arrows. */}
+      {runs(items).map((r, i) => (
+        <Fragment key={`${i}:${r.group ?? ''}`}>
+          {i > 0 && <div role="separator" class="menu-sep" />}
+          {r.group ? (
+            <div role="group" aria-labelledby={`${id}-g${i}`} class="menu-group">
+              <div id={`${id}-g${i}`} class="menu-heading">
+                {r.group}
+              </div>
+              {r.items.map(row)}
+            </div>
+          ) : (
+            r.items.map(row)
+          )}
+        </Fragment>
+      ))}
+    </div>
+  )
+}
+
+export interface MenuProps {
+  label: string
+  items: MenuItem[]
+  icon?: IconName
+  iconSize?: number
+  buttonClass?: string
+  /** What the button shows in place of the icon; label still names it. */
+  trigger?: ComponentChildren
+  /** The checked items are one choice of many, not each on or off. */
+  radio?: boolean
+}
+
+export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass = 'btn btn-icon btn-ghost', trigger, radio = false }: MenuProps) {
+  const [open, setOpen] = useState<'first' | 'last' | null>(null)
+  const id = useId()
+  const box = useRef<HTMLDivElement>(null)
+  const btn = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const away = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(null)
+    }
+    document.addEventListener('pointerdown', away)
+    return () => document.removeEventListener('pointerdown', away)
+  }, [open])
+
+  const close = (back: boolean) => {
+    setOpen(null)
+    if (back) btn.current?.focus()
+  }
+
+  const onButtonKey = (e: KeyboardEvent) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    e.preventDefault()
+    setOpen(e.key === 'ArrowUp' ? 'last' : 'first')
+  }
+
+  return (
     <div class="menu" ref={box}>
       <button
         ref={btn}
@@ -134,26 +196,7 @@ export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass =
       >
         {trigger ?? <Icon name={icon} size={iconSize} />}
       </button>
-      {open && (
-        <div id={id} ref={list} role="menu" aria-label={label} class="menu-list" onKeyDown={onListKey}>
-          {/* A titled run is a group its heading names; the heading and the line are no stops for the arrows. */}
-          {runs(items).map((r, i) => (
-            <Fragment key={`${i}:${r.group ?? ''}`}>
-              {i > 0 && <div role="separator" class="menu-sep" />}
-              {r.group ? (
-                <div role="group" aria-labelledby={`${id}-g${i}`} class="menu-group">
-                  <div id={`${id}-g${i}`} class="menu-heading">
-                    {r.group}
-                  </div>
-                  {r.items.map(row)}
-                </div>
-              ) : (
-                r.items.map(row)
-              )}
-            </Fragment>
-          ))}
-        </div>
-      )}
+      {open && <MenuList id={id} label={label} items={items} radio={radio} start={open} onClose={close} />}
     </div>
   )
 }

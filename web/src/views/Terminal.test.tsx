@@ -1,3 +1,4 @@
+import { closeContext, ContextMenuHost } from '../components/ContextMenu'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeScreen } from '../../test/fakeScreen'
@@ -2423,5 +2424,50 @@ describe('pickers', () => {
       await hinted()
       expect(textbox().placeholder).toBe(`${HINT} · Tab`)
     })
+  })
+})
+
+describe('the terminal\'s context menu (spec §3 #242)', () => {
+  afterEach(() => act(() => closeContext()))
+
+  const rightClick = () => {
+    fireEvent.contextMenu(document.querySelector('.term-stage')!, { button: 2, clientX: 30, clientY: 30 })
+    return screen.getByRole('menu', { name: '터미널' })
+  }
+
+  it('copies the selection, pastes the clipboard as typing, and selects all', async () => {
+    const readText = vi.fn(async () => 'git status')
+    const writeText = vi.fn(async () => {})
+    vi.stubGlobal('isSecureContext', true)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { readText, writeText } })
+    render(<ContextMenuHost />)
+    const { ws } = await mount()
+    await attach(ws)
+    const sc = FakeScreen.last()
+
+    expect(items(rightClick())).toEqual(['붙여 넣기', '모두 선택', '파일 올리기', '중단'])
+    fireEvent.click(screen.getByRole('menuitem', { name: '붙여 넣기' }))
+    await vi.waitFor(() => expect(ws.input()).toEqual(['git status']))
+
+    sc.selected = 'hello'
+    expect(items(rightClick())).toEqual(['복사', '붙여 넣기', '모두 선택', '파일 올리기', '중단'])
+    fireEvent.click(screen.getByRole('menuitem', { name: '복사' }))
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('hello'))
+    expect(sc.selected).toBe('hello') // the selection stays, as a copy key leaves it
+
+    sc.write('a line')
+    rightClick()
+    fireEvent.click(screen.getByRole('menuitem', { name: '모두 선택' }))
+    expect(sc.selection()).toBe(sc.text)
+  })
+
+  it('offers no paste or upload while only watching', async () => {
+    vi.stubGlobal('isSecureContext', true)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { readText: async () => '', writeText: async () => {} } })
+    render(<ContextMenuHost />)
+    const { ws } = await mount()
+    await attach(ws)
+    fireEvent.click(more('menuitemcheckbox', '보기 전용'))
+    expect(items(rightClick())).toEqual(['모두 선택', '중단'])
   })
 })

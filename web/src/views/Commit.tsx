@@ -14,7 +14,7 @@ import { commitTime, relTime } from '../lib/time'
 import { toast } from '../lib/toast'
 import type { Commit } from '../lib/types'
 import { DiffPane } from './Git'
-import { FileLabel } from './GitChanges'
+import { FileLabel, fileContext } from './GitChanges'
 import { RefChips } from './RefChips'
 import { Loading } from './rows'
 import { shownLog, useCommit, useRepo, type CommitRead, type Repo } from './useLog'
@@ -200,7 +200,14 @@ function PanelFiles({ c, items, sel, onSel }: { c: Commit; items: CommitItem[]; 
         <ul class="gc-list">
           {items.map((it) => (
             <li key={it.key}>
-              <button type="button" class="gc-file cm-file" aria-current={it.key === sel ? 'true' : undefined} title={it.path} onClick={() => onSel(it.key)}>
+              <button
+                type="button"
+                class="gc-file cm-file"
+                aria-current={it.key === sel ? 'true' : undefined}
+                title={it.path}
+                onClick={() => onSel(it.key)}
+                onContextMenu={fileContext(it, onSel)}
+              >
                 <FileLabel it={it} />{' '}
                 <FileCounts it={it} />
               </button>

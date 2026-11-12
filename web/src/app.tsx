@@ -1,3 +1,4 @@
+import { ContextMenuHost } from './components/ContextMenu'
 import { Toasts } from './components/Toasts'
 import { hello, paired, phase, refusal } from './lib/boot'
 import { Pair } from './views/Pair'
@@ -11,6 +12,7 @@ export function App() {
       {ph === 'pair' && <Pair hello={hello.value} onPaired={paired} />}
       {ph === 'app' && <Shell />}
       {ph === 'refused' && refusal.value && <Refused err={refusal.value} />}
+      <ContextMenuHost />
       <Toasts />
     </>
   )

@@ -32,6 +32,11 @@ export interface Screen {
   setKeyboard(on: boolean): void
   /** What is selected on the screen, '' for nothing; the selection is cleared. */
   takeSelection(): string
+  /** What is selected on the screen, '' for nothing; the selection stays. */
+  selection(): string
+  selectAll(): void
+  /** Types text as a paste: marked as one when the program asked (bracketed paste). */
+  paste(text: string): void
   focus(): void
   /** Shows the end of the output, where the cursor is. */
   scrollToBottom(): void
@@ -179,6 +184,9 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
       term.clearSelection()
       return s
     },
+    selection: () => (term.hasSelection() ? term.getSelection() : ''),
+    selectAll: () => term.selectAll(),
+    paste: (text) => term.paste(text),
     setKeyboard: (on) => {
       if (on) term.textarea?.removeAttribute('inputmode')
       else term.textarea?.setAttribute('inputmode', 'none')

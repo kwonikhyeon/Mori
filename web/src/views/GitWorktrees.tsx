@@ -3,10 +3,12 @@
 // is made in a sheet.
 import { useEffect, useId, useState } from 'preact/hooks'
 import { Confirm } from '../components/Confirm'
+import { onContext } from '../components/ContextMenu'
 import { Icon } from '../components/Icon'
 import { Menu, type MenuItem } from '../components/Menu'
 import { Sheet, SheetHead } from '../components/Sheet'
 import { ApiError } from '../lib/api'
+import { copyAndTell } from '../lib/copy'
 import { shortPath, wtLabel } from '../lib/format'
 import { sessionsByWorktree } from '../lib/queue'
 import { useHost } from '../lib/scope'
@@ -100,6 +102,12 @@ export function WorktreeList({ variant, g, own, onShow, onMade, onRemoved }: Wor
           if (!w.prunable) items.push({ label: '이 워크트리에서 새 세션', icon: 'plus', onSelect: () => h.go({ name: 'new', folder: f.id, wt: w.path }) })
           // git keeps the main one, and a locked one even when forced once.
           if (!w.main && !w.locked) items.push({ label: '워크트리 삭제', icon: 'trash', danger: true, onSelect: () => setAsk({ w, force: null }) })
+          // A right-click on the row: what its menu has, with the path to copy (spec §3 #242).
+          const ctx = [
+            ...items.filter((it) => !it.danger),
+            { label: '경로 복사', icon: 'copy', onSelect: () => void copyAndTell(w.path, '경로를 복사했습니다') } satisfies MenuItem,
+            ...items.filter((it) => it.danger).map((it) => ({ ...it, sep: true })),
+          ]
           return (
             <li key={w.path} class="gw-item">
               <button
@@ -109,6 +117,7 @@ export function WorktreeList({ variant, g, own, onShow, onMade, onRemoved }: Wor
                 disabled={w.prunable}
                 title={w.path}
                 onClick={() => onShow(w.path)}
+                onContextMenu={onContext(wtLabel(w), () => ctx)}
               >
                 <span class="gw-main">
                   <span class="mono gw-branch">{wtLabel(w)}</span>{' '}

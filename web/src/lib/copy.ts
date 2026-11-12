@@ -1,6 +1,7 @@
 // Copying a text for people to paste elsewhere. The clipboard API needs a
 // secure page, and Mori over the tailnet is often plain http: there the
 // selection of a hidden text box is copied instead.
+import { toast } from './toast'
 
 export async function copyText(text: string): Promise<boolean> {
   if (window.isSecureContext && navigator.clipboard) {
@@ -31,4 +32,10 @@ export async function copyText(text: string): Promise<boolean> {
   ta.remove()
   back?.focus?.()
   return ok
+}
+
+/** Copies text and says so in a toast, or that it could not. */
+export async function copyAndTell(text: string, done: string): Promise<void> {
+  if (await copyText(text)) toast(done)
+  else toast('복사하지 못했습니다', 'error')
 }

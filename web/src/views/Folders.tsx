@@ -1,7 +1,10 @@
 // The folder screen: every registered folder with its live terminals,
 // newest first (finished ones are not listed, spec §3 #229); 기타 holds the
 // rest.
+import { onContext } from '../components/ContextMenu'
 import { Icon } from '../components/Icon'
+import type { MenuItem } from '../components/Menu'
+import { copyAndTell } from '../lib/copy'
 import { appName, branchOf, place, shortPath } from '../lib/format'
 import { groupByFolder, type FolderGroup } from '../lib/queue'
 import { useHost } from '../lib/scope'
@@ -21,9 +24,18 @@ function FolderSection({ g, p }: { g: FolderGroup; p: ListProps }) {
   const h = useHost()
   const f = g.folder
   const id = `f-${p.variant}-${f ? f.id : 'rest'}`
+  // A right-click on the folder's head (spec §3 #242).
+  const items = (): MenuItem[] =>
+    f
+      ? [
+          { label: '새 세션', icon: 'plus', onSelect: () => h.go({ name: 'new', folder: f.id }) },
+          ...(f.repo ? [{ label: 'Git 보기', icon: 'git', onSelect: () => h.go({ name: 'git', folder: f.id }) } satisfies MenuItem] : []),
+          { label: '경로 복사', icon: 'copy', sep: true, onSelect: () => void copyAndTell(f.path, '경로를 복사했습니다') },
+        ]
+      : []
   return (
     <section class="fsec" aria-labelledby={id}>
-      <div class="fsec-head">
+      <div class="fsec-head" onContextMenu={onContext(f ? f.name : '기타', items)}>
         <Icon name="folder" size={18} class="fsec-icon" />
         <div class="fsec-name">
           <h2 id={id}>{f ? f.name : '기타'}</h2>

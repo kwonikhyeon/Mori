@@ -14,6 +14,12 @@ const SHAPES = {
   'chevron-down': <path d="M6 9l6 6 6-6" />,
   'chevron-right': <path d="M9 6l6 6-6 6" />,
   'chevron-up': <path d="M6 15l6-6 6 6" />,
+  clipboard: (
+    <>
+      <rect x="5" y="5" width="14" height="16" rx="2" />
+      <path d="M9 5V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M9 11h6M9 15h4" />
+    </>
+  ),
   close: <path d="M6 6l12 12M18 6L6 18" />,
   commit: (
     <>
@@ -93,6 +99,7 @@ const SHAPES = {
       <path d="M16 16l4 4" />
     </>
   ),
+  select: <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M9 9h6v6H9z" />,
   send: <path d="M12 19V5M6 11l6-6 6 6" />,
   sliders: (
     <>

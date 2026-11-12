@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { folder, status, term } from '../../test/fixtures'
 import { inHost, withHost } from '../../test/scopes'
+import { closeContext, ContextMenuHost } from '../components/ContextMenu'
 import { now } from '../lib/clock'
 import { markSeen, resetSeen } from '../lib/seen'
 import { folders, presets, ready, resetStore, terminals } from '../lib/store'
@@ -230,5 +231,57 @@ describe('FolderList', () => {
     const mori = screen.getByRole('region', { name: 'Mori' })
     expect(fireEvent.click(within(mori).getByRole('link', { name: 'Mori Git 보기' }))).toBe(false)
     expect(fireEvent.click(within(within(mori).getByRole('list')).getByRole('link'))).toBe(false)
+  })
+})
+
+describe('a session row\'s context menu (spec §3 #242)', () => {
+  let calls: { method: string; url: string; body: unknown }[] = []
+  beforeEach(() => {
+    calls = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit = {}) => {
+        calls.push({ method: init.method ?? 'GET', url: String(url), body: init.body ? JSON.parse(String(init.body)) : undefined })
+        return Response.json({})
+      }),
+    )
+  })
+  afterEach(() => {
+    act(() => closeContext())
+    vi.unstubAllGlobals()
+  })
+
+  const open = (name: RegExp) => {
+    render(
+      <>
+        <FolderList variant="pc" />
+        <ContextMenuHost />
+      </>,
+    )
+    fireEvent.contextMenu(screen.getByRole('link', { name }), { button: 2, clientX: 10, clientY: 10 })
+    return screen.getByRole('menu')
+  }
+  const names = (m: HTMLElement) => [...m.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent)
+
+  it('offers what is done to a live session, ending it after asking', async () => {
+    load([term({ address: 't1', display_title: '알림 정리', status: status('working') })])
+    const m = open(/알림 정리/)
+    expect(m.getAttribute('aria-label')).toBe('알림 정리')
+    expect(names(m)).toEqual(['열기', '새 창에서 열기', '이름 바꾸기', '작업 폴더 경로 복사', '중단', '종료'])
+    fireEvent.click(screen.getByRole('menuitem', { name: '종료' }))
+    fireEvent.click(screen.getByRole('button', { name: '종료' }))
+    await vi.waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.url === '/api/terminals/t1/kill')).toBe(true))
+  })
+
+  it('renames in the row: Enter keeps the name, Escape does not', async () => {
+    load([term({ address: 't1', display_title: '알림 정리', status: status('idle') })])
+    open(/알림 정리/)
+    fireEvent.click(screen.getByRole('menuitem', { name: '이름 바꾸기' }))
+    const field = screen.getByRole('textbox', { name: '세션 이름' })
+    expect(document.activeElement).toBe(field)
+    fireEvent.input(field, { target: { value: '새 이름' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+    await vi.waitFor(() => expect(calls).toContainEqual({ method: 'PATCH', url: '/api/terminals/t1', body: { title: '새 이름' } }))
+    expect(screen.queryByRole('textbox', { name: '세션 이름' })).toBeNull()
   })
 })

@@ -5,9 +5,11 @@
 import { Component } from 'preact'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { ConnBanner } from '../components/ConnBanner'
+import { onContext } from '../components/ContextMenu'
 import { Icon, type IconName } from '../components/Icon'
 import { Segmented } from '../components/Segmented'
 import { now } from '../lib/clock'
+import { copyAndTell } from '../lib/copy'
 import { shortHash, shortPath } from '../lib/format'
 import { geom, graphWidth, isHead, laneX, PC, PHONE, rowPaths, tone, type Geom } from '../lib/graph'
 import { parseHash, plainClick } from '../lib/router'
@@ -241,6 +243,18 @@ export function GraphScreen({ variant, folder, path, head, c, back }: GraphScree
     e.preventDefault()
     pick(a.dataset.hash!, false)
   }
+  // A right-click on a commit's row (spec §3 #242): it, its hash, its subject.
+  const menu = onContext('커밋', (e) => {
+    const a = (e.target as Element).closest<HTMLElement>('a.gr-row')
+    const x = a ? commits[Number(a.dataset.i)] : undefined
+    if (!x) return []
+    return [
+      { label: '커밋 보기', icon: 'commit', onSelect: () => pick(x.hash, false) },
+      { label: '해시 복사', icon: 'copy', sep: true, onSelect: () => void copyAndTell(x.hash, '해시를 복사했습니다') },
+      { label: '짧은 해시 복사', icon: 'copy', onSelect: () => void copyAndTell(shortHash(x.hash), '해시를 복사했습니다') },
+      { label: '제목 복사', icon: 'copy', onSelect: () => void copyAndTell(x.subject, '제목을 복사했습니다') },
+    ]
+  })
   const onKey = (e: KeyboardEvent) => {
     const a = (e.target as Element).closest<HTMLElement>('a.gr-row')
     if (!a || e.altKey || e.ctrlKey || e.metaKey) return
@@ -283,7 +297,7 @@ export function GraphScreen({ variant, folder, path, head, c, back }: GraphScree
   const tabAt = c && byHash.has(c) ? c : commits[0]?.hash
   const to = (hash: string) => h.href({ name: 'graph', folder, path, head, c: hash })
   const rows = commits.length > 0 && (
-    <ol class="gr-list" aria-label="커밋" ref={listRef} onClick={onClick} onKeyDown={onKey}>
+    <ol class="gr-list" aria-label="커밋" ref={listRef} onClick={onClick} onKeyDown={onKey} onContextMenu={menu}>
       {commits.map((x, i) => (
         <Row key={x.hash} c={x} i={i} g={g} svgW={svgW} sel={x.hash === c} tab={x.hash === tabAt} when={relTime(x.time_ms, t)} to={to(x.hash)} variant={variant} />
       ))}

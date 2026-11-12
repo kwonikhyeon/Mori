@@ -12,6 +12,7 @@ import { Chip } from '../components/Chip'
 import { Confirm } from '../components/Confirm'
 import { ConnBanner } from '../components/ConnBanner'
 import { Icon } from '../components/Icon'
+import { onContext } from '../components/ContextMenu'
 import { Menu, type MenuItem } from '../components/Menu'
 import { announce } from '../lib/announce'
 import { ApiError } from '../lib/api'
@@ -48,7 +49,7 @@ import { gitFrom } from './Git'
 import { ModeButton, StatusBand, useBox } from './Cover'
 import { PickHints, PickKept, PickPanel, usePick } from './Pick'
 import type { Mode } from '../lib/box'
-import { titleOf, type Variant } from './rows'
+import { RenameField, titleOf, type Variant } from './rows'
 import { useSlash } from './Slash'
 import { TermFontSheet } from './TermFont'
 import './terminal.css'
@@ -513,6 +514,37 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     }
   }
   const pickFile = () => file.current?.click()
+  // What a right-click on the screen offers (spec §3 #242): the selection,
+  // the clipboard, then the session. Pasted text goes where typing goes:
+  // the box while the cover is on.
+  const pasteClip = async () => {
+    let text: string
+    try {
+      text = await navigator.clipboard.readText()
+    } catch {
+      toast(`클립보드를 읽지 못했습니다. ${isApple() ? '⌘V' : 'Ctrl+V'}로 붙여 넣으세요`, 'error')
+      return
+    }
+    if (!text) return
+    if (covered && pathTo.current) {
+      pathTo.current(text, false)
+      focusBox()
+    } else {
+      screen.current?.paste(text)
+      screen.current?.focus()
+    }
+  }
+  const screenItems = (): MenuItem[] => {
+    const sel = screen.current?.selection() ?? ''
+    const out: MenuItem[] = []
+    if (sel) out.push({ label: '복사', icon: 'copy', onSelect: () => void copyText(sel).then((ok) => !ok && toast('복사하지 못했습니다', 'error')) })
+    // The clipboard is read only on a secure page; elsewhere the paste key still works.
+    if (canType && window.isSecureContext && 'readText' in (navigator.clipboard ?? {})) out.push({ label: '붙여 넣기', icon: 'clipboard', onSelect: () => void pasteClip() })
+    out.push({ label: '모두 선택', icon: 'select', onSelect: () => screen.current?.selectAll() })
+    if (canType) out.push({ label: '파일 올리기', icon: 'paperclip', sep: true, onSelect: pickFile })
+    if (active) out.push({ label: '중단', icon: 'stop', sep: !canType, onSelect: interrupt })
+    return out
+  }
   const observe = (on: boolean) => link?.setObserve(on)
 
   const titleEl =
@@ -528,6 +560,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     <div
       ref={stage}
       class={'term-stage' + (drop ? ' is-drop' : '')}
+      onContextMenu={onContext('터미널', screenItems)}
       onClick={() => {
         // with the cover a PC gives the box the focus, and a phone nothing: its keyboard would shrink the terminal
         if (covered) {
@@ -983,40 +1016,6 @@ function useLater(on: boolean, ms: number): boolean {
 }
 
 /** The title in place: Enter or leaving keeps it, Escape does not. */
-function RenameField({ initial, onDone }: { initial: string; onDone: (next: string | null) => void }) {
-  const ref = useRef<HTMLInputElement>(null)
-  const done = useRef(false)
-  useEffect(() => {
-    ref.current?.focus()
-    ref.current?.select()
-  }, [])
-  const finish = (keepIt: boolean) => {
-    if (done.current) return
-    done.current = true
-    const v = (ref.current?.value ?? '').trim()
-    onDone(keepIt && v !== initial ? v : null)
-  }
-  return (
-    <input
-      ref={ref}
-      class="input term-rename"
-      aria-label="세션 이름"
-      maxLength={100}
-      defaultValue={initial}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && !e.isComposing) {
-          e.preventDefault()
-          finish(true)
-        } else if (e.key === 'Escape') {
-          e.preventDefault()
-          finish(false)
-        }
-      }}
-      onBlur={() => finish(true)}
-    />
-  )
-}
-
 interface AskBarProps {
   t: TerminalView
   phone: boolean

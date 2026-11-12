@@ -70,7 +70,8 @@ Reuse these classes before writing new ones. A new control maps to an astryx com
 | `.toasts`, `.toast` | Toast | Inverted colours. |
 | `.empty` | EmptyState | What is missing, and the next step. |
 | `.field` | Field and TextInput | |
-| `.menu`, `.menu-list` | DropdownMenu | `MenuItem.group` makes a titled run, `.menu-group` with its `.menu-heading` (DropdownMenuGroup); `.menu-sep` parts the runs (DropdownMenuDivider). |
+| `.menu`, `.menu-list` | DropdownMenu | `MenuItem.group` makes a titled run, `.menu-group` with its `.menu-heading` (DropdownMenuGroup); `.menu-sep` parts the runs (DropdownMenuDivider), and `MenuItem.sep` starts a run with no heading. |
+| `.ctx-menu` (`components/ContextMenu.tsx`) | ContextMenu | The same list at the pointer. A region gives `onContextMenu={onContext(label, items)}`; `ContextMenuHost` draws the one menu. |
 | `.term-slash` | DropdownMenu | The slash-command list. |
 | `.hostpick` | DropdownMenu trigger | A secondary button. |
 | `dialog.confirm` (`components/Confirm.tsx`) | AlertDialog | No border, the high shadow. |

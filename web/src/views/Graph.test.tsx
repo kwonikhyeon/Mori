@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { folder } from '../../test/fixtures'
 import { inHost, withHost } from '../../test/scopes'
 import { A, B, C, COMMITS, diffOf, LOG, linear, MAIN, NOW } from '../../test/history'
 import { spoken } from '../../test/spoken'
+import { closeContext, ContextMenuHost } from '../components/ContextMenu'
 import { now } from '../lib/clock'
 import { href, route, type Route } from '../lib/router'
 import { folders, ready, resetStore } from '../lib/store'
@@ -269,6 +270,30 @@ describe('GraphScreen on a PC', () => {
     graphFrom.value = { host: '', folder: 'f1', href: '#/t/t1/git' }
     render(inHost(s, <Routed variant="pc" />))
     expect(screen.getByRole('link', { name: 'Git 화면으로' }).getAttribute('href')).toBe('#/h/h_desk0001/git/f1')
+  })
+})
+
+describe('a commit row\'s context menu (spec §3 #242)', () => {
+  afterEach(() => act(() => closeContext()))
+
+  it('opens the commit and copies its hash and subject', async () => {
+    serve()
+    const writeText = vi.fn(async () => {})
+    vi.stubGlobal('isSecureContext', true)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    open('pc')
+    render(<ContextMenuHost />)
+    await list()
+    const row = rows()[1]
+    fireEvent.contextMenu(row.querySelector('.gr-text')!, { button: 2, clientX: 5, clientY: 5 })
+    const m = screen.getByRole('menu', { name: '커밋' })
+    expect([...m.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent)).toEqual(['커밋 보기', '해시 복사', '짧은 해시 복사', '제목 복사'])
+    fireEvent.click(screen.getByRole('menuitem', { name: '해시 복사' }))
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(B))
+    await vi.waitFor(() => expect(toasts.value.at(-1)?.text).toBe('해시를 복사했습니다'))
+    fireEvent.contextMenu(row, { button: 2 })
+    fireEvent.click(screen.getByRole('menuitem', { name: '커밋 보기' }))
+    expect(route.value).toEqual(graph(B))
   })
 })
 

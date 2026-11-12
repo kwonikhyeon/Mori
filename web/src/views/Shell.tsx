@@ -264,7 +264,7 @@ function PcHeader({ side }: { side?: number }) {
     <header class={'pc-head' + (side ? ' has-side' : '')} style={side ? `--pc-side: ${side}px` : undefined}>
       <div class="pc-head-start">
         <a class="pc-logo" href={h.href({ name: 'queue' })} aria-label="Mori, 지금 볼 것" title="Mori">
-          <img src="/icons/icon-192.png" alt="" width="24" height="24" />
+          <img src="/icons/icon-192-v2.png" alt="" width="24" height="24" />
         </a>
         <div class="hostbar">
           <HostPicker />

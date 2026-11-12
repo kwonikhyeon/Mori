@@ -3,11 +3,16 @@
 // lighter blue cursor after it (spec §3 #231), anti-aliased with distance
 // fields; nothing but Node is needed.
 import { deflateSync } from 'node:zlib'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const out = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'icons')
+// In every icon's name. A new picture takes a new number, and the names in
+// manifest.json, index.html, sw.js and Shell.tsx with it: an installed app
+// takes a new icon only from a new URL, and Windows keeps a shortcut's
+// icon by its path (spec §3 #239). The icons of other numbers are removed.
+const VERSION = 2
 const BG = [0xff, 0xff, 0xff]
 const INK = [0x24, 0x57, 0xd6]
 const CURSOR = [0x5b, 0x8c, 0xff]
@@ -100,10 +105,16 @@ function icon(size, corner, scale) {
 
 mkdirSync(out, { recursive: true })
 const icons = {
-  'icon-192.png': icon(192, 22.5, 1),
-  'icon-512.png': icon(512, 22.5, 1),
-  'icon-maskable-512.png': icon(512, 0, 0.8), // inside the 80% safe circle
-  'apple-touch-icon.png': icon(180, 0, 1), // iOS rounds the corners itself
+  [`icon-192-v${VERSION}.png`]: icon(192, 22.5, 1),
+  [`icon-512-v${VERSION}.png`]: icon(512, 22.5, 1),
+  [`icon-maskable-512-v${VERSION}.png`]: icon(512, 0, 0.8), // inside the 80% safe circle
+  [`apple-touch-icon-v${VERSION}.png`]: icon(180, 0, 1), // iOS rounds the corners itself
+}
+for (const name of readdirSync(out)) {
+  if (name.endsWith('.png') && !(name in icons)) {
+    rmSync(join(out, name))
+    console.log(`${name} removed`)
+  }
 }
 for (const [name, data] of Object.entries(icons)) {
   writeFileSync(join(out, name), data)

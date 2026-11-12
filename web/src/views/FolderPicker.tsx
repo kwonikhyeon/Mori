@@ -129,7 +129,10 @@ function Browse({ id, value, onPick, onClose, onList, browse }: PickerProps & { 
   const here = listing?.path
   const known = here ? host.folders.value.find((f) => samePath(f.path, here)) : undefined
   const register = async () => {
-    if (!here || saving || (browse && known)) return
+    if (!here || saving || loading || (browse && known)) return
+    // A path typed but not opened yet is opened first: the button must not register the folder listed before it.
+    const typed = path.trim()
+    if (typed && typed !== here) return void go(typed)
     if (known) {
       onPick(known)
       return
@@ -220,7 +223,7 @@ function Browse({ id, value, onPick, onClose, onList, browse }: PickerProps & { 
           />
           숨긴 폴더 보기
         </label>
-        <button type="button" class="btn btn-primary" disabled={!here || saving || (browse && !!known)} onClick={() => void register()}>
+        <button type="button" class="btn btn-primary" disabled={!here || saving || loading || (browse && !!known)} onClick={() => void register()}>
           {known ? (browse ? '등록된 폴더입니다' : '이 폴더 고르기') : '이 폴더 등록'}
         </button>
       </footer>

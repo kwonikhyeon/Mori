@@ -343,7 +343,7 @@ export function ChildrenSwitch() {
           하위 터미널도 알림
         </span>
         <span id={id + '-sub'} class="st-row-sub is-wrap">
-          세션 안에서 따로 연 터미널까지 알립니다. 이 호스트의 모든 기기에 적용됩니다.
+          {failed ? '설정을 읽지 못했습니다. 연결되면 다시 읽습니다.' : '세션 안에서 따로 연 터미널까지 알립니다. 이 호스트의 모든 기기에 적용됩니다.'}
         </span>
       </span>
       {children === null && !failed ? (

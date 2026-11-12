@@ -340,6 +340,9 @@ func openLogger(path string) (*slog.Logger, func(), error) {
 	var w io.Writer = os.Stderr
 	closeFn := func() {}
 	if path != "" {
+		if fi, err := os.Stat(path); err == nil && fi.Size() > 10<<20 {
+			os.Rename(path, path+".1") // one old file is kept; the log must not grow for good
+		}
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {
 			return nil, nil, fmt.Errorf("로그 파일을 열지 못했습니다: %w", err)

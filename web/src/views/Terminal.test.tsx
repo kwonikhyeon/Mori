@@ -2159,6 +2159,37 @@ describe('pickers', () => {
       expect(document.querySelector('.term-boxnote')?.textContent).toBe(NOTE)
     })
 
+    // a stage that changed asks for a new size: the band stays until it comes back (spec §3 #228)
+    it('keeps the cover while a new size is on its way', async () => {
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(80 * 8 + 14)
+      layOut({ 'term-stage': 24 * 17 })
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      expect(band()).not.toBeNull()
+      layOut({ 'term-stage': 30 * 17 })
+      act(() => {
+        window.dispatchEvent(new Event('resize'))
+      })
+      await frame(200)
+      expect(ws.messages().filter((m) => m.type === 'resize')).toEqual([{ type: 'resize', cols: 80, rows: 30 }])
+      expect(band()).not.toBeNull()
+    })
+
+    // the hold keeps the cover as it was, but not down over a box that is empty again
+    it('covers again during a send once the box is empty', async () => {
+      reply = (c) => (c.url.endsWith('/send') ? new Promise<Response>(() => {}) : undefined)
+      const { ws } = await mount()
+      await attach(ws)
+      await show(withText('안녕'))
+      expect(band()).toBeNull()
+      fireEvent.input(screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }), { target: { value: 'hi' } })
+      fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+      await vi.waitFor(() => expect(sent('/api/terminals/t1/send')).toHaveLength(1))
+      await show(IDLE)
+      expect(band()).not.toBeNull()
+    })
+
     it('does not cover while only watching', async () => {
       const { ws } = await mount()
       await attach(ws)

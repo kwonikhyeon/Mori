@@ -202,6 +202,10 @@ func (s *Server) modifyResponse(res *http.Response) error {
 	}
 	if rwc, ok := res.Body.(io.ReadWriteCloser); ok && res.StatusCode == http.StatusSwitchingProtocols {
 		res.Body = &tunnelBody{ReadWriteCloser: rwc, tw: t.tw}
+	} else if res.Header.Get("Content-Type") != "" {
+		// Every relayed route answers JSON. A host that says HTML or script
+		// would otherwise run it in the hub's origin, with the hub's cookie (spec §3 #245).
+		res.Header.Set("Content-Type", "application/json; charset=utf-8")
 	}
 	return nil
 }

@@ -213,6 +213,13 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     }
   }, [addr, phone, h])
 
+  // The size asked for before a new fit went out is still this device's
+  // until the new one comes back: the cover stays meanwhile (spec §3 #228).
+  const askedBefore = useRef<Size | null>(null)
+  const refit = (l: TermLink) => {
+    askedBefore.current = l.fit.peek()
+    l.setFit(measure())
+  }
   // The terminal follows the stage once it has settled.
   useEffect(() => {
     const el = stage.current
@@ -220,7 +227,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     let timer: ReturnType<typeof setTimeout> | undefined
     const later = () => {
       clearTimeout(timer)
-      timer = setTimeout(() => link.setFit(measure()), FIT_DELAY)
+      timer = setTimeout(() => refit(link), FIT_DELAY)
     }
     let stop: () => void
     if (typeof ResizeObserver !== 'undefined') {
@@ -247,7 +254,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       if (!changed || dead) return
       // the cells are measured again once the screen has drawn with them
       requestAnimationFrame(() => {
-        if (!dead) link.setFit(measure())
+        if (!dead) refit(link)
       })
     })
     return () => {
@@ -347,9 +354,6 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   // a moment: the cover stays as it was.
   const claudeOn = !!t && isClaude(t) && pickOn.value && active
   const reading = useBox({ screen, ready: link, on: claudeOn })
-  // The size asked for before the rows for the cover changed is still this
-  // device's until the new one comes back: the cover stays meanwhile.
-  const askedBefore = useRef<Size | null>(null)
   if (same(fit, size)) askedBefore.current = null
   const sameSize = !fit || !size || same(fit, size) || same(askedBefore.current, size)
   const [sending, setSending] = useState(false)
@@ -371,7 +375,8 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const boxable = !!rb && !boxShown.value && canType && sameSize && reading.alternate
   const coverNow = boxable && reading.end && reading.row >= 0 && rb.text === ''
   const coverWas = useRef(false)
-  if (!holding) coverWas.current = coverNow
+  // held as it was, but a box read empty again brings the cover back at once
+  if (!holding || coverNow) coverWas.current = coverNow
   const covered = coverWas.current && !!rb && !seen
   const coverRef = useRef(covered)
   coverRef.current = covered
@@ -406,8 +411,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     if (want?.k === cur?.k && want?.sheet === cur?.sheet) return
     const f = fits()
     tall.current = want && f?.z ? { ...want, extra: coverExtra(f.z.rows, f.room, f.cellH, want.sheet, want.k) } : null
-    askedBefore.current = link.fit.peek()
-    link.setFit(measure())
+    refit(link)
   }, [link, tallOn, tallK, sheet])
   // Those rows reach below the stage: with the cover its top shows, the
   // output down to the band; without, its bottom, with the box.
@@ -570,7 +574,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     renaming && t ? (
       <RenameField initial={t.labels?.['mori.title'] ?? titleOf(t, h.presets.value)} onDone={rename} />
     ) : (
-      <h1 class="term-title">{title}</h1>
+      <h1 class="term-title" title={title}>{title}</h1>
     )
 
   // A window's panel lies over the bottom of the terminal, which keeps its

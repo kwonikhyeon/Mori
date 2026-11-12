@@ -36,7 +36,7 @@ export interface TermLinkOptions {
   /** The calls of the terminal's host; the hub's unless given. */
   api?: HostApi
   /** What the terminal's host says of its core and terminals; the hub's unless given. */
-  store?: Pick<HostStore, 'core' | 'terminals'>
+  store?: Pick<HostStore, 'core' | 'terminals' | 'conn'>
 }
 
 /** The lines of an ended program painted when there is no stream to replay. */
@@ -98,6 +98,8 @@ export class TermLink {
       }),
     )
     this.stops.push(onWake(() => this.session.nudge()))
+    // The event stream came back from a dead link: this socket may be dead the same way, and has no watchdog of its own.
+    this.stops.push(effect(() => void (st.conn.value === 'open' && this.session.nudge())))
   }
 
   /** Types s into the terminal; false when only watching or not attached. */

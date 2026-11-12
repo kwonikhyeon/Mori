@@ -88,12 +88,17 @@ func shellLine(shell string, argv []string) string {
 func (s *Server) resumeClaude(ctx context.Context, t hc.Terminal) {
 	s.resumeMu.Lock()
 	defer s.resumeMu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	// Read again under the lock: another viewer's resume may have set the
+	// label since t was read at attach.
+	if err := s.d.Core.Call(ctx, "terminal.get", map[string]any{"terminal": t.Address}, &t); err != nil {
+		return
+	}
 	line := s.resumeLine(t)
 	if line == "" {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
 	labels := map[string]string{core.LabelClaudeResumed: strconv.Itoa(*t.Pid)}
 	if err := s.d.Core.Call(ctx, "terminal.label", map[string]any{"terminal": t.Address, "labels": labels}, nil); err != nil {
 		s.log.Warn("claude resume", "terminal", t.Address, "err", err)

@@ -128,6 +128,25 @@ describe('AttachSession', () => {
     ])
   })
 
+  it('asks for the earlier fit again before the echo of the last resize came', () => {
+    const { s } = session()
+    const ws = attached(100, 30)
+    s.resize(100, 20) // the keyboard came up
+    s.resize(100, 30) // and went, before {size 100×20} arrived
+    expect(ws.messages()).toEqual([
+      { type: 'resize', cols: 100, rows: 20 },
+      { type: 'resize', cols: 100, rows: 30 },
+    ])
+  })
+
+  it('sends a big paste in pieces the server takes', () => {
+    const { s } = session()
+    const ws = attached()
+    s.send('a'.repeat(600 * 1024))
+    s.send('')
+    expect(ws.sent.map((b) => b.length)).toEqual([256 * 1024, 256 * 1024, 88 * 1024, 0])
+  })
+
   it('sends a fit found while connecting once attached, not one it asked for', () => {
     const { s } = session({ cols: undefined, rows: undefined })
     s.resize(90, 28)

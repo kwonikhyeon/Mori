@@ -95,7 +95,8 @@ async function loadOverview(): Promise<void> {
   try {
     applyOverview(await api.overview())
   } catch {
-    // the banner says what is wrong; the next open asks again
+    // Asked again soon: without the presets a new session cannot be made, and the stream may stay open for hours.
+    setTimeout(() => void (conn.value === 'open' && loadOverview()), 5_000)
   }
 }
 

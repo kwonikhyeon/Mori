@@ -21,6 +21,7 @@ import (
 var ErrUnavailable = errors.New("core unavailable")
 
 const (
+	silenceLimit = 45 * time.Second // three heartbeats missed
 	dialTimeout  = 20 * time.Second // hc connect may have to start the core first
 	startTimeout = 15 * time.Second
 	maxResyncs   = 3 // events channel restarts in a row before reconnecting
@@ -157,7 +158,15 @@ func (m *Manager) dial(ctx context.Context) (*hc.Conn, *hc.Events, hc.Snapshot, 
 func (m *Manager) follow(ctx context.Context, c *hc.Conn, ev *hc.Events, seq int64) error {
 	resyncs := 0
 	for {
-		n, err := ev.Recv(ctx)
+		// The core sends a heartbeat every 15 s; one that hangs with the pipe
+		// open must not pass for connected.
+		rctx, cancel := context.WithTimeout(ctx, silenceLimit)
+		n, err := ev.Recv(rctx)
+		cancel()
+		if err != nil && ctx.Err() == nil && rctx.Err() != nil {
+			ev.Close()
+			return fmt.Errorf("core is silent: %w", err)
+		}
 		if err == nil && n.Method == "event" && n.Event != nil && n.Seq > seq {
 			seq = n.Seq
 			if err = m.apply(*n.Event); err == nil {

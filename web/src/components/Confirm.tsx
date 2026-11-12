@@ -17,7 +17,9 @@ export interface ConfirmProps {
 export function Confirm({ open, title, text, confirm, danger, busy, onConfirm, onCancel }: ConfirmProps) {
   const ref = useRef<HTMLDialogElement>(null)
   const id = useId()
-  useLayer(open, onCancel, true)
+  // While the action runs it cannot be called back: 취소 then would only hide what still happens.
+  const cancel = () => void (busy || onCancel())
+  useLayer(open, cancel, true)
   useEffect(() => {
     const d = ref.current
     if (!d) return
@@ -37,10 +39,10 @@ export function Confirm({ open, title, text, confirm, danger, busy, onConfirm, o
       aria-describedby={id + '-d'}
       onCancel={(e) => {
         e.preventDefault()
-        onCancel()
+        cancel()
       }}
       onClick={(e) => {
-        if (e.target === ref.current) onCancel()
+        if (e.target === ref.current) cancel()
       }}
     >
       {open && (
@@ -48,7 +50,7 @@ export function Confirm({ open, title, text, confirm, danger, busy, onConfirm, o
           <h2 id={id + '-t'} class="confirm-title">{title}</h2>
           <p id={id + '-d'} class="confirm-text">{text}</p>
           <div class="confirm-actions">
-            <button type="button" class="btn" autofocus onClick={onCancel}>
+            <button type="button" class="btn" autofocus aria-disabled={busy} onClick={cancel}>
               취소
             </button>
             <button type="button" class={danger ? 'btn btn-danger-fill' : 'btn btn-primary'} disabled={busy} onClick={onConfirm}>

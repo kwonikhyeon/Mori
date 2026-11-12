@@ -133,7 +133,7 @@ a.term-back {
 
 .term-git {
   gap: var(--spacing-1);
-  height: 44px;
+  height: var(--mori-size-touch);
   padding: 0 var(--spacing-3);
   font-size: var(--text-label-size);
   font-weight: var(--text-label-weight);
@@ -441,7 +441,7 @@ a.term-back {
 /* A 44 px target that leaves the title's line as it is. */
 .term-ask-more {
   flex: none;
-  height: 44px;
+  height: var(--mori-size-touch);
   margin: calc(-1 * var(--spacing-3)) calc(-1 * var(--spacing-1)) calc(-1 * var(--spacing-3)) 0;
   padding: 0 var(--spacing-1);
   border: 0;
@@ -475,7 +475,7 @@ a.term-back {
 .term-phone .term-ask-reject {
   grid-column: 1 / -1;
   justify-content: center;
-  height: 44px;
+  height: var(--mori-size-touch);
   border-radius: var(--radius-container);
 }
 
@@ -715,7 +715,7 @@ a.term-back {
   flex: 1 1 0;
   align-items: center;
   justify-content: center;
-  height: 44px;
+  height: var(--mori-size-touch);
   padding: 0;
   border: 0;
   border-radius: var(--radius-element);

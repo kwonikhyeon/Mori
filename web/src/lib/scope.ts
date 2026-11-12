@@ -245,13 +245,15 @@ export function startHosts(o: HostsOptions = {}): () => void {
           if (c !== 'open') return
           s.unreachable.value = false
           run.restart.reset()
-          // The presets are not in the stream: ask on every open.
-          s.api.overview().then(
-            (ov) => {
-              if (runs.get(s.id) === run) s.applyOverview(ov)
-            },
-            () => {},
-          )
+          // The presets are not in the stream: ask on every open, and again soon when that fails.
+          const ask = (): void =>
+            void s.api.overview().then(
+              (ov) => {
+                if (runs.get(s.id) === run) s.applyOverview(ov)
+              },
+              () => setTimeout(() => void (runs.get(s.id) === run && s.conn.value === 'open' && ask()), 5_000),
+            )
+          ask()
         },
         onDrop: (code) => {
           if (code === OUT_OF_REACH) s.unreachable.value = true

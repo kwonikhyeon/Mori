@@ -322,7 +322,8 @@ export function PresetsCard() {
           프리셋 {list.length}
         </h2>
         {!draft && (
-          <button type="button" class="btn btn-sm" onClick={start}>
+          // The server always has a preset: none means they are not read yet, and saving then would replace them all.
+          <button type="button" class="btn btn-sm" disabled={list.length === 0} onClick={start}>
             <Icon name="pencil" size={16} />
             편집
           </button>

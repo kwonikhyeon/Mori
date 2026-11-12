@@ -78,7 +78,8 @@ export class EventStream {
       this.connect()
       return
     }
-    if (ws.readyState !== OPEN || this.probing !== undefined) return
+    // A socket still connecting is timed as well: after a sleep it can hang there until the watchdog.
+    if (this.probing !== undefined) return
     this.probing = setTimeout(() => {
       this.probing = undefined
       this.detach()?.close()
@@ -88,7 +89,7 @@ export class EventStream {
       this.connect()
     }, this.o.probe ?? 4_000)
     try {
-      ws.send('{"type":"ping"}')
+      if (ws.readyState === OPEN) ws.send('{"type":"ping"}')
     } catch {
       // the probe runs out
     }

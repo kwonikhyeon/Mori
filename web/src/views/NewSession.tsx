@@ -58,6 +58,8 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
+  const shown = useRef(true)
+  useEffect(() => () => void (shown.current = false), [])
   const nameRef = useRef<HTMLInputElement>(null)
   const focusName = useRef(false)
 
@@ -147,7 +149,8 @@ export function NewSession({ variant, folder, wt, back }: NewSessionProps) {
       // The list has it before the event stream brings it.
       h.apply({ type: 'terminal', terminal: t })
       save(LAST, { folder: f.id, preset: preset.id } satisfies Last)
-      h.go({ name: 'terminal', addr: t.address, git: false }, { replace: true })
+      // Left while it was made: the session is in the list, and the screen they went to stays.
+      if (shown.current) h.go({ name: 'terminal', addr: t.address, git: false }, { replace: true })
     } catch (e) {
       setError('세션을 만들지 못했습니다. ' + errorText(e))
     } finally {

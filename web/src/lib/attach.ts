@@ -62,6 +62,7 @@ type Handlers = { [K in keyof AttachEvents]: Set<(v: AttachEvents[K]) => void> }
 
 const OPEN = 1
 const enc = new TextEncoder()
+const CHUNK = 256 * 1024
 
 export class AttachSession {
   state: AttachState = 'connecting'
@@ -157,7 +158,9 @@ export class AttachSession {
   /** Types data, unless only watching or not attached. */
   send(data: string | Uint8Array<ArrayBuffer>): boolean {
     if (!this.writable() || this.o.observe) return false
-    this.ws!.send(typeof data === 'string' ? enc.encode(data) : data)
+    const b = typeof data === 'string' ? enc.encode(data) : data
+    // In pieces: the server drops a socket that sends a message over 1 MiB (a big paste).
+    for (let i = 0; i === 0 || i < b.length; i += CHUNK) this.ws!.send(b.length > CHUNK ? b.subarray(i, i + CHUNK) : b)
     return true
   }
 
@@ -181,7 +184,8 @@ export class AttachSession {
     const changed = !this.want || this.want.cols !== cols || this.want.rows !== rows
     this.want = { cols, rows }
     if (this.o.observe || !this.writable()) return
-    if (force || (changed && (cols !== this.cols || rows !== this.rows))) this.json({ type: 'resize', cols, rows })
+    // Not compared with this.cols/rows: they are stale while an earlier resize's echo is on its way.
+    if (force || changed) this.json({ type: 'resize', cols, rows })
   }
 
   /** Whether a person looks at this terminal now (spec §3 #127). */

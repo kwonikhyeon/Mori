@@ -133,7 +133,7 @@ func (a *Auth) Device(r *http.Request) (store.Device, string, bool) {
 		return store.Device{}, "", false
 	}
 	h := []byte(hashToken(c.Value))
-	for _, d := range a.st.Get().Devices {
+	for _, d := range a.st.Devices() {
 		if subtle.ConstantTimeCompare([]byte(d.TokenHash), h) == 1 {
 			return d, c.Value, true
 		}
@@ -167,7 +167,7 @@ func (a *Auth) Touch(w http.ResponseWriter, dev store.Device, token, userAgent s
 
 // Devices lists the paired devices, without their token hashes.
 func (a *Auth) Devices() []store.Device {
-	ds := a.st.Get().Devices
+	ds := a.st.Devices()
 	for i := range ds {
 		ds[i].TokenHash = ""
 	}

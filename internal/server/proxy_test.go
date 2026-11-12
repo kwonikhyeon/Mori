@@ -459,3 +459,27 @@ func TestCloseReason(t *testing.T) {
 		t.Fatal(r)
 	}
 }
+
+// A host must not get HTML or script to run in the hub's origin (spec §3 #245).
+func TestProxyAnswersAsJSON(t *testing.T) {
+	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		io.WriteString(w, "<script>alert(1)</script>")
+	}))
+	t.Cleanup(host.Close)
+	e := newTestEnv(t, withLinks(nil))
+	e.pair()
+	req, err := http.NewRequest("GET", e.srv.URL+"/h/"+e.linkHost(host.URL)+"/api/overview", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: e.token})
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if ct := res.Header.Get("Content-Type"); res.StatusCode != http.StatusOK || !strings.HasPrefix(ct, "application/json") || res.Header.Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("%d %q %q", res.StatusCode, ct, res.Header.Get("X-Content-Type-Options"))
+	}
+}

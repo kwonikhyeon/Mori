@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/kwonikhyeon/mori/internal/auth"
 	"github.com/kwonikhyeon/mori/internal/store"
@@ -70,6 +71,8 @@ func isPublic(r *http.Request) bool {
 // readJSON decodes a body of at most 1 MiB into v. An empty body leaves v
 // as it is.
 func readJSON(w http.ResponseWriter, r *http.Request, v any) error {
+	// A body that never ends must not hold the connection (pairing is public).
+	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(15 * time.Second))
 	err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxJSONBody)).Decode(v)
 	var tooLarge *http.MaxBytesError
 	switch {

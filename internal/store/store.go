@@ -71,6 +71,14 @@ func (s *Store) Folders() []Folder {
 	return append([]Folder{}, s.cur.Folders...)
 }
 
+// Devices returns a copy of the paired devices, cheaper than Get: every
+// request asks for them.
+func (s *Store) Devices() []Device {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]Device{}, s.cur.Devices...)
+}
+
 // Hosts returns a copy of the linked hosts, cheaper than Get.
 func (s *Store) Hosts() []Host {
 	s.mu.Lock()

@@ -38,6 +38,7 @@ type wsMsg struct {
 	Reason    string         `json:"reason"`
 	ExitCode  *int           `json:"exit_code"`
 	Signal    *int           `json:"signal"`
+	Automatic bool           `json:"automatic"`
 }
 
 // wsClient is a browser in a test: it keeps the output it has read and the
@@ -365,6 +366,13 @@ func TestAttachRoundTripSizeAndClose(t *testing.T) {
 	}
 	a.input("echo ws-$((2+3))\r")
 	a.untilOutput("ws-5")
+	// What the browser's terminal typed by itself reaches the program apart
+	// from typing, where the core takes it (spec §3 #237).
+	if !at.Automatic {
+		t.Fatal("the core's attach takes no AUTOMATIC_INPUT")
+	}
+	a.send(map[string]any{"type": "auto", "data": "echo auto-$((1+2))\r"})
+	a.untilOutput("auto-3")
 	a.send(map[string]any{"type": "resize", "cols": 100, "rows": 30})
 	a.untilMsg("size", func(m wsMsg) bool { return m.Type == "size" && m.Cols == 100 && m.Rows == 30 })
 	a.send(map[string]any{"type": "focus", "focused": true})

@@ -82,6 +82,34 @@ describe('AttachSession', () => {
     expect(ws.input()).toEqual(['ls\r', '\x1b'])
   })
 
+  // What the terminal typed by itself goes apart from typing where the
+  // server says it takes it, and as typing to an older one (spec §3 #237).
+  it('passes what the terminal typed by itself apart, where the server takes it', () => {
+    const { s } = session()
+    expect(s.sendAuto('\x1b[O')).toBe(false)
+    let ws = FakeWebSocket.last()
+    ws.open()
+    ws.json({ type: 'attached', terminal: term(), cols: 100, rows: 30, automatic: true })
+    expect(s.sendAuto('\x1b[<35;35;14M')).toBe(true)
+    expect(ws.messages()).toEqual([{ type: 'auto', data: '\x1b[<35;35;14M' }])
+    expect(ws.input()).toEqual([])
+    ws.drop(1006)
+    vi.advanceTimersByTime(500)
+    ws = attached() // an older Mori: no "automatic"
+    expect(s.sendAuto('\x1b[O')).toBe(true)
+    expect(ws.input()).toEqual(['\x1b[O'])
+    expect(ws.messages()).toEqual([])
+  })
+
+  it('passes nothing while only watching', () => {
+    const { s } = session({ observe: true })
+    const ws = FakeWebSocket.last()
+    ws.open()
+    ws.json({ type: 'attached', terminal: term(), cols: 100, rows: 30, automatic: true })
+    expect(s.sendAuto('\x1b[O')).toBe(false)
+    expect(ws.messages()).toEqual([])
+  })
+
   it('resizes when the fit changes, not to fight another screen', () => {
     const { s } = session()
     const ws = attached(100, 30)

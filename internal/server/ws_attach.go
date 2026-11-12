@@ -71,6 +71,8 @@ type (
 		Terminal TerminalView `json:"terminal"`
 		Cols     int          `json:"cols"`
 		Rows     int          `json:"rows"`
+		// The browser may send what its terminal typed by itself as {type: "auto"} (spec §3 #237).
+		Automatic bool `json:"automatic"`
 	}
 	sizeMsg struct {
 		Type string `json:"type"`
@@ -91,6 +93,7 @@ type attachment struct {
 	c      *websocket.Conn
 	q      attachQuery
 	viewer string // this socket in Presence
+	auto   bool   // the core takes AUTOMATIC_INPUT on this stream
 
 	sizeMu     sync.Mutex // held while a size goes out, so two never cross
 	cols, rows int        // the size the browser was told last
@@ -141,7 +144,8 @@ func (a *attachment) run(ctx context.Context) {
 	if res.Terminal.Cols > 0 && res.Terminal.Rows > 0 {
 		a.cols, a.rows = res.Terminal.Cols, res.Terminal.Rows
 	}
-	if err := writeWS(ctx, a.c, attachedMsg{Type: "attached", Terminal: s.view(res.Terminal), Cols: a.cols, Rows: a.rows}); err != nil {
+	a.auto = res.AutomaticInput
+	if err := writeWS(ctx, a.c, attachedMsg{Type: "attached", Terminal: s.view(res.Terminal), Cols: a.cols, Rows: a.rows, Automatic: a.auto}); err != nil {
 		wt.Close()
 		a.c.CloseNow()
 		return
@@ -257,12 +261,25 @@ func (a *attachment) input(ctx context.Context, st *hc.Stream, addr string) {
 			Cols    int    `json:"cols"`
 			Rows    int    `json:"rows"`
 			Focused bool   `json:"focused"`
+			Data    string `json:"data"`
 			hc.Display
 		}
 		if json.Unmarshal(b, &m) != nil {
 			continue
 		}
 		switch m.Type {
+		case "auto":
+			// What the browser's terminal typed by itself: the program gets it, and
+			// the core does not take it for a person typing, whom terminal.send and
+			// terminal.keys wait out (spec §3 #237).
+			if a.q.observe || m.Data == "" {
+				break
+			}
+			if a.auto {
+				st.WriteAutomatic([]byte(m.Data))
+			} else {
+				st.Write([]byte(m.Data))
+			}
 		case "resize":
 			if !a.q.observe && m.Cols > 0 && m.Rows > 0 {
 				st.Resize(clampSize(m.Cols, defaultCols), clampSize(m.Rows, defaultRows))

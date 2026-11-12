@@ -7,6 +7,7 @@
 import { effect, signal } from '@preact/signals'
 import { api, type HostApi } from './api'
 import { AttachSession, type AttachState, type Closed, type Size } from './attach'
+import { automatic } from './autoinput'
 import type { SocketCtor } from './events'
 import { watchFocus } from './focus'
 import { keyBytes, NO_MODS, tapMod, withMods, type Mod, type Mods, type QuickKey } from './keys'
@@ -71,7 +72,8 @@ export class TermLink {
     this.fit.value = o.fit ?? null
     this.observing.value = !!o.observe
     const sc = o.screen
-    this.stops.push(sc.onData((s) => void this.typed(s)))
+    // A reply, a focus report or a pointer moving goes apart from typing, which send and keys wait out (spec §3 #237).
+    this.stops.push(sc.onData((s) => void (automatic(s) ? this.session.sendAuto(s) : this.typed(s))))
     this.stops.push(sc.onBinary((s) => void this.session.send(bytes(s))))
     this.open()
     this.stops.push(

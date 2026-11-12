@@ -333,7 +333,8 @@ export type EventMessage =
 
 /** The JSON messages of /ws/attach from the server (spec §7.3). */
 export type AttachMessage =
-  | { type: 'attached'; terminal: TerminalView; cols: number; rows: number }
+  /** automatic: the server takes what the terminal typed by itself as {type: "auto"} (spec §3 #237); absent from an older Mori. */
+  | { type: 'attached'; terminal: TerminalView; cols: number; rows: number; automatic?: boolean }
   | { type: 'size'; cols: number; rows: number }
   | { type: 'closed'; reason: string; exit_code: number | null; signal: number | null }
   | { type: 'pong' }

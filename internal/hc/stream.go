@@ -293,11 +293,20 @@ func (s *Stream) Recv(ctx context.Context) (StreamMsg, error) {
 func (s *Stream) Credit(n int) error { return s.credit(n) }
 
 // Write types p into the terminal.
-func (s *Stream) Write(p []byte) (int, error) {
+func (s *Stream) Write(p []byte) (int, error) { return s.write(KindData, p) }
+
+// WriteAutomatic passes p, which the viewer's terminal typed by itself (a
+// reply to a query, a focus or mouse-motion report), as AUTOMATIC_INPUT:
+// the program gets it, and the core does not count it as a person typing,
+// so terminal.send and terminal.keys need not wait for it to stop. Only
+// where AttachResult.AutomaticInput says the path takes it.
+func (s *Stream) WriteAutomatic(p []byte) (int, error) { return s.write(KindAutomaticInput, p) }
+
+func (s *Stream) write(kind byte, p []byte) (int, error) {
 	n := 0
 	for len(p) > 0 {
 		k := min(len(p), maxWrite)
-		if err := s.send(KindData, p[:k]); err != nil {
+		if err := s.send(kind, p[:k]); err != nil {
 			return n, err
 		}
 		n += k

@@ -83,6 +83,8 @@ export class AttachSession {
   private asked: Size | null = null
   private focused = false
   private sentFocus = false
+  /** The server takes what the terminal typed by itself apart from typing (spec §3 #237). */
+  private automatic = false
   private facts: DisplayFacts | null = null
   private sentFacts = ''
   private readonly backoff: Backoff
@@ -156,6 +158,18 @@ export class AttachSession {
   send(data: string | Uint8Array<ArrayBuffer>): boolean {
     if (!this.writable() || this.o.observe) return false
     this.ws!.send(typeof data === 'string' ? enc.encode(data) : data)
+    return true
+  }
+
+  /**
+   * Passes what the terminal typed by itself: a reply, a focus or motion
+   * report. A server that tells them apart from typing gets them as such;
+   * an older one, as typing.
+   */
+  sendAuto(data: string): boolean {
+    if (!this.automatic) return this.send(data)
+    if (!this.writable() || this.o.observe) return false
+    this.json({ type: 'auto', data })
     return true
   }
 
@@ -252,6 +266,7 @@ export class AttachSession {
         this.backoff.reset()
         this.cols = m.cols
         this.rows = m.rows
+        this.automatic = m.automatic === true
         this.sentFocus = false
         this.sentFacts = ''
         this.reason = ''

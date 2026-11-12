@@ -55,8 +55,10 @@ func TestStreamInputCreditResizeClose(t *testing.T) {
 	s.Resize(100, 30)
 	s.Focus(true)
 	s.Facts(Display{FG: "#ffffff"})
+	s.WriteAutomatic([]byte("\x1b[O"))
 	want := []Frame{{5, KindData, []byte("ls\r")}, {5, KindCredit, []byte{0xd2, 0x04, 0, 0}},
-		{5, KindResize, []byte{100, 0, 30, 0}}, {5, KindFocus, []byte{1}}, {5, KindFacts, []byte(`{"fg":"#ffffff"}`)}}
+		{5, KindResize, []byte{100, 0, 30, 0}}, {5, KindFocus, []byte{1}}, {5, KindFacts, []byte(`{"fg":"#ffffff"}`)},
+		{5, KindAutomaticInput, []byte("\x1b[O")}}
 	for _, w := range want {
 		got := f.readFrame()
 		if got.Channel != w.Channel || got.Kind != w.Kind || !bytes.Equal(got.Payload, w.Payload) {

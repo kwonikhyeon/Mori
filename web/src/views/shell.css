@@ -54,14 +54,18 @@
 }
 
 /* 세션 이동 as astryx's search field: it opens the switcher rather than
-   taking text, so it is a button that looks like the field. */
+   taking text, so it is a button that looks like the field. Its key caps
+   keep as far from its right edge as from its top and bottom, and round
+   with it: their corners share the field's centres (spec §3 #236). */
 .pc-find {
+  --pc-find-h: var(--size-element-md);
+  --pc-find-inset: calc((var(--pc-find-h) - var(--spacing-5)) / 2);
   display: flex;
   align-items: center;
   gap: var(--spacing-2);
   width: 100%;
-  height: var(--size-element-md);
-  padding: 0 var(--spacing-1-5) 0 var(--spacing-3);
+  height: var(--pc-find-h);
+  padding: 0 calc(var(--pc-find-inset) - var(--border-width)) 0 var(--spacing-3);
   border: 1px solid var(--color-border-emphasized);
   border-radius: var(--radius-element);
   background-color: var(--color-background-surface);
@@ -89,14 +93,8 @@
   white-space: nowrap;
 }
 
-.pc-find-key {
-  flex: none;
-  padding: var(--spacing-0-5) var(--spacing-1-5);
-  border-radius: var(--radius-inner);
-  background-color: var(--color-neutral);
-  font-family: inherit;
-  font-size: var(--text-supporting-size);
-  line-height: var(--text-supporting-leading);
+.pc-find .kbd {
+  border-radius: calc(var(--radius-element) - var(--pc-find-inset));
 }
 
 .pc-head-end {
@@ -137,13 +135,18 @@
     app-region: no-drag;
   }
 
-  .pc-head :is(.pc-find, .btn-sm, .hostpick) {
+  .pc-head :is(.btn-sm, .hostpick) {
     height: var(--size-element-sm);
     min-height: var(--size-element-sm);
   }
 
   .pc-head .btn-icon.btn-sm {
     width: var(--size-element-sm);
+  }
+
+  /* Its key caps follow: 4 px clear and the inner radius (spec §3 #236). */
+  .pc-head .pc-find {
+    --pc-find-h: var(--size-element-sm);
   }
 }
 

@@ -688,6 +688,36 @@ textarea.input {
   }
 }
 
+/* ---------- key badges (astryx Kbd) ---------- */
+/* One key cap per key, 4 px apart: 20 px, the neutral fill over a 2 px
+   edge. The control the keys work names them (aria-keyshortcuts), so the
+   caps are hidden from assistive technology. */
+.kbd-group {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: var(--spacing-5);
+  height: var(--spacing-5);
+  padding: 0 var(--spacing-1);
+  border-bottom: calc(2 * var(--border-width)) solid var(--color-border-emphasized);
+  border-radius: var(--radius-inner);
+  background-color: var(--color-neutral);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-supporting-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--text-supporting-leading);
+  user-select: none;
+}
+
 /* ---------- confirm dialog (astryx AlertDialog) ---------- */
 /* No border: the high shadow lifts it off the scrim. */
 dialog.confirm {

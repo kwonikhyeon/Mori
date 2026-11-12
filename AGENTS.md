@@ -82,6 +82,7 @@ Reuse these classes before writing new ones. A new control maps to an astryx com
 | `.st-check`, `.fp-hidden input` | CheckboxInput | For a choice that is applied later, on submit. |
 | `.pc-aside.is-over` | Drawer | The side panel, laid over the main area below 1180px (`lib/resize.ts`). |
 | `.spin` | Spinner | |
+| `.kbd-group`, `.kbd` | Kbd | One key cap per key, hidden from assistive technology; the control names its keys with `aria-keyshortcuts`. Inside a rounded field, give the caps the field's radius less their inset (`.pc-find`). |
 
 ### States
 

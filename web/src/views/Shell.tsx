@@ -306,6 +306,8 @@ function PcEmpty() {
 function SwitchField() {
   const apple = isApple()
   const keys = apple ? '⌘P' : 'Ctrl+P'
+  // One key cap per key, as astryx's Kbd draws mod+p (spec §3 #236).
+  const caps = apple ? ['⌘', 'P'] : ['Ctrl', 'P']
   return (
     <button
       type="button"
@@ -318,7 +320,13 @@ function SwitchField() {
     >
       <Icon name="search" size={16} />
       <span class="pc-find-text">세션 찾기 · 이동</span>
-      <kbd class="pc-find-key">{keys}</kbd>
+      <span class="kbd-group" aria-hidden="true">
+        {caps.map((k) => (
+          <kbd key={k} class="kbd">
+            {k}
+          </kbd>
+        ))}
+      </span>
     </button>
   )
 }

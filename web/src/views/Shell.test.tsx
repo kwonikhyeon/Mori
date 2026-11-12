@@ -122,7 +122,12 @@ describe('PC', () => {
     const [start, find, end] = [...bar.children] as HTMLElement[]
     expect(within(start).getByRole('link', { name: 'Mori, 지금 볼 것' }).getAttribute('href')).toBe('#/')
     expect(find.getAttribute('aria-label')).toBe('세션 이동')
-    expect(find.textContent).toMatch(/세션 찾기 · 이동(⌘P|Ctrl\+P)/)
+    expect(find.textContent).toMatch(/^세션 찾기 · 이동(⌘P|CtrlP)$/)
+    // One key cap per key, hidden: the button names its keys (aria-keyshortcuts).
+    expect([...find.querySelectorAll('kbd.kbd')].map((k) => k.textContent)).toEqual(expect.arrayContaining(['P']))
+    expect(find.querySelectorAll('kbd.kbd')).toHaveLength(2)
+    expect(find.querySelector('.kbd-group')!.getAttribute('aria-hidden')).toBe('true')
+    expect(find.getAttribute('aria-keyshortcuts')).toMatch(/^(Meta|Control)\+P$/)
     expect(within(end).getByRole('link', { name: '새 세션' }).getAttribute('href')).toBe('#/new')
     expect(within(end).getByRole('link', { name: '설정' }).getAttribute('href')).toBe('#/settings')
   })

@@ -212,8 +212,24 @@ describe('the title bar', () => {
     expect(wco.get('.pc-head')).toMatch(
       /[^-]height: max\(env\(titlebar-area-height, var\(--size-element-lg\)\), calc\(var\(--size-element-sm\) \+ 2 \* var\(--spacing-1-5\)\)\);/,
     )
-    expect(wco.get('.pc-head :is(.pc-find, .btn-sm, .hostpick)')).toMatch(/[^-]height: var\(--size-element-sm\);/)
+    expect(wco.get('.pc-head :is(.btn-sm, .hostpick)')).toMatch(/[^-]height: var\(--size-element-sm\);/)
     expect(wco.get('.pc-head .btn-icon.btn-sm')).toMatch(/width: var\(--size-element-sm\);/)
+    expect(wco.get('.pc-head .pc-find')).toMatch(/--pc-find-h: var\(--size-element-sm\);/)
+  })
+
+  // The key caps sit as far from the field's right edge as from its top and
+  // bottom, and their corners share the field's centres (spec §3 #236).
+  it('rounds the key caps with the field', () => {
+    const css = sheets['../views/shell.css']
+    const [[start, end]] = blocks(css, /@media \(display-mode: window-controls-overlay\) \{/g)
+    const plain = new Map(rules(css).filter(([, , at]) => at < start || at >= end).map(([sel, body]) => [sel, body]))
+    const find = plain.get('.pc-find')!
+    expect(find).toMatch(/--pc-find-inset: calc\(\(var\(--pc-find-h\) - var\(--spacing-5\)\) \/ 2\);/)
+    expect(find).toMatch(/[^-]height: var\(--pc-find-h\);/)
+    expect(find).toMatch(/padding: 0 calc\(var\(--pc-find-inset\) - var\(--border-width\)\) 0 /)
+    expect(find).toMatch(/border-radius: var\(--radius-element\);/)
+    expect(plain.get('.pc-find .kbd')).toMatch(/border-radius: calc\(var\(--radius-element\) - var\(--pc-find-inset\)\);/)
+    expect(rules(sheets['./ui.css']).find(([sel]) => sel === '.kbd')?.[1]).toMatch(/[^-]height: var\(--spacing-5\);/)
   })
 
   // The field starts where the main area does: the sidebar's width, then the

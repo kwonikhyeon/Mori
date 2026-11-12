@@ -3,6 +3,7 @@
 package core
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/kwonikhyeon/mori/internal/hc"
@@ -14,7 +15,20 @@ const (
 	LabelFolder = "mori.folder" // the folder's ID
 	LabelPreset = "mori.preset" // the preset's ID
 	LabelTitle  = "mori.title"  // a name the user gave it
+
+	// LabelClaudeSession is the ID of the conversation Claude Code holds
+	// in the terminal, as its SessionStart hook last said (spec §3 #230).
+	LabelClaudeSession = "mori.claude.session"
+	// LabelClaudeResumed is the pid of the shell Mori last sent the
+	// command that takes the conversation up again.
+	LabelClaudeResumed = "mori.claude.resumed"
 )
+
+// sessionID is how Claude Code names a conversation: a UUID.
+var sessionID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// IsSessionID says whether s names a Claude Code conversation.
+func IsSessionID(s string) bool { return sessionID.MatchString(s) }
 
 // DisplayTitle is the name to show for t: the user's name for it, the
 // program's title, the foreground program, the started program, or "셸".

@@ -68,11 +68,6 @@
   font-weight: var(--font-weight-semibold);
 }
 
-.qs-row.is-finished .qs-title {
-  color: var(--color-text-secondary);
-  font-weight: var(--font-weight-medium);
-}
-
 .qs-sub {
   color: var(--color-text-secondary);
   font-size: var(--text-supporting-size);

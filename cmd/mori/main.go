@@ -58,6 +58,8 @@ func main() {
 		err = runHosts(os.Stdout, args)
 	case "doctor":
 		err = runDoctor(args)
+	case "claude-hook": // Claude Code runs it, not a person (spec §3 #230)
+		runClaudeHook(os.Getenv("HC_TERMINAL_ID"), os.Stdin, hcLabel)
 	case "version", "-v", "--version":
 		fmt.Printf("mori %s (%s/%s, %s)\n", version.Version, runtime.GOOS, runtime.GOARCH, runtime.Version())
 	case "help", "-h", "--help":

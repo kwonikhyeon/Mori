@@ -1,8 +1,8 @@
-// The folder screen: every registered folder with its terminals, the live
-// ones newest first and the finished ones last; 기타 holds the rest.
+// The folder screen: every registered folder with its live terminals,
+// newest first (finished ones are not listed, spec §3 #229); 기타 holds the
+// rest.
 import { Icon } from '../components/Icon'
-import { now } from '../lib/clock'
-import { appName, branchOf, finishedLine, place, shortPath } from '../lib/format'
+import { appName, branchOf, place, shortPath } from '../lib/format'
 import { groupByFolder, type FolderGroup } from '../lib/queue'
 import { useHost } from '../lib/scope'
 import type { HostStore } from '../lib/store'
@@ -11,7 +11,6 @@ import { ListFrame, Loading, TermRow, type ListProps } from './rows'
 import './lists.css'
 
 function sub(h: HostStore, t: TerminalView, f: FolderView | null): string {
-  if (t.state === 'finished') return finishedLine(t, h.presets.value, now.value)
   const app = appName(t, h.presets.value)
   if (!f) return `${app} · ${place(t, h.folders.value)}`
   const b = branchOf(t, f)

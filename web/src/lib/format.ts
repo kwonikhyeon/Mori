@@ -156,13 +156,6 @@ export function endText(e: EndFacts): string {
   return REASONS[e.reason ?? ''] ?? '끝남'
 }
 
-/** "셸 · 코드 0 · 2시간 전" */
-export function finishedLine(t: TerminalView, presets: Preset[], now: number): string {
-  const parts = [appName(t, presets), endText(t)]
-  if (t.finished_ms != null) parts.push(relTime(t.finished_ms, now))
-  return parts.join(' · ')
-}
-
 interface BranchFacts {
   head: string
   branch: string

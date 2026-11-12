@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { folder, status, term, worktree } from '../../test/fixtures'
-import { appName, askText, branchLine, branchOf, changeGroups, chip, commitItems, endText, fileParts, fileTotals, finishedLine, homeWorktree, place, shortHash, shortPath, since, splitMessage, versionText } from './format'
+import { appName, askText, branchLine, branchOf, changeGroups, chip, commitItems, endText, fileParts, fileTotals, homeWorktree, place, shortHash, shortPath, since, splitMessage, versionText } from './format'
 import type { Change, Commit, CommitFile, Preset } from './types'
 
 const presets: Preset[] = [
@@ -132,12 +132,6 @@ describe('endText', () => {
     expect(endText({ reason: 'host_shutdown', exit_code: null, signal: null })).toBe('컴퓨터 종료')
     expect(endText({ reason: 'something-new', exit_code: null, signal: null })).toBe('끝남')
     expect(endText({ reason: null, exit_code: 2, signal: null })).toBe('코드 2')
-  })
-
-  it('writes the line of a recently finished session', () => {
-    const now = 1_800_000_000_000
-    const t = term({ preset: 'shell', argv: [], state: 'finished', reason: 'exited', exit_code: 0, finished_ms: now - 2 * 3_600_000 })
-    expect(finishedLine(t, presets, now)).toBe('셸 · 코드 0 · 2시간 전')
   })
 })
 

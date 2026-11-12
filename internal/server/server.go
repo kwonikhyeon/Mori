@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -63,21 +64,26 @@ type Deps struct {
 	// box's ↑ reads (spec §3 #226). Empty takes $CLAUDE_CONFIG_DIR or
 	// ~/.claude.
 	ClaudeConfig string
+	// ClaudeHook is the command Claude Code runs as its SessionStart hook
+	// in the terminals Mori starts (`mori claude-hook`, spec §3 #230); ""
+	// gives it none.
+	ClaudeHook string
 }
 
 // Server routes requests. Build it with New and serve Handler().
 type Server struct {
-	d       Deps
-	log     *slog.Logger
-	mux     *http.ServeMux
-	hub     *hub
-	proxy   *httputil.ReverseProxy // nil without Deps.Links
-	folders signal                 // fired by FoldersChanged
-	viewers atomic.Int64           // numbers attach sockets for Presence
-	hosts   *hostCheck
-	slow    time.Duration // a request this slow is logged; tests lower it
-	answers answers       // the questions being answered (spec §3 #194)
-	unblock time.Duration // how long a reject waits for the question to go; tests lower it
+	d        Deps
+	log      *slog.Logger
+	mux      *http.ServeMux
+	hub      *hub
+	proxy    *httputil.ReverseProxy // nil without Deps.Links
+	folders  signal                 // fired by FoldersChanged
+	viewers  atomic.Int64           // numbers attach sockets for Presence
+	hosts    *hostCheck
+	slow     time.Duration // a request this slow is logged; tests lower it
+	answers  answers       // the questions being answered (spec §3 #194)
+	unblock  time.Duration // how long a reject waits for the question to go; tests lower it
+	resumeMu sync.Mutex    // one Claude Code resume decided at a time (spec §3 #230)
 }
 
 func New(d Deps) *Server {

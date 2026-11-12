@@ -146,6 +146,10 @@ func (a *attachment) run(ctx context.Context) {
 		a.c.CloseNow()
 		return
 	}
+	// A shell that took Claude Code's place takes its conversation up again as it is opened (spec §3 #230).
+	if !q.observe {
+		go s.resumeClaude(context.WithoutCancel(ctx), res.Terminal)
+	}
 
 	sctx, cancel := context.WithCancel(ctx) // ends when the browser does
 	stop := make(chan struct{})

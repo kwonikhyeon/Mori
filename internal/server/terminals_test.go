@@ -179,7 +179,7 @@ func (e *testEnv) upload(path, field, name string, data []byte) *http.Response {
 func TestRunParams(t *testing.T) {
 	f := store.Folder{ID: "f_1", Path: "/repo"}
 	p := store.Preset{ID: "claude", Name: "Claude Code", Argv: []string{"claude"}, Task: true}
-	got := runParams(f, "/repo", p, createReq{Task: "버그 고쳐줘", Cols: 5, Rows: 5000})
+	got := runParams(f, "/repo", p, createReq{Task: "버그 고쳐줘", Cols: 5, Rows: 5000}, "")
 	if !slices.Equal(got.Argv, []string{"claude", "버그 고쳐줘"}) || got.Cwd != "/repo" || !got.Keep || !got.NoParent {
 		t.Fatalf("%+v", got)
 	}
@@ -196,30 +196,30 @@ func TestRunParams(t *testing.T) {
 		t.Fatal("preset argv modified:", p.Argv)
 	}
 
-	sh := runParams(f, "/repo", store.Preset{ID: "shell", Name: "셸", Argv: []string{}}, createReq{Task: "ignored"})
+	sh := runParams(f, "/repo", store.Preset{ID: "shell", Name: "셸", Argv: []string{}}, createReq{Task: "ignored"}, "")
 	if sh.Argv != nil || sh.Labels["mori.title"] != "셸" || sh.Size.Cols != 80 || sh.Size.Rows != 24 {
 		t.Fatalf("%+v", sh)
 	}
 
-	long := runParams(f, "/repo/wt", p, createReq{Task: "  첫 줄\n둘째 줄   " + strings.Repeat("가", 50), Title: ""})
+	long := runParams(f, "/repo/wt", p, createReq{Task: "  첫 줄\n둘째 줄   " + strings.Repeat("가", 50), Title: ""}, "")
 	if title := long.Labels["mori.title"]; title != "첫 줄 둘째 줄 "+strings.Repeat("가", 31) || long.Cwd != "/repo/wt" {
 		t.Fatalf("%q %q", title, long.Cwd)
 	}
-	named := runParams(f, "/repo", p, createReq{Task: "x", Title: " 내\t이름 "})
+	named := runParams(f, "/repo", p, createReq{Task: "x", Title: " 내\t이름 "}, "")
 	if named.Labels["mori.title"] != "내 이름" {
 		t.Fatal(named.Labels)
 	}
 	// A preset that takes a task but has no program must not run the task.
-	odd := runParams(f, "/repo", store.Preset{ID: "odd", Name: "odd", Task: true}, createReq{Task: "rm -rf x"})
+	odd := runParams(f, "/repo", store.Preset{ID: "odd", Name: "odd", Task: true}, createReq{Task: "rm -rf x"}, "")
 	if odd.Argv != nil {
 		t.Fatal(odd.Argv)
 	}
 	// A task that looks like an option stays the task.
-	opt := runParams(f, "/repo", p, createReq{Task: " --dangerously-skip-permissions 해 줘\n"})
+	opt := runParams(f, "/repo", p, createReq{Task: " --dangerously-skip-permissions 해 줘\n"}, "")
 	if !slices.Equal(opt.Argv, []string{"claude", " --dangerously-skip-permissions 해 줘"}) || opt.Labels["mori.title"] != "--dangerously-skip-permissions 해 줘" {
 		t.Fatalf("%q %q", opt.Argv, opt.Labels["mori.title"])
 	}
-	if blank := runParams(f, "/repo", p, createReq{Task: " \n "}); !slices.Equal(blank.Argv, []string{"claude"}) || blank.Labels["mori.title"] != "Claude Code" {
+	if blank := runParams(f, "/repo", p, createReq{Task: " \n "}, ""); !slices.Equal(blank.Argv, []string{"claude"}) || blank.Labels["mori.title"] != "Claude Code" {
 		t.Fatalf("%+v", blank)
 	}
 }

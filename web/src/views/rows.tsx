@@ -73,15 +73,13 @@ export interface TermRowProps {
   t: TerminalView
   p: ListProps
   sub: string
-  /** What stands on the right; the state chip unless given. */
-  end?: ComponentChildren
 }
 
-export function TermRow({ t, p, sub, end }: TermRowProps) {
+export function TermRow({ t, p, sub }: TermRowProps) {
   const h = useHost()
   const sel = p.selected === t.address
   const fresh = unseen(h.id, t, now.value)
-  const cls = 'qrow' + (t.state === 'finished' ? ' is-finished' : '') + (sel ? ' is-selected' : '') + (fresh ? ' is-unseen' : '')
+  const cls = 'qrow' + (sel ? ' is-selected' : '') + (fresh ? ' is-unseen' : '')
   return (
     <li>
       <a class={cls} href={termHref(h, t, p)} aria-current={sel ? 'true' : undefined}>
@@ -93,12 +91,10 @@ export function TermRow({ t, p, sub, end }: TermRowProps) {
           </span>
           <span class="qrow-sub">{sub}</span>
         </span>
-        {end ?? (
-          <span class="qrow-state">
-            <Since t={t} />
-            <Chip info={chip(t)} />
-          </span>
-        )}
+        <span class="qrow-state">
+          <Since t={t} />
+          <Chip info={chip(t)} />
+        </span>
       </a>
     </li>
   )

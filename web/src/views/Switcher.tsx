@@ -5,7 +5,6 @@
 import { useEffect, useId, useState } from 'preact/hooks'
 import { Chip } from '../components/Chip'
 import { Sheet, SheetHead } from '../components/Sheet'
-import { now } from '../lib/clock'
 import { chip } from '../lib/format'
 import { isApple } from '../lib/platform'
 import { href, route } from '../lib/router'
@@ -34,7 +33,7 @@ function SwitchList({ id }: { id: string }) {
   const [sel, setSel] = useState<{ q: string; i: number } | null>(null)
   const r = route.value
   const here = spotOf(r)
-  const all = entriesOf(allScopes.value, now.value)
+  const all = entriesOf(allScopes.value)
   const shown = filterEntries(all, q)
   // The first session that is not the one on the screen.
   const first = Math.max(0, shown.findIndex((e) => !isAt(e, here)))
@@ -97,7 +96,7 @@ function SwitchList({ id }: { id: string }) {
                 id={option(n)}
                 role="option"
                 aria-selected={n === i ? 'true' : 'false'}
-                class={'qs-row' + (e.group === 'finished' ? ' is-finished' : '')}
+                class="qs-row"
                 onClick={() => open(e)}
               >
                 <span class="qs-main">

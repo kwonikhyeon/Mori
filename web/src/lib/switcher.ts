@@ -3,7 +3,6 @@
 // waits for approval.
 
 import { signal } from '@preact/signals'
-import { now } from './clock'
 import { appName, place } from './format'
 import { GROUP_TITLE, groupQueue, type GroupKey } from './queue'
 import { route, type Route } from './router'
@@ -54,10 +53,10 @@ const usable = (s: HostScope) => !s.problem.value && s.ready.value
 
 /**
  * The sessions of every host it can reach: the queue's groups in their order
- * (승인 대기 first, 최근 종료 last), each group host by host as the queue
+ * (승인 대기 first, 상태 없음 last), each group host by host as the queue
  * orders it.
  */
-export function entriesOf(scopes: HostScope[], at: number): Entry[] {
+export function entriesOf(scopes: HostScope[]): Entry[] {
   const many = scopes.length > 1
   const by = new Map<GroupKey, Entry[]>()
   for (const s of scopes) {
@@ -65,7 +64,7 @@ export function entriesOf(scopes: HostScope[], at: number): Entry[] {
     const presets = s.presets.value
     const folders = s.folders.value
     const host = nameOf(s)
-    for (const g of groupQueue(s.terminals.value.values(), at)) {
+    for (const g of groupQueue(s.terminals.value.values())) {
       const list = by.get(g.key) ?? []
       by.set(g.key, list)
       for (const t of g.items) {
@@ -104,11 +103,11 @@ export function filterEntries(es: Entry[], q: string): Entry[] {
 }
 
 /** The sessions that wait for approval on every host it can reach, each host's as its queue orders them. */
-export function blockedOf(scopes: HostScope[], at: number): Found[] {
+export function blockedOf(scopes: HostScope[]): Found[] {
   const out: Found[] = []
   for (const s of scopes) {
     if (!usable(s)) continue
-    const g = groupQueue(s.terminals.value.values(), at).find((x) => x.key === 'blocked')
+    const g = groupQueue(s.terminals.value.values()).find((x) => x.key === 'blocked')
     for (const t of g?.items ?? []) out.push({ s, t })
   }
   return out
@@ -126,7 +125,7 @@ export function stepFrom(list: Found[], at: Spot | null, dir: 1 | -1): Found | n
 /** Opens the next (1) or the previous (-1) session that waits for approval; says so when no other waits. */
 export function stepBlocked(dir: 1 | -1): void {
   const r = route.peek()
-  const list = blockedOf(allScopes.peek(), now.peek())
+  const list = blockedOf(allScopes.peek())
   const to = stepFrom(list, spotOf(r), dir)
   if (!to) {
     toast(list.length ? '다른 승인 대기 세션이 없습니다' : '승인 대기 세션이 없습니다')

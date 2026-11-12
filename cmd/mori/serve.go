@@ -26,6 +26,7 @@ import (
 	"github.com/kwonikhyeon/mori/internal/paths"
 	"github.com/kwonikhyeon/mori/internal/peer"
 	"github.com/kwonikhyeon/mori/internal/presence"
+	"github.com/kwonikhyeon/mori/internal/procutil"
 	"github.com/kwonikhyeon/mori/internal/push"
 	"github.com/kwonikhyeon/mori/internal/server"
 	"github.com/kwonikhyeon/mori/internal/store"
@@ -117,20 +118,21 @@ func runServe(args []string) error {
 	git := gitx.Runner{}
 	fr := folders.New(st, git)
 	srv := server.New(server.Deps{
-		Version:   version.Version,
-		HostName:  host,
-		Auth:      au,
-		Store:     st,
-		Core:      cm,
-		Folders:   fr,
-		Git:       git,
-		PublicURL: pub,
-		Names:     serverNames(pub, *publicFlag != "", tailscale.DNSName),
-		UI:        webui.Handler(),
-		Logger:    logger,
-		Presence:  pres,
-		Push:      notifier,
-		Links:     links,
+		Version:    version.Version,
+		HostName:   host,
+		Auth:       au,
+		Store:      st,
+		Core:       cm,
+		Folders:    fr,
+		Git:        git,
+		PublicURL:  pub,
+		Names:      serverNames(pub, *publicFlag != "", tailscale.DNSName),
+		UI:         webui.Handler(),
+		Logger:     logger,
+		Presence:   pres,
+		Push:       notifier,
+		Links:      links,
+		ClaudeHook: claudeHook(),
 	})
 	hs := &http.Server{
 		Handler:           srv.Handler(),
@@ -372,4 +374,16 @@ func firstLabel(h string) string {
 		h = h[:i]
 	}
 	return strings.ToLower(h)
+}
+
+// claudeHook is the command Claude Code runs as its SessionStart hook in the
+// terminals this server starts: this program's claude-hook (spec §3 #230).
+// Windows gets none: the shell a lost program leaves there is not a POSIX
+// one, so the conversation is not taken up again.
+func claudeHook() string {
+	exe, err := os.Executable()
+	if err != nil || runtime.GOOS == "windows" {
+		return ""
+	}
+	return procutil.QuoteArg(exe) + " claude-hook"
 }

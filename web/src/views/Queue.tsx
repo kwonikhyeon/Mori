@@ -4,12 +4,10 @@
 import { useState } from 'preact/hooks'
 import { Chip } from '../components/Chip'
 import { Icon } from '../components/Icon'
-import { now } from '../lib/clock'
-import { appName, askText, chip, endText, finishedLine, place } from '../lib/format'
+import { appName, askText, chip, place } from '../lib/format'
 import { groupQueue, type GroupKey, type QueueGroup } from '../lib/queue'
 import { useHost } from '../lib/scope'
 import type { HostStore } from '../lib/store'
-import { relTime } from '../lib/time'
 import type { TerminalView } from '../lib/types'
 import { ListFrame, Loading, Since, TermRow, termHref, titleOf, type ListProps } from './rows'
 import './lists.css'
@@ -92,7 +90,6 @@ function Group({ g, p }: { g: QueueGroup; p: ListProps }) {
 function Fold({ g, p, open, onToggle }: { g: QueueGroup; p: ListProps; open: boolean; onToggle: () => void }) {
   const h = useHost()
   const id = `q-${p.variant}-${g.key}`
-  const sub = g.key === 'finished' ? finishedLine(g.items[0], h.presets.value, now.value) : '상태를 보고하지 않는 프로그램'
   return (
     <section class="qfold-sec" aria-labelledby={id}>
       <h2 class="qfold-h">
@@ -101,29 +98,14 @@ function Fold({ g, p, open, onToggle }: { g: QueueGroup; p: ListProps; open: boo
           <span class="qfold-title">
             {g.title} {g.items.length}
           </span>
-          {!open && <span class="qfold-sub">{sub}</span>}
+          {!open && <span class="qfold-sub">상태를 보고하지 않는 프로그램</span>}
         </button>
       </h2>
       {open && (
         <ul id={id + '-list'} class="qrows">
-          {g.items.map((t) =>
-            t.state === 'finished' ? (
-              <TermRow
-                key={t.address}
-                t={t}
-                p={p}
-                sub={appPlace(h, t)}
-                end={
-                  <span class="qrow-end">
-                    {endText(t)}
-                    {t.finished_ms != null && ' · ' + relTime(t.finished_ms, now.value)}
-                  </span>
-                }
-              />
-            ) : (
-              <TermRow key={t.address} t={t} p={p} sub={appPlace(h, t)} />
-            ),
-          )}
+          {g.items.map((t) => (
+            <TermRow key={t.address} t={t} p={p} sub={appPlace(h, t)} />
+          ))}
         </ul>
       )}
     </section>
@@ -151,7 +133,7 @@ export function QueueList(p: ListProps) {
   const [open, setOpen] = useState<ReadonlySet<GroupKey>>(new Set())
   if (!h.ready.value) return <Loading />
   const cls = `qv qv-${p.variant}`
-  const groups = groupQueue(h.terminals.value.values(), now.value).filter((g) => g.items.length > 0)
+  const groups = groupQueue(h.terminals.value.values()).filter((g) => g.items.length > 0)
   if (groups.length === 0) {
     return (
       <ListFrame class={cls}>

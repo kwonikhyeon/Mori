@@ -7,7 +7,6 @@ import { createContext } from 'preact'
 import { useContext } from 'preact/hooks'
 import { api, ApiError, apiFor, hostPrefix, hubUnpaired, wsURL, type HostApi } from './api'
 import { Backoff } from './backoff'
-import { now } from './clock'
 import { EventStream, type SocketCtor } from './events'
 import { hostLabel } from './hello'
 import { isHere } from './hosts'
@@ -46,10 +45,10 @@ export interface HostScope extends HostStore {
 const NO_SUCH_HOST = 4404
 const OUT_OF_REACH = 4502
 
-const NONE: Record<GroupKey, number> = { blocked: 0, error: 0, waiting: 0, working: 0, none: 0, finished: 0 }
+const NONE: Record<GroupKey, number> = { blocked: 0, error: 0, waiting: 0, working: 0, none: 0 }
 
 function tally(store: HostStore, problem: ReadonlySignal<Problem>) {
-  const groups = computed(() => (problem.value ? null : groupQueue(store.terminals.value.values(), now.value)))
+  const groups = computed(() => (problem.value ? null : groupQueue(store.terminals.value.values())))
   const counts = computed(() => {
     const gs = groups.value
     if (!gs) return NONE

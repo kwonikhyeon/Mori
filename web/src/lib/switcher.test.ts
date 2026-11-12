@@ -49,12 +49,11 @@ describe('entriesOf', () => {
       term({ address: 'd2', display_title: '정리', state: 'finished', finished_ms: NOW - 60_000 }),
       term({ address: 'd3', display_title: '옛것', state: 'finished', finished_ms: NOW - 48 * 3_600_000 }),
     )
-    const es = entriesOf([hub, d], NOW)
+    const es = entriesOf([hub, d])
     expect(es.map((e) => [e.s.id, e.t.address, e.group, e.title])).toEqual([
       ['', 't2', 'blocked', 'claude'],
       ['h_desk0001', 'd1', 'blocked', '배포'],
       ['', 't1', 'working', '빌드 고치기'],
-      ['h_desk0001', 'd2', 'finished', '정리'],
     ])
     expect(es[0].sub).toBe('claude · Mori / main · macmini')
     expect(es[1].sub).toBe('claude · ~/dev/Mori · desk')
@@ -63,13 +62,13 @@ describe('entriesOf', () => {
 
   it('leaves the host out of the line with one host, and skips a host it cannot show', () => {
     terminals.value = map(term({ address: 't1', status: status('idle') }))
-    expect(entriesOf([hub], NOW).map((e) => e.sub)).toEqual(['claude · ~/dev/Mori'])
+    expect(entriesOf([hub]).map((e) => e.sub)).toEqual(['claude · ~/dev/Mori'])
     const d = desk(term({ address: 'd1' }))
     d.unreachable.value = true
-    expect(entriesOf([hub, d], NOW).map((e) => e.t.address)).toEqual(['t1'])
+    expect(entriesOf([hub, d]).map((e) => e.t.address)).toEqual(['t1'])
     d.unreachable.value = false
     d.ready.value = false
-    expect(entriesOf([hub, d], NOW).map((e) => e.t.address)).toEqual(['t1'])
+    expect(entriesOf([hub, d]).map((e) => e.t.address)).toEqual(['t1'])
   })
 })
 
@@ -81,7 +80,7 @@ describe('filterEntries', () => {
       term({ address: 'c', display_title: '정리', cwd: '/Users/me/dev/빌드', status: status('working'), status_ms: 1 }),
       term({ address: 'd', display_title: '배포', status: status('working'), status_ms: 0 }),
     )
-    const es = entriesOf([hub], NOW)
+    const es = entriesOf([hub])
     expect(filterEntries(es, '').map((e) => e.t.address)).toEqual(['a', 'b', 'c', 'd'])
     expect(filterEntries(es, '빌드').map((e) => e.t.address)).toEqual(['b', 'a', 'c'])
     expect(filterEntries(es, '  CLAUDE   정리 ').map((e) => e.t.address)).toEqual(['c'])
@@ -97,7 +96,7 @@ describe('stepFrom', () => {
       term({ address: 't2', status: status('blocked'), status_ms: 2 }),
     )
     const d = desk(term({ address: 'd1', status: status('blocked') }), term({ address: 'd2', status: status('working') }))
-    const list = blockedOf([hub, d], NOW)
+    const list = blockedOf([hub, d])
     expect(list.map((f) => f.t.address)).toEqual(['t1', 't2', 'd1'])
     const at = (host: string, addr: string) => ({ host, addr })
     expect(stepFrom(list, at('', 't2'), 1)?.t.address).toBe('d1')

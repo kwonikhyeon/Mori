@@ -82,22 +82,22 @@ describe('QueueList', () => {
     expect(links[1].getAttribute('aria-current')).toBeNull()
   })
 
-  it('folds the quiet groups and says when nothing needs an answer', () => {
+  // a finished session is not listed, however recent (spec §3 #229)
+  it('folds the quiet groups, leaves finished sessions out and says when nothing needs an answer', () => {
     load([
       term({ address: 't1', status: null }),
-      term({ address: 't2', state: 'finished', reason: 'exited', exit_code: 0, finished_ms: NOW - 2 * 3_600_000, argv: [], preset: undefined }),
+      term({ address: 't2', state: 'finished', reason: 'exited', exit_code: 0, finished_ms: NOW - 60_000, argv: [], preset: undefined }),
     ])
     render(<QueueList variant="phone" />)
     expect(screen.getByText('지금 응답할 세션이 없습니다')).toBeTruthy()
-    const fold = screen.getByRole('button', { name: /최근 종료 1/ })
+    expect(screen.queryByRole('button', { name: /최근 종료/ })).toBeNull()
+    const fold = screen.getByRole('button', { name: /상태 없음 1/ })
     expect(fold.getAttribute('aria-expanded')).toBe('false')
-    expect(fold.textContent).toContain('셸 · 코드 0 · 2시간 전')
+    expect(fold.textContent).toContain('상태를 보고하지 않는 프로그램')
     expect(screen.queryByRole('link')).toBeNull()
     fireEvent.click(fold)
     expect(fold.getAttribute('aria-expanded')).toBe('true')
-    const row = screen.getByRole('link')
-    expect(row.getAttribute('href')).toBe('#/t/t2')
-    expect(row.textContent).toContain('코드 0 · 2시간 전')
+    expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['#/t/t1'])
   })
 
   it('tells how long each has worked, asked or waited', () => {
@@ -187,7 +187,7 @@ describe('QueueList on another host', () => {
 })
 
 describe('FolderList', () => {
-  it('lists every folder with its sessions and the rest under 기타', () => {
+  it('lists every folder with its live sessions and the rest under 기타', () => {
     folders.value = [folder(), folder({ id: 'f2', name: 'Notes', path: '/Users/me/notes', repo: false, worktrees: [] })]
     load([
       term({ address: 't1', status: status('idle'), created_ms: 1 }),
@@ -199,9 +199,10 @@ describe('FolderList', () => {
     expect(within(mori).getByText('~/dev/Mori')).toBeTruthy()
     expect(within(mori).getByRole('link', { name: 'Mori Git 보기' }).getAttribute('href')).toBe('#/git/f1')
     expect(within(mori).getByRole('link', { name: 'Mori에서 새 세션' }).getAttribute('href')).toBe('#/new?folder=f1')
+    // the finished t2 is not listed (spec §3 #229)
     const rows = within(mori).getAllByRole('listitem').map((li) => li.textContent)
+    expect(rows).toHaveLength(1)
     expect(rows[0]).toContain('Claude Code · main')
-    expect(rows[1]).toContain('코드 1 · 1분 전')
     const notes = screen.getByRole('region', { name: 'Notes' })
     expect(within(notes).queryByRole('link', { name: /Git/ })).toBeNull()
     expect(within(notes).getByText('세션 없음')).toBeTruthy()

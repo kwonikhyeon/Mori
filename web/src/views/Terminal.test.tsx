@@ -550,6 +550,10 @@ describe('Terminal on a PC', () => {
     // Escape closes what is open; a shortcut is the browser's
     fireEvent.keyDown(document.body, { key: 'Escape' })
     fireEvent.keyDown(document.body, { key: 'r', metaKey: true })
+    // the paste key gives the terminal the focus, for the browser's paste to land there (spec §3 #244)
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    expect(fireEvent.keyDown(document.body, { key: 'v', ctrlKey: true })).toBe(true)
+    expect(s.focused).toBe(focused + 3)
     // A button keeps the keys that press it; a letter still types.
     const upload = screen.getByRole('button', { name: '파일 올리기' })
     upload.focus()
@@ -2289,6 +2293,18 @@ describe('pickers', () => {
       fireEvent.keyDown(document.body, { key: 'a' })
       expect(document.activeElement).toBe(textbox())
       fireEvent.keyDown(document.body, { key: 'Enter' })
+      expect(ws.input()).toEqual([])
+    })
+
+    // the paste key on the page lands in the box (spec §3 #244)
+    it('moves the paste key on the page to the box', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const upload = screen.getByRole('button', { name: '파일 올리기' })
+      upload.focus()
+      expect(fireEvent.keyDown(upload, { key: 'v', ctrlKey: true })).toBe(true) // the browser still pastes
+      expect(document.activeElement).toBe(textbox())
       expect(ws.input()).toEqual([])
     })
 

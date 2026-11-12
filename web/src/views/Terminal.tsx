@@ -430,7 +430,9 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   // On a PC a key pressed while the focus is on the page, or on one of the
   // terminal's own buttons, types into the terminal and gives it the focus
   // (spec §3 #188). A field, a menu or a dialog keeps its keys; a button
-  // keeps the keys that press it or move from it.
+  // keeps the keys that press it or move from it. The paste key (⌘V, Ctrl+V)
+  // only moves the focus, so the browser's paste lands where typing would
+  // (spec §3 #244).
   useEffect(() => {
     if (phone || !link || !canType) return
     const onKey = (e: KeyboardEvent) => {
@@ -440,9 +442,14 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
         if (a.closest(OWN_KEYS) || !a.closest('.term-pc')) return
         if ([...e.key].length !== 1 || e.key === ' ') return
       }
+      const paste = e.key.toLowerCase() === 'v' && !e.altKey && (isApple() ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey)
       // With the cover a letter goes to the box, and nothing else to the terminal (claude-input design §4.1)
       if (coverRef.current) {
-        if ([...e.key].length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) focusRef.current()
+        if (paste || ([...e.key].length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey)) focusRef.current()
+        return
+      }
+      if (paste) {
+        screen.current?.focus()
         return
       }
       const bytes = strayBytes(e, screen.current?.appCursor() ?? false)

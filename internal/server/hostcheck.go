@@ -45,11 +45,8 @@ func (c *hostCheck) allows(hostport string) bool {
 	}
 	if now := time.Now(); !now.Before(c.next) {
 		c.next = now.Add(namesEvery)
-		c.mu.Unlock() // names may run the tailscale CLI for seconds
-		names := c.names()
-		c.mu.Lock()
 		c.known = map[string]bool{}
-		for _, n := range names {
+		for _, n := range c.names() {
 			if strings.Contains(n, "://") {
 				u, err := url.Parse(n)
 				if err != nil {

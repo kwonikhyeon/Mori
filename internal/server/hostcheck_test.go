@@ -83,3 +83,24 @@ func TestHostname(t *testing.T) {
 		}
 	}
 }
+
+// Requests that come while the names are asked wait for them and are not
+// refused: the phone and the Mac come back at once when the server starts.
+func TestHostCheckWaitsForTheNames(t *testing.T) {
+	release := make(chan struct{})
+	c := &hostCheck{names: func() []string {
+		<-release
+		return []string{"https://macmini.example.ts.net"}
+	}}
+	got := make(chan bool, 2)
+	for range 2 {
+		go func() { got <- c.allows("macmini.example.ts.net") }()
+	}
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	for range 2 {
+		if !<-got {
+			t.Fatal("refused while the names were asked")
+		}
+	}
+}

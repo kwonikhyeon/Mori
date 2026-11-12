@@ -119,8 +119,10 @@ export function ModeButton({
  * The band over the box's rows, from the rule over it to the bottom: a sheet
  * at its foot, as tall as what it shows, with the status line's parts, and
  * on a phone the mode, as the PC has it in the box's row; above the sheet the
- * band is the terminal's own blank. A press elsewhere in it gives the box
- * the focus (PC).
+ * band is the terminal's own blank, less than a row once the terminal has
+ * taken the rows the sheet leaves (spec §3 #228): onSheet hears the sheet's
+ * height with all its rows. A press elsewhere in it gives the box the focus
+ * (PC).
  */
 export function StatusBand({
   box,
@@ -129,6 +131,7 @@ export function StatusBand({
   mode,
   onMode,
   onFocus,
+  onSheet,
 }: {
   box: BoxLook;
   top: number;
@@ -136,6 +139,7 @@ export function StatusBand({
   mode: Mode | null;
   onMode: () => void;
   onFocus: () => void;
+  onSheet: (px: number) => void;
 }): JSX.Element {
   const parts = readStatus(box.status);
   const extras = mode?.extras ?? [];
@@ -151,6 +155,7 @@ export function StatusBand({
       ...sh.querySelectorAll<HTMLElement>(":scope > .term-cover-row"),
     ];
     for (const r of rows) r.hidden = false;
+    onSheet(sh.offsetHeight);
     const cs = getComputedStyle(sh);
     const px = (v: string) => parseFloat(v) || 0;
     const room =

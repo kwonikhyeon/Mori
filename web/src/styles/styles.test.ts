@@ -106,6 +106,8 @@ describe('the stylesheets', () => {
     // what the band covers beyond its sheet reads as the terminal's own blank rows
     expect(css.get('.term-cover')).toMatch(/background-color: var\(--term-bg\);/)
     expect(css.get('.term-cover')).toMatch(/justify-content: flex-end;/)
+    // the rows the cover takes reach below the stage, which does not scroll to them (spec §3 #228)
+    expect(css.get('.term-scroll.is-tall')).toMatch(/overflow-y: hidden;/)
     // the sheet, as tall as what it shows, at the foot of the band
     expect(css.get('.term-cover-sheet')).toMatch(/background-color: var\(--color-background-surface\);/)
     // a row of chips scrolls sideways rather than wrap into the rows below

@@ -19,7 +19,7 @@ import type { Closed, Size } from '../lib/attach'
 import { now } from '../lib/clock'
 import { copyText } from '../lib/copy'
 import { draftKey, loadDraft, saveDraft } from '../lib/drafts'
-import { fitSize } from '../lib/fit'
+import { coverExtra, fitSize, MAX_CELLS } from '../lib/fit'
 import { watchFocus } from '../lib/focus'
 import { appName, askText, chip, endText, place, type EndFacts } from '../lib/format'
 import type { Hint } from '../lib/hints'
@@ -125,19 +125,32 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const layout: Layout = phone ? 'phone' : 'pc'
   const fontPx = fontFor(layout)
 
-  // The cells that fit the stage inside the scroll box's padding.
-  const measure = (): Size | null => {
+  // While Claude Code's box lies under the status band: the rows from its
+  // box down (k) and the height of the band's sheet, and the rows they add
+  // (spec §3 #228).
+  const tall = useRef<{ k: number; sheet: number; extra: number } | null>(null)
+
+  // The cells that fit the stage inside the scroll box's padding, and the
+  // stage's height from the first row down.
+  const fits = (): { z: Size | null; room: number; cellH: number } | null => {
     const st = stage.current
     const sc = scroll.current
     const s = screen.current
     if (!st || !sc || !s) return null
     const cs = getComputedStyle(sc)
     const px = (v: string) => parseFloat(v) || 0
-    return fitSize(
+    const z = fitSize(
       st.clientWidth - px(cs.paddingLeft) - px(cs.paddingRight),
       st.clientHeight - px(cs.paddingTop) - px(cs.paddingBottom),
       s.cell(),
     )
+    return { z, room: st.clientHeight - px(cs.paddingTop), cellH: s.cell()[1] }
+  }
+  // What the terminal should be: the cells that fit, and the rows the cover adds.
+  const measure = (): Size | null => {
+    const z = fits()?.z ?? null
+    const extra = tall.current?.extra ?? 0
+    return z && extra ? { cols: z.cols, rows: Math.min(z.rows + extra, MAX_CELLS) } : z
   }
 
   useEffect(() => {
@@ -321,7 +334,11 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   // a moment: the cover stays as it was.
   const claudeOn = !!t && isClaude(t) && pickOn.value && active
   const reading = useBox({ screen, ready: link, on: claudeOn })
-  const sameSize = !fit || !size || (fit.cols === size.cols && fit.rows === size.rows)
+  // The size asked for before the rows for the cover changed is still this
+  // device's until the new one comes back: the cover stays meanwhile.
+  const askedBefore = useRef<Size | null>(null)
+  if (same(fit, size)) askedBefore.current = null
+  const sameSize = !fit || !size || same(fit, size) || same(askedBefore.current, size)
   const [sending, setSending] = useState(false)
   // a moment after a send ends, as the core may answer before the terminal
   // clears its box: known in the very render the send ends in
@@ -362,6 +379,30 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     if (label !== null && modeSaid.current !== null && label !== modeSaid.current) announce(`모드: ${label}`)
     if (label !== null) modeSaid.current = label
   }, [reading.mode?.label])
+  // The rows for the cover come with Claude Code's box under the band and
+  // its sheet, and stay while the cover is down a moment (a window, text in
+  // the box, a send): only leaving Claude Code's screen gives them back
+  // (spec §3 #228).
+  const [sheet, setSheet] = useState(0)
+  const tallOn = claudeOn && canType && reading.alternate && !boxShown.value
+  const tallK = covered && rb ? rb.rows : 0
+  useEffect(() => {
+    if (!link) return
+    const cur = tall.current
+    const want = !tallOn ? null : tallK > 0 && sheet > 0 ? { k: tallK, sheet } : cur
+    if (want?.k === cur?.k && want?.sheet === cur?.sheet) return
+    const f = fits()
+    tall.current = want && f?.z ? { ...want, extra: coverExtra(f.z.rows, f.room, f.cellH, want.sheet, want.k) } : null
+    askedBefore.current = link.fit.peek()
+    link.setFit(measure())
+  }, [link, tallOn, tallK, sheet])
+  // Those rows reach below the stage: with the cover its top shows, the
+  // output down to the band; without, its bottom, with the box.
+  const tallView = !!tall.current?.extra && sameSize
+  useLayoutEffect(() => {
+    const sc = scroll.current
+    if (sc && tallView) sc.scrollTop = covered ? 0 : sc.scrollHeight
+  }, [tallView, covered, size?.rows])
   const coverTop = () => {
     const sc = scroll.current
     const pad = sc ? parseFloat(getComputedStyle(sc).paddingTop) || 0 : 0
@@ -529,7 +570,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
         void upload(fs)
       }}
     >
-      <div ref={scroll} class="term-scroll">
+      <div ref={scroll} class={'term-scroll' + (tallView ? ' is-tall' : '')}>
         <div ref={host} class="term-host" />
       </div>
       <div class="term-status" role="status" aria-live="polite">
@@ -770,7 +811,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     return b !== null && !!link?.send(b)
   }
   const band = covered && rb && (
-    <StatusBand box={rb} top={coverTop()} phone={phone} mode={reading.mode} onMode={nextMode} onFocus={() => !phone && focusBox()} />
+    <StatusBand box={rb} top={coverTop()} phone={phone} mode={reading.mode} onMode={nextMode} onFocus={() => !phone && focusBox()} onSheet={setSheet} />
   )
   const toClose = seen ?? pick.held
   const observeBar = observing && active && <ObserveBar onOff={() => observe(false)} />
@@ -1210,6 +1251,8 @@ interface ComposerProps {
   /** Takes the box's fill of the hint, for a phone's quick key Tab; true when it filled the box. */
   takeTab?: { current: (() => boolean) | null }
 }
+
+const same = (a: Size | null, b: Size | null) => !!a && !!b && a.cols === b.cols && a.rows === b.rows
 
 /** How long the cover stays as it was after a send ends (claude-input design §3.2). */
 const SEND_SETTLE_MS = 1000

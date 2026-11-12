@@ -175,6 +175,13 @@ a.term-back {
   padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
 }
 
+/* With the rows the cover takes, the terminal is taller than the stage: the
+   page shows its top or its bottom, never a place a finger left it between
+   (spec §3 #228). */
+.term-scroll.is-tall {
+  overflow-y: hidden;
+}
+
 /* A terminal wider than the stage scrolls; the font stays (spec §3 #125). */
 .term-host {
   width: max-content;
@@ -633,11 +640,11 @@ a.term-back {
    input box, status line and mode line, lies under this band (claude-input
    design §3, spec §3 #223): the status line, the person's own, as astryx
    Badges and ProgressBars, and on a phone the mode as a button. Over the
-   rows it stands for, inside the stage: the terminal keeps its size. The
-   rows it covers are more than it shows: its sheet, as tall as what it
-   shows, sits at its foot, by the box below, and the band above the sheet
-   is the terminal's own blank. The picker panel's layer (4): the two never
-   show together. */
+   rows it stands for, inside the stage. Its sheet, as tall as what it
+   shows, sits at its foot, by the box below; the terminal takes rows enough
+   that the rows the sheet does not need go below the stage, so the band
+   above the sheet, the terminal's own blank, is less than a row (#228).
+   The picker panel's layer (4): the two never show together. */
 .term-cover {
   position: absolute;
   inset-inline: 0;

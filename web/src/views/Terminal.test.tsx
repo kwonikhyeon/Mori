@@ -1970,6 +1970,44 @@ describe('pickers', () => {
       expect(mode.closest('.term-compose')).not.toBeNull()
     })
 
+    // Claude Code's output reaches the band's sheet: the terminal takes the
+    // rows the sheet leaves, and its box and status go below the stage (spec §3 #228)
+    it('takes the rows the sheet leaves, keeps them a moment, and gives them back', async () => {
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(80 * 8 + 14)
+      layOut({ 'term-stage': 24 * 17, 'term-cover-sheet': 40 })
+      const { ws } = await mount()
+      await attach(ws)
+      const resizes = () => ws.messages().filter((m) => m.type === 'resize')
+      const scroller = () => document.querySelector<HTMLElement>('.term-scroll')!
+      await show(IDLE)
+      // 408px less the 40px sheet holds 21 rows, and the 7 from the rule down go after them
+      expect(resizes()).toEqual([{ type: 'resize', cols: 80, rows: 28 }])
+      // while the new size is on its way the band stays
+      expect(band()).not.toBeNull()
+      await act(() => ws.json({ type: 'size', cols: 80, rows: 28 }))
+      await show(IDLE)
+      expect(band()!.style.top).toBe(`${(28 - 9 + 2) * 17}px`)
+      expect(scroller().classList.contains('is-tall')).toBe(true)
+      // text in the box takes the cover down, not the rows
+      await show(withText('안녕'))
+      expect(band()).toBeNull()
+      // nor a stage a few pixels taller without the cover: 414px fits 24 rows still, so 28 stay
+      layOut({ 'term-stage': 414, 'term-cover-sheet': 40 })
+      act(() => {
+        window.dispatchEvent(new Event('resize'))
+      })
+      await frame(200)
+      expect(resizes()).toHaveLength(1)
+      await show(IDLE)
+      expect(band()).not.toBeNull()
+      // leaving Claude Code's screen gives them back
+      act(() => FakeScreen.last().show('$ ', 'normal'))
+      await frame()
+      expect(resizes().at(-1)).toEqual({ type: 'resize', cols: 80, rows: 24 })
+      await act(() => ws.json({ type: 'size', cols: 80, rows: 24 }))
+      expect(scroller().classList.contains('is-tall')).toBe(false)
+    })
+
     // with no mode line the mode is the default one (pickers design §9.5)
     it('reads a box with no mode line as the default mode', async () => {
       const { ws } = await mount()

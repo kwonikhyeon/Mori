@@ -99,17 +99,15 @@
 
 /* Installed by Chrome or Edge with window controls overlay, the bar is the
    window's title bar: it keeps clear of the traffic lights (macOS, left) or
-   the caption buttons (Windows, right), fits their height and drags the
-   window; what is pressed in it does not (spec §3 #232). */
+   the caption buttons (Windows, right) and drags the window; what is pressed
+   in it does not (spec §3 #232). */
 @media (display-mode: window-controls-overlay) {
-  /* The bar is exactly the title bar's height, so its controls sit level
-     with the window's own. They are astryx's sm (28 px) where that leaves
-     1 px clear above and below; a maximized Windows window's title bar is
-     26 px, and there they are 24 px, as Chrome's buttons beside them
-     (spec §3 #233). */
+  /* 40 px, or the title bar if that is higher: astryx's sm controls (28 px)
+     6 px clear above and below. The window's own buttons keep the title
+     bar's height at the top corner, 26 px on a maximized Windows window, so
+     they sit above Mori's (spec §3 #233). */
   .pc-head {
-    --titlebar-control: min(var(--size-element-sm), calc(env(titlebar-area-height, var(--size-element-lg)) - var(--spacing-0-5)));
-    height: env(titlebar-area-height, var(--size-element-lg));
+    height: max(env(titlebar-area-height, var(--size-element-lg)), calc(var(--size-element-sm) + 2 * var(--spacing-1-5)));
     min-height: 0;
     padding-top: 0;
     padding-right: calc(100vw - env(titlebar-area-x, var(--spacing-0)) - env(titlebar-area-width, 100vw) + var(--spacing-3));
@@ -124,21 +122,12 @@
   }
 
   .pc-head :is(.pc-find, .btn-sm, .hostpick) {
-    height: var(--titlebar-control);
-    min-height: 0;
+    height: var(--size-element-sm);
+    min-height: var(--size-element-sm);
   }
 
   .pc-head .btn-icon.btn-sm {
-    width: var(--titlebar-control);
-  }
-
-  .pc-logo img {
-    width: min(var(--spacing-6), var(--titlebar-control));
-    height: min(var(--spacing-6), var(--titlebar-control));
-  }
-
-  .pc-find-key {
-    padding-block: 0;
+    width: var(--size-element-sm);
   }
 }
 

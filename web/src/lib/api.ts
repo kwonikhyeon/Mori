@@ -195,6 +195,8 @@ export function apiFor(prefix: string, onHostError?: (kind: HostError) => void) 
       log: (path: string, o: { limit?: number; head?: boolean } = {}) =>
         get<Graph>('/api/git/log' + query({ path, limit: o.limit, head: o.head })),
       commit: (path: string, rev: string) => get<Commit>('/api/git/commit' + query({ path, rev })),
+      /** Fetches every remote of the worktree's repository (spec §3 #227). */
+      fetch: (path: string) => req<void>('POST', '/api/git/fetch' + query({ path })),
     },
 
     terminals: {

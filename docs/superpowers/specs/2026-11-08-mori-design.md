@@ -371,6 +371,7 @@ herdr 제품군에는 두 계열이 있다.
 | 224 | 입력창의 지난 글 | 입력창이 비었거나 캐럿이 첫 줄이면 ↑가 한 칸 오래된 글을, 지난 글을 보는 중 캐럿이 마지막 줄이면 ↓가 새 글을 넣고, 끝에서는 쓰던 글로 돌아온다. 목록은 Claude Code 터미널이면 서버가 준 그 폴더의 기록(226), 없으면 이 기기에서 보낸 글(호스트·터미널마다 100개)이다. 고치면 보던 자리를 잊고, 보내면 목록을 다시 받는다. 빗금 목록과 고르는 창의 키(221)가 먼저이고, 보내는 중에는 하지 않는다 | Mori에서 보낸 글만 | 사용자가 터미널의 ↑처럼 쓰고 싶어 했다(2026-11-12). 다른 기기와 터미널에서 친 글도 나온다 |
 | 225 | 입력창의 안내와 제안 | 터미널의 빈 입력칸에 회색 안내나 제안이 있으면 입력창의 안내 글이 "<안내> · Tab"이 되고, 빈 입력창의 Tab이 그 글을 넣는다. 안내 글은 한 줄이고 넘치면 자른다(입력칸이 단추 높이를 지키도록, 222). "터미널 입력칸 보기"를 켜도 한다 | 터미널에서만 보임 | 사용자 요청(2026-11-12) |
 | 226 | 지난 글 API | `GET /api/terminals/{t}/prompts?limit=200`(최대 500)이 그 호스트의 Claude Code 설정 폴더(`$CLAUDE_CONFIG_DIR`, 없으면 `~/.claude`)의 `history.jsonl` 끝 4MB에서 터미널 폴더(`foreground.cwd`, 없으면 `cwd`)의 글을 새것부터, 이어진 같은 글은 하나로 준다(`{prompts: [{text, at}], source}`). 붙여 넣은 글의 자리표시는 내용이 있으면 펼친다. 깨진 줄은 건너뛰고, 파일이 없거나 그 폴더의 글이 없거나 다른 기계의 터미널이면 `source: "none"`이다 | 브라우저가 기록을 따로 둠 | 기록은 Claude Code 내부 형식이라 판마다 바뀔 수 있어, 못 읽으면 물러난다 |
+| 227 | 가져오기(git fetch) | Git 패널과 Git 화면의 브랜치 줄(폰은 브랜치 카드), 그래프 화면(PC는 머리, 폰은 보기 범위 옆)에 "가져오기" 단추를 둔다. 누르면 `POST /api/git/fetch?path=`가 보이는 워크트리에서 `git fetch --all --prune --quiet`를 돌리고(204), 화면은 바로 다시 읽어 ↑↓와 원격 브랜치가 새로 보인다. 한도는 60초다. 비밀번호는 묻지 않으므로(`GIT_TERMINAL_PROMPT=0`) 서버의 SSH 키나 자격 증명 도우미로 닿지 않는 원격은 git의 이유로 실패한다(422 `git_failed`). 도는 동안 단추는 크기와 초점을 지키고 `aria-busy`이며 다시 눌러도 한 번만 돈다. 끝나면 "원격에서 가져왔습니다"를, 실패하면 이유를 토스트로 보인다. 허브는 이 API도 중계한다. 저절로 가져오지 않고, pull·merge는 하지 않는다 | 터미널에서만 · 주기적으로 가져옴 · 현재 브랜치의 원격만 | 사용자가 다른 기기에서 원격에 올린 커밋을 이 기기에서 바로 보고 싶어 했다(2026-11-12). fetch는 원격 추적 브랜치만 바꾸고 브랜치와 파일은 그대로여서 §14의 쓰기 작업과 다르다. 다른 원격이나 새 브랜치에 올린 것도 보이고, 원격에서 지운 브랜치는 그래프와 새 세션의 원격 목록에서 빠진다. 네트워크를 타므로 다른 git 호출의 10초로는 모자란다 |
 
 ## 4. 구조
 
@@ -535,6 +536,7 @@ herdr 제품군에는 두 계열이 있다.
 | `GET /api/git/diff?path=&file=&staged=0&rev=&orig=` | `file`(파일이나 디렉터리, 비우면 전체)의 unified diff `{diff, truncated}`. 읽기 전용이고, 1 MiB에서 줄 단위로 자른다. `rev`가 없으면 워크트리의 diff다. 이때 `file`이 비면 추적 파일 전체이고, 스테이지 안 한 diff에는 추적 안 된 파일이 새 파일로 붙는다(결정 62). `rev`를 주면 그 커밋의 diff다(결정 109·110). `orig`는 이름이 바뀐 파일의 이전 경로이고, `file`과 함께 `rev`나 `staged=1`이 있을 때만 쓴다(결정 135). `rev`와 `staged=1`을 함께 주거나, `file` 없이 또는 `rev`와 `staged=1` 둘 다 없이 `orig`를 주면 400이다 |
 | `GET /api/git/log?path=&limit=200&head=0` | 커밋 그래프 `{commits, width, more}`. 커밋은 `{hash, parents, author, time_ms, subject, refs, lane, color, up, pass, down}`이다. `refs`는 `[{name, kind, current}]`이고, `kind`는 `head`(분리된 HEAD)·`branch`·`remote`·`tag`다. `current`는 HEAD가 가리키는 브랜치에서만 켜진다. 순서는 `head`, `branch`(현재 브랜치가 먼저), `remote`, `tag`이고 같은 종류는 이름순이다. 선(`up`·`pass`·`down`)은 `[{lane, color}]`이고, `width`는 칸 수다(결정 104~108, 111) |
 | `GET /api/git/commit?path=&rev=` | 커밋 상세 `{hash, parents, author, email, author_ms, committer, committer_email, commit_ms, message, files, truncated}`. `files`는 첫 부모에 대한 변경 `[{path, orig?, kind, added, deleted, binary}]`이고, `kind`는 `added`·`deleted`·`modified`·`renamed`·`copied`·`typechange`다(결정 109·110) |
+| `POST /api/git/fetch?path=` | 그 워크트리의 저장소에서 `git fetch --all --prune --quiet`, 204. 60초 한도, 비밀번호는 묻지 않는다. 실패는 422 `git_failed`와 git의 이유다(결정 227) |
 | `GET /api/terminals?all=0` | 터미널 목록(각각 `folder_id`, `worktree`, `display_title` 포함). 기본값은 살아 있는 것과 24시간 안에 끝난 것 |
 | `POST /api/terminals` | 세션 만들기(§6.3) |
 | `GET/PATCH/DELETE /api/terminals/{t}` | 한 터미널 · 제목 변경(`mori.title` 라벨) · 끝난 터미널 지우기(`terminal.rm`) |
@@ -755,7 +757,7 @@ Claude Code 고르는 창(2026-11-11): 사용자가 명령 뒤에 뜨는 고르�
 - 호스트 자동 발견(`tailscale status`로 피어를 찾아 Mori 여부 확인). 여러 호스트를 한 앱에서 다루는 허브(결정 158)는 2026-11-10에 단계 11로 들어왔다. 허브끼리의 사슬 중계와 허브 여러 개의 이중화는 하지 않는다.
 - 네이티브 앱과 데스크톱 셸
 - 화면 텍스트로 에이전트 상태를 추정하는 기능, 채팅형 UI
-- Git 쓰기 작업(commit, push, merge, stage). 첫 버전은 읽기와 워크트리 관리만 한다. 쓰기는 세션 안의 에이전트나 셸이 한다.
+- Git 쓰기 작업(commit, push, merge, stage). 첫 버전은 읽기와 워크트리 관리, 원격 추적 브랜치만 바꾸는 가져오기(결정 227)만 한다. 쓰기는 세션 안의 에이전트나 셸이 한다.
 - 파일 편집기, 파일 브라우저(폴더 고르기 제외)
 - Linux 서비스 설치. 빌드는 한다.
 - AUTOMATIC_INPUT 태깅. xterm.js가 만든 응답과 사람 입력을 구분할 수 없어서 모두 DATA로 보낸다.

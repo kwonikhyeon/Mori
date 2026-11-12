@@ -1,6 +1,7 @@
 // Package gitx runs the host's git (spec §3 decision 14) for the status,
 // branches, worktrees and diffs of a folder, and reads what it prints.
-// It writes nothing to a repository but worktrees.
+// It writes nothing to a repository but worktrees and, on Fetch, the
+// remote-tracking branches.
 package gitx
 
 import (
@@ -19,6 +20,9 @@ import (
 
 // DefaultTimeout bounds each git call of a zero Runner.
 const DefaultTimeout = 10 * time.Second
+
+// FetchTimeout bounds Fetch, which goes over the network (spec §3 #227).
+const FetchTimeout = 60 * time.Second
 
 // Runner runs git. The zero value runs "git" from PATH with DefaultTimeout.
 type Runner struct {
@@ -309,4 +313,16 @@ func (g Runner) RemoveWorktree(ctx context.Context, repo, path string, force boo
 		os.Remove(parent) // fails, as it should, while it holds anything
 	}
 	return nil
+}
+
+// Fetch updates the remote-tracking branches of every remote of dir's
+// repository and drops the ones the remotes no longer have (spec §3 #227).
+// It takes FetchTimeout, or the Runner's timeout when that is longer. It
+// leaves the branches and the files alone. git asks for no password
+// (gitEnv); a remote that needs one fails.
+// shortcut: ssh can still ask on the server's own terminal when Mori runs in one, until the timeout; detach git from it (setsid) if that bites.
+func (g Runner) Fetch(ctx context.Context, dir string) error {
+	g.Timeout = max(g.timeout(), FetchTimeout)
+	_, err := g.run(ctx, dir, "fetch", "--all", "--prune", "--quiet")
+	return err
 }

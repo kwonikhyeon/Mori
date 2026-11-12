@@ -343,6 +343,22 @@ func (s *Server) handleGitCommit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, c)
 }
 
+// handleGitFetch fetches every remote of a worktree's repository (spec §3
+// #227). The worktree's own branch and files stay as they are.
+func (s *Server) handleGitFetch(w http.ResponseWriter, r *http.Request) {
+	wt, err := s.worktreeParam(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if err := s.d.Git.Fetch(r.Context(), wt.Path); err != nil {
+		writeError(w, err)
+		return
+	}
+	s.log.Info("fetched", "path", wt.Path)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // badRev refuses a rev that is not a full commit hash (spec §3 decision
 // 109).
 func badRev(rev string) *apiError {

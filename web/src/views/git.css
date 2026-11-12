@@ -132,7 +132,9 @@
   line-height: var(--text-supporting-leading);
 }
 
-.gp-graph {
+.gp-graph,
+.gp-fetch {
+  flex: none;
   gap: var(--spacing-1-5);
   padding: 0 var(--spacing-3);
 }
@@ -665,6 +667,12 @@
   font-size: var(--text-heading-2-size);
   font-weight: var(--text-heading-2-weight);
   line-height: var(--text-heading-2-leading);
+}
+
+/* 가져오기 at the end of the branch line, centred on it (spec §3 #227). */
+.gs-fetch {
+  align-self: center;
+  margin-left: auto;
 }
 
 .gs-branch .gp-ab {

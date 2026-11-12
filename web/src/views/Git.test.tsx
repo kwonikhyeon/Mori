@@ -227,6 +227,30 @@ describe('GitPanel', () => {
     expect(calls.filter((c) => c.url === '/api/folders/f1/git')).toHaveLength(5)
   })
 
+  it('fetches the remotes of the worktree shown, once while it runs, then reads it again', async () => {
+    let done!: (r: Response) => void
+    serve((c) => (url(c).pathname === '/api/git/fetch' ? new Promise<Response>((r) => (done = r)) : undefined))
+    render(panel())
+    await vi.waitFor(() => expect(statusCalls()).toHaveLength(1))
+    const btn = screen.getByRole('button', { name: '가져오기' })
+    fireEvent.click(btn)
+    fireEvent.click(btn)
+    const fetches = () => calls.filter((c) => url(c).pathname === '/api/git/fetch')
+    expect(fetches().map((c) => [c.method, url(c).searchParams.get('path')])).toEqual([['POST', MAIN]])
+    expect(btn.getAttribute('aria-busy')).toBe('true')
+    done(new Response(null, { status: 204 }))
+    await vi.waitFor(() => expect(statusCalls()).toHaveLength(2))
+    expect(toastTexts()).toEqual([['원격에서 가져왔습니다', 'info']])
+    expect(btn.getAttribute('aria-busy')).toBe('false')
+  })
+
+  it('says why it could not fetch', async () => {
+    serve((c) => (url(c).pathname === '/api/git/fetch' ? fail(422, 'git_failed', 'Permission denied (publickey).') : undefined))
+    render(panel())
+    fireEvent.click(await screen.findByRole('button', { name: '가져오기' }))
+    await vi.waitFor(() => expect(toastTexts()).toEqual([['Permission denied (publickey).', 'error']]))
+  })
+
   it('shows another worktree in the panel and marks the session’s own', async () => {
     serve()
     render(panel({ path: WT }))

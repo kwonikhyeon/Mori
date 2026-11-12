@@ -115,3 +115,49 @@ func TestGitLogAndCommit(t *testing.T) {
 		e.expectError("GET", "/api/git/commit"+at(p)+"&rev="+rename, nil, 400)
 	}
 }
+
+// TestGitFetch: a commit pushed from elsewhere shows as behind after a
+// fetch, a branch the remote dropped goes, and an unreachable remote is
+// git's error (spec §3 #227).
+func TestGitFetch(t *testing.T) {
+	repo := gittest.Repo(t)
+	gittest.Git(t, repo, "branch", "old")
+	base := filepath.Dir(repo)
+	origin, here, other := filepath.Join(base, "origin.git"), filepath.Join(base, "here"), filepath.Join(base, "other")
+	gittest.Git(t, base, "clone", "-q", "--bare", repo, origin)
+	gittest.Git(t, base, "clone", "-q", origin, here)
+	gittest.Git(t, base, "clone", "-q", origin, other)
+	writeFile(t, filepath.Join(other, "README.md"), "mori\nother\n")
+	gittest.Git(t, other, "commit", "-q", "-am", "from another device")
+	gittest.Git(t, other, "push", "-q", "origin", "main")
+	gittest.Git(t, origin, "branch", "-D", "old")
+
+	e := newTestEnv(t)
+	e.pair()
+	var f FolderView
+	e.json("POST", "/api/folders", map[string]any{"path": here}, 201, &f)
+	at := "?path=" + url.QueryEscape(here)
+	var st gitx.Status
+	e.json("GET", "/api/git/status"+at, nil, 200, &st)
+	if st.Behind != 0 {
+		t.Fatalf("before the fetch: %+v", st)
+	}
+	e.json("POST", "/api/git/fetch"+at, nil, 204, nil)
+	e.json("GET", "/api/git/status"+at, nil, 200, &st)
+	if st.Behind != 1 || st.Ahead != 0 {
+		t.Fatalf("after the fetch: %+v", st)
+	}
+	var bs gitx.Branches
+	e.json("GET", "/api/folders/"+f.ID+"/branches", nil, 200, &bs)
+	for _, b := range bs.Remote {
+		if b.Name == "origin/old" {
+			t.Fatalf("a branch the remote dropped stays: %+v", bs.Remote)
+		}
+	}
+
+	gittest.Git(t, here, "remote", "set-url", "origin", filepath.Join(base, "gone"))
+	if eb := e.expectError("POST", "/api/git/fetch"+at, nil, 422); eb.Error.Kind != "git_failed" {
+		t.Fatalf("%+v", eb)
+	}
+	e.expectError("POST", "/api/git/fetch?path="+url.QueryEscape(base), nil, 400)
+}

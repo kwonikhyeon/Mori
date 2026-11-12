@@ -27,6 +27,7 @@ const SHAPES = {
       <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
     </>
   ),
+  download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
   external: <path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4" />,
   eye: (
     <>

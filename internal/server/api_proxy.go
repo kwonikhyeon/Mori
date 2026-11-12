@@ -54,6 +54,7 @@ var proxied = []string{
 	"GET /api/git/diff",
 	"GET /api/git/log",
 	"GET /api/git/commit",
+	"POST /api/git/fetch",
 	"GET /api/terminals",
 	"POST /api/terminals",
 	"GET /api/terminals/{t}",

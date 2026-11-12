@@ -1,8 +1,8 @@
 // Git for a folder: the branch of the worktree shown, the folder's
 // worktrees, and the changes with a file's diff. Beside a session on a PC
 // (the B-PC board's aside), as a screen of its own from the folders and on
-// a phone (the B-Git board). It only reads; commits and pushes are for the
-// terminal.
+// a phone (the B-Git board). It only reads, but for 가져오기 (git fetch,
+// spec §3 #227); commits and pushes are for the terminal.
 import { signal } from '@preact/signals'
 import { useMemo, useState } from 'preact/hooks'
 import { ConnBanner } from '../components/ConnBanner'
@@ -11,6 +11,7 @@ import { totals } from '../lib/diff'
 import { branchLine, changeGroups, fileParts, shortPath, wtLabel, type ChangeGroup, type ChangeItem } from '../lib/format'
 import { href, route } from '../lib/router'
 import { useHost, type HostScope } from '../lib/scope'
+import { toast, toastError } from '../lib/toast'
 import { DiffView } from './Diff'
 import { ChangeCards, ChangeList } from './GitChanges'
 import { WorktreeList } from './GitWorktrees'
@@ -36,6 +37,35 @@ function Refresh({ g, size = 16 }: { g: GitData; size?: number }) {
   return (
     <button type="button" class="btn btn-icon btn-ghost gp-refresh" aria-label="새로 고침" title="새로 고침" disabled={g.state !== 'ok'} onClick={g.refresh}>
       <Icon name="refresh" size={size} />
+    </button>
+  )
+}
+
+/**
+ * 가져오기: git fetch in the worktree at path, then onDone reads again (spec
+ * §3 #227). While it runs it stays focusable and the same size, as astryx's
+ * busy Button does, and a second press does nothing.
+ */
+export function FetchButton({ path, onDone, class: cls = '' }: { path: string; onDone: () => void; class?: string }) {
+  const h = useHost()
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      await h.api.git.fetch(path)
+      toast('원격에서 가져왔습니다')
+      onDone()
+    } catch (e) {
+      toastError(e, '원격에서 가져오지 못했습니다')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <button type="button" class={'btn btn-sm gp-fetch ' + cls} title="원격에서 가져오기 (git fetch)" disabled={!path} aria-busy={busy} onClick={run}>
+      <Icon name={busy ? 'refresh' : 'download'} size={15} class={busy ? 'spin' : undefined} />
+      가져오기
     </button>
   )
 }
@@ -92,6 +122,7 @@ function BranchRow({ g }: { g: GitData }) {
         </div>
         <span class="gp-branch-sub">{line.sub ? line.sub + ' · 보기만 합니다' : '보기만 합니다'}</span>
       </div>
+      {g.shown && <FetchButton path={g.shown} onDone={g.refresh} />}
       {g.shown && (
         <a class="btn btn-sm gp-graph" href={graphHref(h, g)} onClick={fromHere(h, g)}>
           <Icon name="graph" size={15} />
@@ -109,6 +140,7 @@ function BranchCard({ g }: { g: GitData }) {
       <div class="gs-branch-line">
         <span class="mono gs-branch-name">{line.name}</span>
         <AheadBehind g={g} />
+        {g.shown && <FetchButton path={g.shown} onDone={g.refresh} class="gs-fetch" />}
       </div>
       {line.sub && <span class="gs-branch-sub">{line.sub}</span>}
       <p class="gs-note">

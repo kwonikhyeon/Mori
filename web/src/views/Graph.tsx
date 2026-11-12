@@ -15,6 +15,7 @@ import { useHost } from '../lib/scope'
 import { relTime } from '../lib/time'
 import type { LogCommit } from '../lib/types'
 import { CommitSheet } from './Commit'
+import { FetchButton } from './Git'
 import { RefChips } from './RefChips'
 import { Loading, type Variant } from './rows'
 import { graphFrom, LOG_MAX, shownLog, useLog, useRepo, type LogData, type Repo } from './useLog'
@@ -317,6 +318,7 @@ export function GraphScreen({ variant, folder, path, head, c, back }: GraphScree
           </div>
           <div class="gr-tools">
             {scope}
+            <FetchButton path={repo.shown} onDone={log.refresh} />
             {refresh('btn-sm gr-refresh', 16)}
             <BackLink folder={folder} path={path} />
           </div>
@@ -348,7 +350,10 @@ export function GraphScreen({ variant, folder, path, head, c, back }: GraphScree
         {refresh('btn-ghost gp-refresh', 20)}
       </header>
       <ConnBanner class="gs-banner" />
-      <div class="gr-scope">{scope}</div>
+      <div class="gr-scope">
+        {scope}
+        <FetchButton path={repo.shown} onDone={log.refresh} />
+      </div>
       <div class="gr-scroll">
         {rows ? (
           <>

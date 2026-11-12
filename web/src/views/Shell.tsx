@@ -261,20 +261,22 @@ function PcHeader() {
   const fresh = newBuild.value !== null
   return (
     <header class="pc-head">
-      <a class="wordmark" href={h.href({ name: 'queue' })}>
-        Mori
-      </a>
-      <div class="hostbar">
-        <HostPicker />
-        <OthersBadge />
+      <div class="pc-head-start">
+        <a class="pc-logo" href={h.href({ name: 'queue' })} aria-label="Mori, 지금 볼 것" title="Mori">
+          <img src="/icons/icon-192.png" alt="" width="24" height="24" />
+        </a>
+        <div class="hostbar">
+          <HostPicker />
+          <OthersBadge />
+        </div>
       </div>
+      <SwitchField />
       <div class="pc-head-end">
-        <SwitchButton />
-        <a class="btn btn-primary" href={h.href({ name: 'new' })}>
-          <Icon name="plus" stroke={2} />새 세션
+        <a class="btn btn-icon btn-sm btn-primary" href={h.href({ name: 'new' })} aria-label="새 세션" title="새 세션">
+          <Icon name="plus" stroke={2} />
         </a>
         <ThemeButton />
-        <a class="btn btn-icon" href={h.href({ name: 'settings' })} aria-label={fresh ? '설정, 새 버전이 있습니다' : '설정'} title={fresh ? '설정 · 새 버전이 있습니다' : '설정'} aria-current={r.name === 'settings' ? 'page' : undefined}>
+        <a class="btn btn-icon btn-sm btn-ghost" href={h.href({ name: 'settings' })} aria-label={fresh ? '설정, 새 버전이 있습니다' : '설정'} title={fresh ? '설정 · 새 버전이 있습니다' : '설정'} aria-current={r.name === 'settings' ? 'page' : undefined}>
           <Icon name="sliders" size={18} />
           {fresh && <span class="nav-dot" aria-hidden="true" />}
         </a>
@@ -299,21 +301,23 @@ function PcEmpty() {
   )
 }
 
-/** Opens 세션 이동, as ⌘P or Ctrl+P does. */
-function SwitchButton() {
+/** Opens 세션 이동, as ⌘P or Ctrl+P does: a field in the middle of the title bar (spec §3 #232). */
+function SwitchField() {
   const apple = isApple()
   const keys = apple ? '⌘P' : 'Ctrl+P'
   return (
     <button
       type="button"
-      class="btn btn-icon"
+      class="pc-find"
       aria-label="세션 이동"
       aria-haspopup="dialog"
       aria-keyshortcuts={apple ? 'Meta+P' : 'Control+P'}
       title={`세션 이동 (${keys})`}
       onClick={openSwitcher}
     >
-      <Icon name="search" size={18} />
+      <Icon name="search" size={16} />
+      <span class="pc-find-text">세션 찾기 · 이동</span>
+      <kbd class="pc-find-key">{keys}</kbd>
     </button>
   )
 }
@@ -328,7 +332,7 @@ export function ThemeButton() {
   const t = theme.value
   const label = `화면 테마: ${THEME_LABEL[t]}`
   return (
-    <button type="button" class="btn btn-icon" aria-label={label} title={`${label} · 누르면 ${THEME_LABEL[THEME_NEXT[t]]}`} onClick={() => setTheme(THEME_NEXT[t])}>
+    <button type="button" class="btn btn-icon btn-sm btn-ghost" aria-label={label} title={`${label} · 누르면 ${THEME_LABEL[THEME_NEXT[t]]}`} onClick={() => setTheme(THEME_NEXT[t])}>
       <Icon name={THEME_ICON[t]} size={18} />
     </button>
   )

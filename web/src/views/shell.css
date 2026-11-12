@@ -9,29 +9,121 @@
 }
 
 .pc-head {
-  display: flex;
+  display: grid;
   flex: none;
-  flex-wrap: wrap;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 360px) minmax(0, 1fr);
   align-items: center;
-  gap: var(--spacing-2) var(--spacing-5);
-  min-height: 60px;
-  padding: var(--spacing-2) max(var(--spacing-5), env(safe-area-inset-right, 0)) var(--spacing-2) max(var(--spacing-5), env(safe-area-inset-left, 0));
-  border-bottom: 1px solid var(--color-border);
-  background-color: var(--color-background-surface);
+  gap: var(--spacing-4);
+  min-height: calc(var(--size-element-md) + 2 * var(--spacing-2));
+  padding: var(--spacing-2) max(var(--spacing-4), env(safe-area-inset-right, 0)) 0 max(var(--spacing-4), env(safe-area-inset-left, 0));
+  background-color: var(--color-background-body);
 }
 
-.wordmark {
-  color: var(--color-text-primary);
-  font-size: var(--text-heading-3-size);
-  line-height: var(--text-heading-3-leading);
-  font-weight: var(--text-heading-3-weight);
+.pc-head-start {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  min-width: 0;
+}
+
+.pc-logo {
+  display: inline-flex;
+  flex: none;
+  border-radius: var(--radius-element);
+}
+
+.pc-logo img {
+  display: block;
+  width: var(--spacing-6);
+  height: var(--spacing-6);
+}
+
+/* The host picker, quiet in the bar: astryx's ghost trigger at the field's height. */
+.pc-head .hostpick {
+  min-height: var(--size-element-md);
+  background-color: transparent;
+}
+
+/* 세션 이동 as astryx's search field: it opens the switcher rather than
+   taking text, so it is a button that looks like the field. */
+.pc-find {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  width: 100%;
+  height: var(--size-element-md);
+  padding: 0 var(--spacing-1-5) 0 var(--spacing-3);
+  border: 1px solid var(--color-border-emphasized);
+  border-radius: var(--radius-element);
+  background-color: var(--color-background-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .pc-find:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
+}
+
+.pc-find svg {
+  flex: none;
+}
+
+.pc-find-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pc-find-key {
+  flex: none;
+  padding: var(--spacing-0-5) var(--spacing-1-5);
+  border-radius: var(--radius-inner);
+  background-color: var(--color-neutral);
+  font-family: inherit;
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
 }
 
 .pc-head-end {
   display: flex;
   align-items: center;
-  gap: var(--spacing-2);
-  margin-left: auto;
+  justify-content: flex-end;
+  gap: var(--spacing-1-5);
+}
+
+/* Installed by Chrome or Edge with window controls overlay, the bar is the
+   window's title bar: it keeps clear of the traffic lights (macOS, left) or
+   the caption buttons (Windows, right), fits their height and drags the
+   window; what is pressed in it does not (spec §3 #232). */
+@media (display-mode: window-controls-overlay) {
+  .pc-head {
+    min-height: env(titlebar-area-height, var(--size-element-lg));
+    padding-top: 0;
+    padding-right: calc(100vw - env(titlebar-area-x, var(--spacing-0)) - env(titlebar-area-width, 100vw) + var(--spacing-3));
+    padding-left: calc(env(titlebar-area-x, var(--spacing-0)) + var(--spacing-3));
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  .pc-head :is(a, button, .menu-list) {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+
+  .pc-head :is(.pc-find, .btn-sm, .hostpick) {
+    height: var(--size-element-sm);
+    min-height: var(--size-element-sm);
+  }
+
+  .pc-head .btn-icon.btn-sm {
+    width: var(--size-element-sm);
+  }
 }
 
 .pc-banner:not(:empty) {

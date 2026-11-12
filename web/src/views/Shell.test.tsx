@@ -114,6 +114,19 @@ afterEach(() => {
 })
 
 describe('PC', () => {
+  // The title bar (spec §3 #232): the icon and host on the left, 세션 이동 as a field in the middle, the buttons on the right.
+  it('lays out the title bar: icon and host, the search field, the buttons', () => {
+    at(1440, { name: 'queue' })
+    render(<Shell />)
+    const bar = document.querySelector<HTMLElement>('.pc-head')!
+    const [start, find, end] = [...bar.children] as HTMLElement[]
+    expect(within(start).getByRole('link', { name: 'Mori, 지금 볼 것' }).getAttribute('href')).toBe('#/')
+    expect(find.getAttribute('aria-label')).toBe('세션 이동')
+    expect(find.textContent).toMatch(/세션 찾기 · 이동(⌘P|Ctrl\+P)/)
+    expect(within(end).getByRole('link', { name: '새 세션' }).getAttribute('href')).toBe('#/new')
+    expect(within(end).getByRole('link', { name: '설정' }).getAttribute('href')).toBe('#/settings')
+  })
+
   it('draws the sidebar at its default width and widens it from the keyboard', () => {
     at(1440, { name: 'queue' })
     render(<Shell />)

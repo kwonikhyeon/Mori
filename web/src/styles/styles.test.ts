@@ -188,6 +188,21 @@ describe('the stylesheets', () => {
   })
 })
 
+// Installed with window controls overlay, the PC header is the window's title
+// bar (spec §3 #232): it drags the window, what is pressed in it does not, and
+// it keeps clear of the window's own controls on either side.
+describe('the title bar', () => {
+  it('drags the window but not from its controls, and keeps clear of the window buttons', () => {
+    const css = sheets['../views/shell.css']
+    const [[start, end]] = blocks(css, /@media \(display-mode: window-controls-overlay\) \{/g)
+    const wco = new Map(rules(css.slice(start, end)).map(([sel, body]) => [sel, body]))
+    expect(wco.get('.pc-head')).toMatch(/app-region: drag;/)
+    expect(wco.get('.pc-head')).toMatch(/padding-left: calc\(env\(titlebar-area-x/)
+    expect(wco.get('.pc-head')).toMatch(/padding-right: calc\(100vw - env\(titlebar-area-x/)
+    expect(wco.get('.pc-head :is(a, button, .menu-list)')).toMatch(/app-region: no-drag;/)
+  })
+})
+
 // The astryx guideline (AGENTS.md, spec §3 #201): every value comes from tokens.css.
 describe('the stylesheets, after astryx', () => {
   // One row of the script gives a colour's light and both dark copies.

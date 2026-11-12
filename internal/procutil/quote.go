@@ -11,6 +11,18 @@ func QuoteArg(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
+// psQuotes doubles each character PowerShell reads as a single quote.
+var psQuotes = strings.NewReplacer("'", "''", "\u2018", "\u2018\u2018", "\u2019", "\u2019\u2019", "\u201a", "\u201a\u201a", "\u201b", "\u201b\u201b")
+
+// QuotePSArg quotes s for PowerShell: as is when that is safe, else in
+// single quotes, with each quote inside doubled.
+func QuotePSArg(s string) string {
+	if plain(s) {
+		return s
+	}
+	return "'" + psQuotes.Replace(s) + "'"
+}
+
 // QuoteWinArg quotes s so that a program that splits its command line as
 // the Microsoft C runtime and Go do gets s back: as is when that is safe,
 // else in double quotes, with the backslashes before a quote doubled.

@@ -18,6 +18,21 @@ func TestQuoteArg(t *testing.T) {
 	}
 }
 
+func TestQuotePSArg(t *testing.T) {
+	for in, want := range map[string]string{
+		"--resume": "--resume",
+		"":         "''",
+		`C:\Users\u\AppData\Local\Mori\claude-settings.json`: `'C:\Users\u\AppData\Local\Mori\claude-settings.json'`,
+		"it's":  "'it''s'",
+		"it’s":  "'it’’s'", // PowerShell reads the curly quote as one too
+		"$HOME": "'$HOME'",
+	} {
+		if got := QuotePSArg(in); got != want {
+			t.Errorf("%q: %s want %s", in, got, want)
+		}
+	}
+}
+
 func TestQuoteWinArg(t *testing.T) {
 	for in, want := range map[string]string{
 		"serve":         "serve",

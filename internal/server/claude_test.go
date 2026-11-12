@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -22,20 +21,9 @@ import (
 const testSession = "3fb3a8e8-f08c-4666-9f7f-faa8caa2f6db"
 
 func TestWithHook(t *testing.T) {
-	got := withHook([]string{"/usr/local/bin/claude", "--dangerously-skip-permissions"}, "'/a b/mori' claude-hook")
-	if len(got) != 4 || got[2] != "--settings" {
+	got := withHook([]string{"/usr/local/bin/claude", "--dangerously-skip-permissions"}, "/a b/claude-settings.json")
+	if !slices.Equal(got, []string{"/usr/local/bin/claude", "--dangerously-skip-permissions", "--settings", "/a b/claude-settings.json"}) {
 		t.Fatal(got)
-	}
-	var s struct {
-		Hooks map[string][]struct {
-			Hooks []struct{ Type, Command string }
-		}
-	}
-	if err := json.Unmarshal([]byte(got[3]), &s); err != nil {
-		t.Fatal(err)
-	}
-	if h := s.Hooks["SessionStart"]; len(h) != 1 || len(h[0].Hooks) != 1 || h[0].Hooks[0].Type != "command" || h[0].Hooks[0].Command != "'/a b/mori' claude-hook" {
-		t.Fatalf("%+v", s)
 	}
 	// not Claude Code, no hook, or settings of its own: as it was
 	for _, argv := range [][]string{{"codex"}, {"/bin/zsh"}, {"claude", "--settings", "x.json"}, {}} {
@@ -54,10 +42,7 @@ func TestWithHook(t *testing.T) {
 }
 
 func TestResumeLine(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("no resume on Windows")
-	}
-	e := newTestEnv(t, func(d *Deps) { d.ClaudeHook = "mori claude-hook" })
+	e := newTestEnv(t, func(d *Deps) { d.ClaudeSettings = "/a b/s.json" })
 	e.addPreset(store.Preset{ID: "cc", Name: "cc", Argv: []string{"claude", "--dangerously-skip-permissions"}, Task: true})
 	pid := 42
 	shell := func(f func(*hc.Terminal)) hc.Terminal {
@@ -69,7 +54,7 @@ func TestResumeLine(t *testing.T) {
 		}
 		return t
 	}
-	want := `claude --dangerously-skip-permissions --settings '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"mori claude-hook"}]}]}}' --resume ` + testSession
+	want := `claude --dangerously-skip-permissions --settings '/a b/s.json' --resume ` + testSession
 	if got := e.s.resumeLine(shell(nil)); got != want {
 		t.Fatalf("%s\n%s", got, want)
 	}
@@ -78,18 +63,33 @@ func TestResumeLine(t *testing.T) {
 		t.Fatal(got)
 	}
 	for name, f := range map[string]func(*hc.Terminal){
-		"finished":        func(t *hc.Terminal) { t.State = "finished" },
-		"claude runs":     func(t *hc.Terminal) { t.Argv = []string{"claude"} },
-		"no conversation": func(t *hc.Terminal) { delete(t.Labels, core.LabelClaudeSession) },
-		"not an ID":       func(t *hc.Terminal) { t.Labels[core.LabelClaudeSession] = "x; rm -rf ~" },
-		"busy shell":      func(t *hc.Terminal) { t.Foreground = &hc.Foreground{Pid: 99, Name: "claude"} },
-		"no foreground":   func(t *hc.Terminal) { t.Foreground = nil },
-		"no program":      func(t *hc.Terminal) { t.Pid = nil },
-		"sent already":    func(t *hc.Terminal) { t.Labels[core.LabelClaudeResumed] = strconv.Itoa(pid) },
+		"finished":    func(t *hc.Terminal) { t.State = "finished" },
+		"claude runs": func(t *hc.Terminal) { t.Argv = []string{"claude"} },
+		"no sign of Claude Code": func(t *hc.Terminal) {
+			t.Labels[core.LabelPreset] = "gone"
+			delete(t.Labels, core.LabelClaudeSession)
+		},
+		"busy shell":    func(t *hc.Terminal) { t.Foreground = &hc.Foreground{Pid: 99, Name: "claude"} },
+		"no foreground": func(t *hc.Terminal) { t.Foreground = nil },
+		"no program":    func(t *hc.Terminal) { t.Pid = nil },
+		"sent already":  func(t *hc.Terminal) { t.Labels[core.LabelClaudeResumed] = strconv.Itoa(pid) },
 	} {
 		if got := e.s.resumeLine(shell(f)); got != "" {
 			t.Errorf("%s: %s", name, got)
 		}
+	}
+	// a Claude Code preset with no conversation noted (started before the
+	// hook, or a name that is not an ID): Claude Code's own list to pick from
+	picker := `claude --dangerously-skip-permissions --settings '/a b/s.json' --resume`
+	if got := e.s.resumeLine(shell(func(t *hc.Terminal) { delete(t.Labels, core.LabelClaudeSession) })); got != picker {
+		t.Fatal(got)
+	}
+	if got := e.s.resumeLine(shell(func(t *hc.Terminal) { t.Labels[core.LabelClaudeSession] = "x; rm -rf ~" })); got != picker {
+		t.Fatal(got)
+	}
+	// the shell the core gives on Windows: PowerShell's call and quotes
+	if got := e.s.resumeLine(shell(func(t *hc.Terminal) { t.Argv = []string{`C:\Program Files\PowerShell\7\pwsh.exe`} })); got != `& claude --dangerously-skip-permissions --settings '/a b/s.json' --resume `+testSession {
+		t.Fatal(got)
 	}
 	// sent to an earlier shell: this one takes it
 	if got := e.s.resumeLine(shell(func(t *hc.Terminal) { t.Labels[core.LabelClaudeResumed] = "7" })); got != want {
@@ -105,7 +105,7 @@ func TestClaudeResume(t *testing.T) {
 		t.Skip("uses a POSIX shell")
 	}
 	c := hctest.Start(t)
-	e := newTestEnv(t, withCore(t, c), func(d *Deps) { d.ClaudeHook = "true" })
+	e := newTestEnv(t, withCore(t, c), func(d *Deps) { d.ClaudeSettings = "/m/claude-settings.json" })
 	e.pair()
 	dir := t.TempDir()
 	f := e.addFolder(dir)
@@ -128,7 +128,7 @@ func TestClaudeResume(t *testing.T) {
 		return strings.Split(strings.TrimSpace(string(b)), "\n")
 	}
 	e.eventually(func() bool { return len(lines()) == 1 && lines()[0] != "" })
-	if l := lines()[0]; !strings.HasPrefix(l, `--settings {"hooks":{"SessionStart":`) || !strings.HasSuffix(l, " 일해 줘") {
+	if l := lines()[0]; l != "--settings /m/claude-settings.json 일해 줘" {
 		t.Fatal(l)
 	}
 	// what the hook would write as the conversation starts
@@ -156,7 +156,7 @@ func TestClaudeResume(t *testing.T) {
 	// opened: the shell runs it again, on the conversation
 	ws := e.dialWS("/ws/attach?t=" + url.QueryEscape(addr) + "&cols=80&rows=24")
 	e.eventually(func() bool { return len(lines()) == 2 })
-	if l := lines()[1]; !strings.HasPrefix(l, `--settings {"hooks":`) || !strings.HasSuffix(l, " --resume "+testSession) {
+	if l := lines()[1]; l != "--settings /m/claude-settings.json --resume "+testSession {
 		t.Fatal(l)
 	}
 	if get().Labels[core.LabelClaudeResumed] != strconv.Itoa(*shell.Pid) {

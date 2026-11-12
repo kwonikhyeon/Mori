@@ -50,8 +50,8 @@ type createReq struct {
 // runParams starts preset p in cwd, a directory of folder f (spec §6.3).
 // A preset that takes a task gets it as its last argument; an empty argv
 // runs the machine's shell.
-func runParams(f store.Folder, cwd string, p store.Preset, req createReq, hook string) hc.RunParams {
-	argv := withHook(slices.Clone(p.Argv), hook)
+func runParams(f store.Folder, cwd string, p store.Preset, req createReq, settings string) hc.RunParams {
+	argv := withHook(slices.Clone(p.Argv), settings)
 	task := ""
 	if p.Task && len(argv) > 0 {
 		task = strings.TrimSpace(req.Task)
@@ -250,7 +250,7 @@ func (s *Server) createParams(req createReq) (hc.RunParams, error) {
 	if utf8.RuneCountInString(oneLine(req.Title)) > maxTitle {
 		return hc.RunParams{}, invalid("제목은 %d자까지입니다", maxTitle)
 	}
-	return runParams(st.Folders[fi], cwd, st.Presets[pi], req, s.d.ClaudeHook), nil
+	return runParams(st.Folders[fi], cwd, st.Presets[pi], req, s.d.ClaudeSettings), nil
 }
 
 // handlePatchTerminal renames a terminal. An empty title removes the

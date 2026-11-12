@@ -64,10 +64,10 @@ type Deps struct {
 	// box's ↑ reads (spec §3 #226). Empty takes $CLAUDE_CONFIG_DIR or
 	// ~/.claude.
 	ClaudeConfig string
-	// ClaudeHook is the command Claude Code runs as its SessionStart hook
-	// in the terminals Mori starts (`mori claude-hook`, spec §3 #230); ""
-	// gives it none.
-	ClaudeHook string
+	// ClaudeSettings is the settings file Mori gives Claude Code in the
+	// terminals it starts, whose SessionStart hook runs `mori claude-hook`
+	// (spec §3 #230, #241); "" gives it none.
+	ClaudeSettings string
 }
 
 // Server routes requests. Build it with New and serve Handler().

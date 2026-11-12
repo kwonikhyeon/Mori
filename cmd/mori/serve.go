@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -26,7 +28,6 @@ import (
 	"github.com/kwonikhyeon/mori/internal/paths"
 	"github.com/kwonikhyeon/mori/internal/peer"
 	"github.com/kwonikhyeon/mori/internal/presence"
-	"github.com/kwonikhyeon/mori/internal/procutil"
 	"github.com/kwonikhyeon/mori/internal/push"
 	"github.com/kwonikhyeon/mori/internal/server"
 	"github.com/kwonikhyeon/mori/internal/store"
@@ -118,21 +119,21 @@ func runServe(args []string) error {
 	git := gitx.Runner{}
 	fr := folders.New(st, git)
 	srv := server.New(server.Deps{
-		Version:    version.Version,
-		HostName:   host,
-		Auth:       au,
-		Store:      st,
-		Core:       cm,
-		Folders:    fr,
-		Git:        git,
-		PublicURL:  pub,
-		Names:      serverNames(pub, *publicFlag != "", tailscale.DNSName),
-		UI:         webui.Handler(),
-		Logger:     logger,
-		Presence:   pres,
-		Push:       notifier,
-		Links:      links,
-		ClaudeHook: claudeHook(),
+		Version:        version.Version,
+		HostName:       host,
+		Auth:           au,
+		Store:          st,
+		Core:           cm,
+		Folders:        fr,
+		Git:            git,
+		PublicURL:      pub,
+		Names:          serverNames(pub, *publicFlag != "", tailscale.DNSName),
+		UI:             webui.Handler(),
+		Logger:         logger,
+		Presence:       pres,
+		Push:           notifier,
+		Links:          links,
+		ClaudeSettings: claudeSettings(home),
 	})
 	hs := &http.Server{
 		Handler:           srv.Handler(),
@@ -376,14 +377,28 @@ func firstLabel(h string) string {
 	return strings.ToLower(h)
 }
 
-// claudeHook is the command Claude Code runs as its SessionStart hook in the
-// terminals this server starts: this program's claude-hook (spec §3 #230).
-// Windows gets none: the shell a lost program leaves there is not a POSIX
-// one, so the conversation is not taken up again.
-func claudeHook() string {
+// claudeSettings writes the settings file Mori gives Claude Code in the
+// terminals this server starts (spec §3 #230, #241): a SessionStart hook
+// that runs this program's claude-hook in exec form, with no shell (sh, Git
+// Bash or PowerShell) to read its path. It returns the file's path, or ""
+// when it cannot be written, which starts Claude Code with no hook.
+func claudeSettings(home string) string {
 	exe, err := os.Executable()
-	if err != nil || runtime.GOOS == "windows" {
+	if err != nil {
 		return ""
 	}
-	return procutil.QuoteArg(exe) + " claude-hook"
+	type cmd struct {
+		Type    string   `json:"type"`
+		Command string   `json:"command"`
+		Args    []string `json:"args"`
+	}
+	type matcher struct {
+		Hooks []cmd `json:"hooks"`
+	}
+	b, _ := json.Marshal(map[string]map[string][]matcher{"hooks": {"SessionStart": {{Hooks: []cmd{{"command", exe, []string{"claude-hook"}}}}}}})
+	path := filepath.Join(home, "claude-settings.json")
+	if os.WriteFile(path, b, 0o644) != nil {
+		return ""
+	}
+	return path
 }

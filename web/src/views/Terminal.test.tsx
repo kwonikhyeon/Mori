@@ -2136,6 +2136,21 @@ describe('pickers', () => {
       expect(band()).not.toBeNull()
     })
 
+    // On a phone the band and the dock below it read as one sheet: the dock
+    // gives the band its rounded top while the band shows.
+    it('joins the band to the dock on a phone', async () => {
+      const { ws } = await mount(undefined, { variant: 'phone', back: '#/folders' })
+      await attach(ws)
+      const dock = () => document.querySelector('.term-dock')!
+      // a window: no band, the dock keeps its rounded top
+      await show(SCREENS.model)
+      expect(band()).toBeNull()
+      expect(dock().classList.contains('is-joined')).toBe(false)
+      await show(IDLE)
+      expect(band()).not.toBeNull()
+      expect(dock().classList.contains('is-joined')).toBe(true)
+    })
+
     it('puts the mode in the band and the switch in the menu on a phone', async () => {
       const { ws } = await mount(undefined, { variant: 'phone', back: '#/folders' })
       await attach(ws)

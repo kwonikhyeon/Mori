@@ -932,7 +932,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
             {band}
           </>,
         )}
-        <div class="term-dock">
+        <div class={'term-dock' + (band ? ' is-joined' : '')}>
           {askBar}
           {observeBar}
           {endBar}

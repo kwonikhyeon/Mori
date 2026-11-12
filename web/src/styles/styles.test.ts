@@ -107,6 +107,10 @@ describe('the stylesheets', () => {
     // a row of chips scrolls sideways rather than wrap into the rows below
     expect(css.get('.term-cover-row')).toMatch(/overflow-x: auto;/)
     expect(css.get('.term-cover-row')).toMatch(/white-space: nowrap;/)
+    // on a phone the band takes the dock's rounded top, and the dock gives it up
+    expect(css.get('.term-phone .term-cover')).toMatch(/border-radius: var\(--radius-container\) var\(--radius-container\) 0 0;/)
+    expect(css.get('.term-phone .term-cover')).toMatch(/border-top: 0;/)
+    expect(css.get('.term-dock.is-joined')).toMatch(/border-radius: 0;/)
     // the phone's mode button is a finger's height
     expect(phoneRules(sheets['../views/terminal.css']).get('.term-cover-mode')).toMatch(/min-height: 44px/)
   })

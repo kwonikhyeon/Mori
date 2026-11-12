@@ -103,14 +103,21 @@ describe('the stylesheets', () => {
     const css = new Map(rules(sheets['../views/terminal.css']).map(([sel, body]) => [sel, body]))
     expect(css.get('.term-cover')).toMatch(/position: absolute;/)
     expect(css.get('.term-cover')).toMatch(/z-index: 4;/)
-    expect(css.get('.term-cover')).toMatch(/background-color: var\(--color-background-surface\);/)
+    // what the band covers beyond its sheet reads as the terminal's own blank rows
+    expect(css.get('.term-cover')).toMatch(/background-color: var\(--term-bg\);/)
+    expect(css.get('.term-cover')).toMatch(/justify-content: flex-end;/)
+    // the sheet, as tall as what it shows, at the foot of the band
+    expect(css.get('.term-cover-sheet')).toMatch(/background-color: var\(--color-background-surface\);/)
     // a row of chips scrolls sideways rather than wrap into the rows below
     expect(css.get('.term-cover-row')).toMatch(/overflow-x: auto;/)
     expect(css.get('.term-cover-row')).toMatch(/white-space: nowrap;/)
-    // on a phone the band takes the dock's rounded top, and the dock gives it up
-    expect(css.get('.term-phone .term-cover')).toMatch(/border-radius: var\(--radius-container\) var\(--radius-container\) 0 0;/)
-    expect(css.get('.term-phone .term-cover')).toMatch(/border-top: 0;/)
+    // on a phone the sheet takes the dock's rounded top, and the dock gives it up
+    expect(css.get('.term-phone .term-cover-sheet')).toMatch(/border-radius: var\(--radius-container\) var\(--radius-container\) 0 0;/)
+    expect(css.get('.term-phone .term-cover-sheet')).toMatch(/border-top: 0;/)
     expect(css.get('.term-dock.is-joined')).toMatch(/border-radius: 0;/)
+    // a hairline, inset, parts the status from the keys below it
+    expect(css.get('.term-dock.is-joined::before')).toMatch(/height: 1px;/)
+    expect(css.get('.term-dock.is-joined::before')).toMatch(/background-color: var\(--color-border\);/)
     // the phone's mode button is a finger's height
     expect(phoneRules(sheets['../views/terminal.css']).get('.term-cover-mode')).toMatch(/min-height: 44px/)
   })

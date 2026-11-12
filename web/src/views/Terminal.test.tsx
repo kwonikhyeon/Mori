@@ -1957,6 +1957,8 @@ describe('pickers', () => {
       await show(IDLE)
       const b = band()!
       expect(b.parentElement?.classList.contains('term-stage')).toBe(true)
+      // what it shows sits on a sheet at its foot
+      expect(b.querySelector('.term-cover-sheet .term-cover-row')).not.toBeNull()
       // the rule over the box: the sample's third line, at the bottom of 24 rows of 17px
       expect(b.style.top).toBe(`${(24 - 9 + 2) * 17}px`)
       expect(within(b).getByText('Opus 5.5').classList.contains('chip')).toBe(true)

@@ -634,7 +634,10 @@ a.term-back {
    design §3, spec §3 #223): the status line, the person's own, as astryx
    Badges and ProgressBars, and on a phone the mode as a button. Over the
    rows it stands for, inside the stage: the terminal keeps its size. The
-   picker panel's layer (4): the two never show together. */
+   rows it covers are more than it shows: its sheet, as tall as what it
+   shows, sits at its foot, by the box below, and the band above the sheet
+   is the terminal's own blank. The picker panel's layer (4): the two never
+   show together. */
 .term-cover {
   position: absolute;
   inset-inline: 0;
@@ -642,9 +645,17 @@ a.term-back {
   z-index: 4;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  background-color: var(--term-bg);
+}
+
+.term-cover-sheet {
+  display: flex;
+  flex: none;
+  flex-direction: column;
   gap: var(--spacing-1);
   padding: var(--spacing-2) var(--spacing-4);
-  overflow: hidden;
   border-top: 1px solid var(--color-border);
   background-color: var(--color-background-surface);
   color: var(--color-text-secondary);
@@ -675,9 +686,9 @@ a.term-back {
   font-variant-numeric: tabular-nums;
 }
 
-/* On a phone the band and the dock below it are one sheet: the band takes
-   the dock's rounded top and its fill, with no line between them. */
-.term-phone .term-cover {
+/* On a phone the sheet and the dock below it are one: the sheet takes the
+   dock's rounded top and its fill. */
+.term-phone .term-cover-sheet {
   padding: var(--spacing-3) var(--spacing-3) var(--spacing-2);
   border-top: 0;
   border-radius: var(--radius-container) var(--radius-container) 0 0;
@@ -1046,7 +1057,16 @@ textarea.term-send-input::placeholder {
 }
 
 .term-dock.is-joined {
+  padding-top: var(--spacing-1);
   border-radius: 0;
+}
+
+/* A hairline, inset, parts the status above from the keys below. */
+.term-dock.is-joined::before {
+  content: '';
+  flex: none;
+  height: 1px;
+  background-color: var(--color-border);
 }
 
 .term-dock:empty {

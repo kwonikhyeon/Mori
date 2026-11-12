@@ -1,10 +1,10 @@
-// How many terminals wait for a person (spec §3 #122): the page title and
-// the home screen icon.
+// How many terminals wait for a person (spec §3 #122): the page title. The
+// app icon, in the taskbar or on the home screen, shows no number, and a
+// number an earlier Mori put there is cleared (spec §3 #240).
 
-/** "(3) Mori" and the app icon's badge; nothing to do is no number at all. */
+/** "(3) Mori"; nothing to do is no number at all. */
 export function showNeeds(n: number): void {
   document.title = n > 0 ? `(${n}) Mori` : 'Mori'
-  const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> }
-  const p = n > 0 ? nav.setAppBadge?.(n) : nav.clearAppBadge?.()
-  p?.catch(() => {}) // no permission to badge: the title still says it
+  const nav = navigator as Navigator & { clearAppBadge?: () => Promise<void> }
+  nav.clearAppBadge?.().catch(() => {}) // no badge, or no permission to clear it
 }

@@ -105,7 +105,7 @@ describe('CommitPanel', () => {
     const sum = region('커밋 내용')
     expect(facts(sum.querySelector('dl')!)).toEqual([
       ['작성', `김하늘 · 오늘 ${clock(NOW - 5 * 60_000)} (5분 전)`],
-      ['이름표', '현재 브랜치 main 원격 origin/main 태그 v0.2.0'],
+      ['이름표', '현재 브랜치 main, 원격 origin/main 태그 v0.2.0'],
       ['부모', 'aaaaaaa 처음 | bbbbbbb 알림이 두 번 뜨던 문제 고침'],
       ['해시', C],
     ])

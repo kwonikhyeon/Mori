@@ -23,10 +23,48 @@
   --tone: var(--lane-4);
 }
 
+.lane-5 {
+  --tone: var(--lane-5);
+}
+
+.lane-6 {
+  --tone: var(--lane-6);
+}
+
+.lane-7 {
+  --tone: var(--lane-7);
+}
+
+.lane-8 {
+  --tone: var(--lane-8);
+}
+
+.lane-9 {
+  --tone: var(--lane-9);
+}
+
+.lane-10 {
+  --tone: var(--lane-10);
+}
+
+.lane-11 {
+  --tone: var(--lane-11);
+}
+
 .gr-svg {
   display: block;
   flex: none;
   overflow: hidden;
+}
+
+/* As VS Code Git Graph draws them: a line on a wider one in the
+   background's colour, so one crossing another cuts it; a dot ringed in the
+   background; HEAD's commit hollow (spec §3 #246). */
+.gr-shadow {
+  fill: none;
+  stroke: var(--color-background-surface);
+  stroke-opacity: .75;
+  stroke-width: 4;
 }
 
 .gr-edge {
@@ -38,12 +76,16 @@
 
 .gr-dot {
   fill: var(--tone);
+  stroke: var(--color-background-surface);
+  stroke-opacity: .75;
+  stroke-width: 1;
 }
 
-.gr-ring {
-  fill: none;
+.is-head > .gr-svg .gr-dot {
+  fill: var(--color-background-surface);
   stroke: var(--tone);
-  stroke-width: 1.5;
+  stroke-opacity: 1;
+  stroke-width: 2;
 }
 
 /* ---------- the PC header ---------- */
@@ -150,13 +192,6 @@
   min-width: 0;
 }
 
-.gr-line1 {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-1-5);
-  min-width: 0;
-}
-
 .gr-subject {
   min-width: 0;
   overflow: hidden;
@@ -200,6 +235,116 @@
   color: var(--color-text-secondary);
 }
 
+.gr-row.is-head .gr-subject {
+  font-weight: var(--font-weight-semibold);
+}
+
+.gr-row.is-merge .gr-subject {
+  color: var(--color-text-secondary);
+}
+
+/* ---------- the PC's table ---------- */
+
+/* After VS Code Git Graph (spec §3 #246): a column header that stays, and one
+   line a commit, its graph, description, date, author and commit lined up
+   under it. Narrower, as with the commit beside it, the author goes, then the
+   date. */
+.gs-pc .gr-scroll {
+  --gr-graph: 0px; /* the graph's width, set from Graph.tsx */
+  container-type: inline-size;
+  isolation: isolate; /* the header's z-index counts in here only */
+  scroll-padding-top: var(--size-element-sm);
+}
+
+.gr-cols,
+.gs-pc .gr-row {
+  display: grid;
+  grid-template-columns: max(var(--gr-graph), 3.5rem) minmax(0, 1fr) 8.5rem 7.5rem 4.5rem;
+  align-items: center;
+  column-gap: var(--spacing-3);
+  padding: 0 var(--spacing-4) 0 var(--spacing-2);
+}
+
+.gr-cols {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-top: var(--spacing-1);
+  padding-bottom: var(--spacing-1);
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-background-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--text-label-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--text-label-leading);
+  white-space: nowrap;
+}
+
+.gr-cols > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gs-pc .gr-list {
+  padding: var(--spacing-1) 0;
+}
+
+.gs-pc .gr-li {
+  contain-intrinsic-size: auto var(--size-element-sm);
+}
+
+.gs-pc .gr-row {
+  height: var(--size-element-sm);
+}
+
+.gr-desc {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1-5);
+  min-width: 0;
+}
+
+/* As in Git Graph the names keep their room, up to the share .gr-chips allows; the subject gives way. */
+.gr-desc > .gr-chips {
+  flex-shrink: 0;
+}
+
+.gs-pc .gr-when,
+.gs-pc .gr-author,
+.gs-pc .gr-hash {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
+  line-height: var(--text-supporting-leading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container (max-width: 720px) {
+  .gr-cols,
+  .gs-pc .gr-row {
+    grid-template-columns: max(var(--gr-graph), 3.5rem) minmax(0, 1fr) 8.5rem 4.5rem;
+  }
+
+  .gr-col-author,
+  .gs-pc .gr-author {
+    display: none;
+  }
+}
+
+@container (max-width: 520px) {
+  .gr-cols,
+  .gs-pc .gr-row {
+    grid-template-columns: max(var(--gr-graph), 3.5rem) minmax(0, 1fr) 4.5rem;
+  }
+
+  .gr-col-when,
+  .gs-pc .gr-when {
+    display: none;
+  }
+}
+
 /* ---------- names ---------- */
 
 .gr-chips {
@@ -212,60 +357,71 @@
   overflow: hidden;
 }
 
+/* A name boxed as VS Code Git Graph boxes it (spec §3 #246): the lane's
+   colour behind its icon, a remote of the same branch joined on, and the
+   branch HEAD is on bordered in the lane's colour. Corners as Git Graph's, not
+   a Badge's round ends. */
 .gr-chip {
-  position: relative;
   display: inline-flex;
   flex: 0 1 auto;
-  align-items: center;
-  gap: var(--spacing-1);
+  align-items: stretch;
   min-width: 0;
-  max-width: 200px;
+  max-width: 220px;
   height: var(--spacing-5);
-  padding: 0 var(--spacing-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-full);
-  font-family: var(--font-family-code);
+  overflow: hidden;
+  border: 1px solid var(--color-border-emphasized);
+  border-radius: var(--radius-inner);
+  background-color: var(--color-background-gray);
+  color: var(--color-text-primary);
   font-size: var(--text-supporting-size);
-  line-height: 1;
+  line-height: var(--text-supporting-leading);
   white-space: nowrap;
 }
 
-.gr-chip svg {
+.gr-chip-icon {
+  display: flex;
   flex: none;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--spacing-5) - 2px);
+  background-color: var(--tone);
+  color: var(--color-background-surface);
+}
+
+.gr-chip-name,
+.gr-chip-remote {
+  align-self: center;
+  min-width: 0;
+  padding: 0 var(--spacing-1-5);
 }
 
 .gr-chip-name {
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.gr-chip.is-head {
-  border-color: var(--color-accent);
-  background-color: var(--color-accent);
-  color: var(--color-on-accent);
-  font-weight: var(--font-weight-medium);
-}
-
-.gr-chip.is-branch {
-  border-color: var(--tone);
-  color: var(--tone);
-}
-
-.gr-chip.is-remote {
-  border-color: var(--tone);
-  border-style: dashed;
+.gr-chip-remote {
+  display: flex;
+  flex: none;
+  align-self: stretch;
+  align-items: center;
+  border-left: 1px solid var(--color-border-emphasized);
   color: var(--color-text-secondary);
+  font-style: italic;
 }
 
-.gr-chip.is-tag {
-  background-color: var(--color-background-gray);
-  color: var(--color-text-gray);
+.gr-chip.is-current {
+  border-color: var(--tone);
+}
+
+.gr-chip.is-current .gr-chip-name {
+  font-weight: var(--font-weight-semibold);
 }
 
 .gr-chip.is-more {
   flex: none;
-  background-color: var(--color-background-gray);
+  align-items: center;
+  padding: 0 var(--spacing-2);
   color: var(--color-text-secondary);
 }
 
@@ -360,10 +516,6 @@
 
 .gs-phone .gr-chips {
   max-width: 70%;
-}
-
-.gs-phone .gr-chip {
-  padding: 0 var(--spacing-2);
 }
 
 .gs-phone .gr-foot {

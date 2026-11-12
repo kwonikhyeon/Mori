@@ -6,10 +6,12 @@ import { A, B, C, COMMITS, diffOf, LOG, linear, MAIN, NOW } from '../../test/his
 import { spoken } from '../../test/spoken'
 import { closeContext, ContextMenuHost } from '../components/ContextMenu'
 import { now } from '../lib/clock'
+import { dayClock } from '../lib/time'
 import { href, route, type Route } from '../lib/router'
 import { folders, ready, resetStore } from '../lib/store'
 import { toasts } from '../lib/toast'
 import { GraphScreen } from './Graph'
+import { labels } from './RefChips'
 import type { Variant } from './rows'
 import { forgetCommits, graphFrom, shownLog } from './useLog'
 
@@ -97,13 +99,19 @@ describe('GraphScreen on a PC', () => {
     open('pc')
     await list()
     expect(rows()).toHaveLength(3)
-    expect(screen.getByRole('link', { name: '현재 브랜치 main 원격 origin/main 태그 v0.2.0 fix/notify 병합 ccccccc 김하늘 5분 전' })).toBe(rows()[0])
-    expect(screen.getByRole('link', { name: 'fix/notify 알림이 두 번 뜨던 문제 고침 bbbbbbb Lee 1시간 전' })).toBe(rows()[1])
-    expect(screen.getByRole('link', { name: '처음 aaaaaaa 김하늘 3일 전' })).toBe(rows()[2])
+    // As VS Code Git Graph's table: names and subject, date, author, commit (spec §3 #246)
+    const day = (i: number) => dayClock(LOG.commits[i].time_ms, NOW)
+    expect(screen.getByRole('link', { name: `현재 브랜치 main, 원격 origin/main 태그 v0.2.0 fix/notify 병합 ${day(0)} 김하늘 ccccccc` })).toBe(rows()[0])
+    expect(screen.getByRole('link', { name: `fix/notify 알림이 두 번 뜨던 문제 고침 ${day(1)} Lee bbbbbbb` })).toBe(rows()[1])
+    expect(screen.getByRole('link', { name: `처음 ${day(2)} 김하늘 aaaaaaa` })).toBe(rows()[2])
+    expect(day(0)).toMatch(/^오늘 \d\d:\d\d$/)
+    expect(rows()[0].querySelector('.gr-when')?.getAttribute('title')).toBe(`${day(0)} (5분 전)`)
+    expect(screen.getByText('작성자').closest('.gr-cols')?.getAttribute('aria-hidden')).toBe('true')
     expect(rows()[0].getAttribute('href')).toBe(href({ name: 'graph', folder: 'f1', head: false, c: C }))
 
-    // HEAD's ring, a dot for each commit, and the lines by colour
-    expect(rows().map((a) => a.querySelectorAll('.gr-ring').length)).toEqual([1, 0, 0])
+    // HEAD's commit hollow, a merge quieter, a dot for each commit, and the lines by colour
+    expect(rows().map((a) => a.classList.contains('is-head'))).toEqual([true, false, false])
+    expect(rows().map((a) => a.classList.contains('is-merge'))).toEqual([true, false, false])
     expect(rows().map((a) => a.querySelectorAll('.gr-dot').length)).toEqual([1, 1, 1])
     expect([...rows()[1].querySelectorAll('.gr-edge')].map((p) => p.getAttribute('class'))).toEqual(['gr-edge lane-0', 'gr-edge lane-1'])
     // Tab reaches the first row; the arrow keys the others.
@@ -285,7 +293,7 @@ describe('a commit row\'s context menu (spec §3 #242)', () => {
     render(<ContextMenuHost />)
     await list()
     const row = rows()[1]
-    fireEvent.contextMenu(row.querySelector('.gr-text')!, { button: 2, clientX: 5, clientY: 5 })
+    fireEvent.contextMenu(row.querySelector('.gr-desc')!, { button: 2, clientX: 5, clientY: 5 })
     const m = screen.getByRole('menu', { name: '커밋' })
     expect([...m.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent)).toEqual(['커밋 보기', '해시 복사', '짧은 해시 복사', '제목 복사'])
     fireEvent.click(screen.getByRole('menuitem', { name: '해시 복사' }))
@@ -304,11 +312,10 @@ describe('GraphScreen on a phone', () => {
     await list()
     expect(screen.getByText('Mori · 커밋 3개 · 보기만 합니다')).toBeTruthy()
     expect(screen.getByRole('link', { name: '뒤로' }).getAttribute('href')).toBe('#/git/f1')
-    // A row has room for one name; the rest are counted.
-    expect(screen.getByRole('link', { name: 'fix/notify 병합 현재 브랜치 main 이름표 2개 더 ccccccc 5분 전' })).toBe(rows()[0])
-    expect(within(rows()[0]).getByTitle('원격 origin/main, 태그 v0.2.0').textContent).toBe('+2이름표 2개 더')
-    // HEAD's branch goes by its name alone there, and in full in the sheet.
-    expect(within(rows()[0]).getByTitle('현재 브랜치 main').textContent).toBe('main현재 브랜치 main')
+    // A row has room for one name, with the remote of the same branch joined on; the rest are counted.
+    expect(screen.getByRole('link', { name: 'fix/notify 병합 현재 브랜치 main, 원격 origin/main 이름표 1개 더 ccccccc 5분 전' })).toBe(rows()[0])
+    expect(within(rows()[0]).getByTitle('태그 v0.2.0').textContent).toBe('+1이름표 1개 더')
+    expect(within(rows()[0]).getByTitle('현재 브랜치 main, 원격 origin/main').textContent).toBe('mainorigin현재 브랜치 main, 원격 origin/main')
 
     fireEvent.click(rows()[1])
     const sheet = screen.getByRole('region', { name: '커밋' })
@@ -365,10 +372,10 @@ describe('GraphScreen on a phone', () => {
     expect([...sum.children].map(spoken)).toEqual([
       'fix/notify 병합',
       '알림 고침을 가져옵니다.',
-      '현재 브랜치 main 원격 origin/main 태그 v0.2.0',
+      '현재 브랜치 main, 원격 origin/main 태그 v0.2.0',
       '김하늘 · 5분 전 · 부모 aaaaaaa, bbbbbbb',
     ])
-    expect(within(sum).getByTitle('현재 브랜치 main').textContent).toBe('HEAD → main현재 브랜치 main')
+    expect(within(sum).getByTitle('현재 브랜치 main, 원격 origin/main').classList.contains('is-current')).toBe(true)
   })
 
   it('leaves the focus on the rows the arrow keys walk under it', async () => {
@@ -393,5 +400,19 @@ describe('GraphScreen on a phone', () => {
     expect(await within(sheet).findByRole('heading', { name: '알림이 두 번 뜨던 문제 고침' })).toBeTruthy()
     expect(within(sheet).queryByRole('region', { name: 'notify.go 변경 내용' })).toBeNull()
     expect(document.activeElement).toBe(rows()[1])
+  })
+})
+
+// A remote branch joins the box of the local branch of its name at the same commit, as in VS Code Git Graph (spec §3 #246).
+describe('labels', () => {
+  const r = (kind: string, name: string, current = false) => ({ kind, name, current })
+  it('joins a remote to its local branch, and leaves the rest as they come', () => {
+    const got = labels([r('branch', 'feat/x', true), r('branch', 'main'), r('remote', 'origin/feat/x'), r('remote', 'up/feat/x'), r('remote', 'origin/other'), r('tag', 'origin/main')])
+    expect(got.map((l) => [l.r.name, l.remotes])).toEqual([
+      ['feat/x', ['origin', 'up']],
+      ['main', []],
+      ['origin/other', []],
+      ['origin/main', []],
+    ])
   })
 })

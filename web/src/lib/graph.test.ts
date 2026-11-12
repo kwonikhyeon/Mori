@@ -84,8 +84,8 @@ describe('graphWidth', () => {
 
 describe('geom', () => {
   it('has the row height and the dot of each size', () => {
-    expect(geom(PC, 3, 900)).toEqual({ w: 16, h: 44, r: 4, ring: 7 })
-    expect(geom(PHONE, 3, 358)).toEqual({ w: 14, h: 56, r: 5, ring: 9 })
+    expect(geom(PC, 3, 900)).toEqual({ w: 16, h: 28, r: 4 })
+    expect(geom(PHONE, 3, 358)).toEqual({ w: 14, h: 56, r: 5 })
   })
 
   it('shrinks the dot with the lanes', () => {
@@ -93,12 +93,11 @@ describe('geom', () => {
     expect(g.w).toBe(6)
     expect(g.r).toBeLessThan(4)
     expect(g.r).toBeGreaterThanOrEqual(2)
-    expect(g.ring).toBeLessThan(7)
   })
 })
 
 describe('rowSegs and segPath', () => {
-  const g: Geom = { w: 16, h: 44, r: 4, ring: 7 }
+  const g: Geom = { w: 16, h: 44, r: 4 }
 
   it('draws a line from above in the same lane straight down to the dot', () => {
     const [s] = rowSegs(row(0, [e(0)], [], []), g)
@@ -135,12 +134,12 @@ describe('rowSegs and segPath', () => {
   it('keeps the colour of the line, which the palette cycles through', () => {
     const [s] = rowSegs(row(0, [e(0, 7)], [], []), g)
     expect(s.color).toBe(7)
-    expect(COLORS).toBe(5)
-    expect([0, 4, 5, 7, 12].map(tone)).toEqual([0, 4, 0, 2, 2])
+    expect(COLORS).toBe(12)
+    expect([0, 11, 12, 13, 25].map(tone)).toEqual([0, 11, 0, 1, 1])
   })
 
   it('writes half pixels when an odd lane width puts a lane between them', () => {
-    const odd: Geom = { w: 13, h: 56, r: 4, ring: 7 }
+    const odd: Geom = { w: 13, h: 56, r: 4 }
     const [s] = rowSegs(row(0, [e(1)], [], []), odd)
     expect(s.x1).toBe(MARGIN + 13 + 6.5)
     expect(segPath(s)).toBe('M23.5 0C23.5 14 10.5 14 10.5 28')
@@ -149,8 +148,8 @@ describe('rowSegs and segPath', () => {
 
 describe('rowPaths', () => {
   it('joins the lines of a colour into one path, those going by under the rest', () => {
-    const g: Geom = { w: 16, h: 44, r: 4, ring: 7 }
-    const c = row(1, [e(1), e(2, 6)], [e(0), e(3, 5)], [e(1)])
+    const g: Geom = { w: 16, h: 44, r: 4 }
+    const c = row(1, [e(1), e(2, 13)], [e(0), e(3, 12)], [e(1)])
     expect(rowPaths(c, g)).toEqual([
       { tone: 0, d: 'M12 0V44M60 0V44' },
       { tone: 1, d: 'M28 0V22M44 0C44 11 28 11 28 22M28 22V44' },

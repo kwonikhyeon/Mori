@@ -1,9 +1,12 @@
-// A commit's names in the graph (spec §3 #104): the branch HEAD is on, or
-// HEAD alone when it is detached, then branches, remote branches and tags,
-// in the order the server sends them. A row shows a few; the rest are
-// counted.
+// A commit's names in the graph (spec §3 #104, #246), drawn as VS Code Git
+// Graph draws them: a box with the commit's lane colour behind its icon, the
+// branch HEAD is on bordered in that colour and its name in semibold. A
+// remote branch at the same commit as the local one of its name joins that
+// box ("main | origin"). The order is the server's: HEAD alone when it is
+// detached, then branches, remote branches and tags. A row shows a few; the
+// rest are counted.
 import { Fragment } from 'preact'
-import { Icon } from '../components/Icon'
+import { Icon, type IconName } from '../components/Icon'
 import { tone } from '../lib/graph'
 import type { LogCommit, Ref } from '../lib/types'
 
@@ -15,41 +18,73 @@ export function refText(r: Ref): string {
   return r.current ? '현재 브랜치 ' + r.name : r.name
 }
 
-function chipOf(r: Ref, lane: string, short: boolean): { cls: string; shown: string } {
-  if (r.kind === 'head') return { cls: 'is-head', shown: 'HEAD' }
-  if (r.kind === 'tag') return { cls: 'is-tag', shown: r.name }
-  if (r.kind === 'remote') return { cls: 'is-remote ' + lane, shown: r.name }
-  if (r.current) return { cls: 'is-head', shown: short ? r.name : 'HEAD → ' + r.name }
-  return { cls: 'is-branch ' + lane, shown: r.name }
+/** A box: a name, and the remotes whose branch of the same name is at the same commit. */
+interface Label {
+  r: Ref
+  remotes: string[]
+}
+
+/** The names as boxes: a remote branch goes into its local branch's box when both are here. */
+export function labels(refs: Ref[]): Label[] {
+  const out: Label[] = []
+  const local = new Map<string, Label>()
+  for (const r of refs) {
+    const slash = r.name.indexOf('/')
+    const mine = r.kind === 'remote' && slash > 0 ? local.get(r.name.slice(slash + 1)) : undefined
+    if (mine) {
+      mine.remotes.push(r.name.slice(0, slash))
+      continue
+    }
+    const l = { r, remotes: [] }
+    if (r.kind === 'branch') local.set(r.name, l)
+    out.push(l)
+  }
+  return out
+}
+
+const labelText = (l: Label) => [refText(l.r), ...l.remotes.map((o) => `원격 ${o}/${l.r.name}`)].join(', ')
+
+function look(r: Ref): { cls: string; icon: IconName; shown: string } {
+  if (r.kind === 'head') return { cls: 'is-current', icon: 'commit', shown: 'HEAD' }
+  if (r.kind === 'tag') return { cls: 'is-tag', icon: 'tag', shown: r.name }
+  if (r.kind === 'remote') return { cls: 'is-remote', icon: 'git', shown: r.name }
+  return { cls: r.current ? 'is-current' : 'is-branch', icon: 'git', shown: r.name }
 }
 
 export interface RefChipsProps {
   c: LogCommit
-  /** The names shown; past it they are counted. */
+  /** The boxes shown; past it they are counted. */
   max?: number
-  /** Where there is little room: the branch HEAD is on by its name alone, its fill saying whose it is. */
-  short?: boolean
 }
 
-export function RefChips({ c, max = 3, short = false }: RefChipsProps) {
+export function RefChips({ c, max = 3 }: RefChipsProps) {
   if (!c.refs.length) return null
   const lane = 'lane-' + tone(c.color)
-  const shown = c.refs.length > max ? c.refs.slice(0, max) : c.refs
-  const rest = c.refs.slice(shown.length)
+  const all = labels(c.refs)
+  const shown = all.slice(0, max)
+  const rest = all.slice(shown.length)
   return (
     <span class="gr-chips">
-      {shown.map((r, i) => {
-        const { cls, shown: text } = chipOf(r, lane, short)
+      {shown.map((l, i) => {
+        const { cls, icon, shown: name } = look(l.r)
+        const text = labelText(l)
         // The spaces keep the names apart when read out; the flex box drops them from the layout.
         return (
-          <Fragment key={r.kind + ':' + r.name}>
+          <Fragment key={l.r.kind + ':' + l.r.name}>
             {i > 0 && ' '}
-            <span class={'gr-chip ' + cls} title={refText(r)}>
-              {r.kind === 'tag' && <Icon name="tag" size={11} />}
-              <span class="gr-chip-name" aria-hidden="true">
-                {text}
+            <span class={`gr-chip ${cls} ${lane}`} title={text}>
+              <span class="gr-chip-icon">
+                <Icon name={icon} size={12} stroke={2.2} />
               </span>
-              <span class="sr-only">{refText(r)}</span>
+              <span class="gr-chip-name" aria-hidden="true">
+                {name}
+              </span>
+              {l.remotes.map((o) => (
+                <span key={o} class="gr-chip-remote" aria-hidden="true">
+                  {o}
+                </span>
+              ))}
+              <span class="sr-only">{text}</span>
             </span>
           </Fragment>
         )
@@ -57,7 +92,7 @@ export function RefChips({ c, max = 3, short = false }: RefChipsProps) {
       {rest.length > 0 && (
         <>
           {' '}
-          <span class="gr-chip is-more" title={rest.map(refText).join(', ')}>
+          <span class="gr-chip is-more" title={rest.map(labelText).join(', ')}>
             <span aria-hidden="true">+{rest.length}</span>
             <span class="sr-only">이름표 {rest.length}개 더</span>
           </span>

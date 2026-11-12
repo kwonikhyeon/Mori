@@ -2,7 +2,7 @@
 // branch, or those HEAD reaches, one row each with the lines the server laid
 // out. Picking a row shows the commit beside the graph on a PC (the aside
 // Shell puts it in) and in a sheet over it on a phone. It only reads.
-import { Component } from 'preact'
+import { Component, Fragment } from 'preact'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { ConnBanner } from '../components/ConnBanner'
 import { onContext } from '../components/ContextMenu'
@@ -14,7 +14,7 @@ import { shortHash, shortPath } from '../lib/format'
 import { geom, graphWidth, isHead, laneX, PC, PHONE, rowPaths, tone, type Geom } from '../lib/graph'
 import { parseHash, plainClick } from '../lib/router'
 import { useHost } from '../lib/scope'
-import { relTime } from '../lib/time'
+import { commitTime, dayClock, relTime } from '../lib/time'
 import type { LogCommit } from '../lib/types'
 import { CommitSheet } from './Commit'
 import { FetchButton } from './Git'
@@ -61,18 +61,13 @@ interface RowProps {
   /** The row Tab reaches; the others are reached with the arrow keys. */
   tab: boolean
   when: string
+  /** The time in full, for a PC's date column. */
+  at?: string
   to: string
   variant: Variant
 }
 
-const ROW_PROPS: (keyof RowProps)[] = ['c', 'i', 'g', 'svgW', 'sel', 'tab', 'when', 'to', 'variant']
-
-const Dot = () => (
-  <>
-    {' '}
-    <span aria-hidden="true">·</span>{' '}
-  </>
-)
+const ROW_PROPS: (keyof RowProps)[] = ['c', 'i', 'g', 'svgW', 'sel', 'tab', 'when', 'at', 'to', 'variant']
 
 /** A commit's row. A row draws again only when what it shows changes, for a log may have 2000 of them. */
 class Row extends Component<RowProps> {
@@ -81,43 +76,46 @@ class Row extends Component<RowProps> {
   }
 
   render() {
-    const { c, i, g, svgW, sel, tab, when, to, variant } = this.props
-    const x = laneX(c.lane, g.w)
-    const y = g.h / 2
+    const { c, i, g, svgW, sel, tab, when, at, to, variant } = this.props
     const lane = 'lane-' + tone(c.color)
     const hash = <span class="mono gr-hash">{shortHash(c.hash)}</span>
+    // As in VS Code Git Graph: HEAD's commit hollow and its subject in semibold, a merge's subject quieter (spec §3 #246).
+    const cls = 'gr-row' + (isHead(c) ? ' is-head' : '') + (c.parents.length > 1 ? ' is-merge' : '')
     return (
       <li class="gr-li">
-        <a class="gr-row" href={to} aria-current={sel ? 'true' : undefined} tabIndex={tab ? 0 : -1} data-i={i} data-hash={c.hash}>
+        <a class={cls} href={to} aria-current={sel ? 'true' : undefined} tabIndex={tab ? 0 : -1} data-i={i} data-hash={c.hash}>
           <svg class="gr-svg" width={svgW} height={g.h} viewBox={`0 0 ${svgW} ${g.h}`} aria-hidden="true" focusable="false">
             {rowPaths(c, g).map((p, k) => (
-              <path key={k} class={'gr-edge lane-' + p.tone} d={p.d} />
+              // Under each line a wider one in the background's colour, so a line crossing another cuts it.
+              <Fragment key={k}>
+                <path class="gr-shadow" d={p.d} />
+                <path class={'gr-edge lane-' + p.tone} d={p.d} />
+              </Fragment>
             ))}
-            {isHead(c) && <circle class={'gr-ring ' + lane} cx={x} cy={y} r={g.ring} />}
-            <circle class={'gr-dot ' + lane} cx={x} cy={y} r={g.r} />
+            <circle class={'gr-dot ' + lane} cx={laneX(c.lane, g.w)} cy={g.h / 2} r={g.r} />
           </svg>
           {variant === 'pc' ? (
-            <span class="gr-text">
-              <span class="gr-line1">
+            <>
+              <span class="gr-desc">
                 <RefChips c={c} />
                 {c.refs.length > 0 && ' '}
                 <span class="gr-subject" title={c.subject}>
                   {c.subject}
                 </span>
               </span>{' '}
-              <span class="gr-meta">
-                {hash}
-                <Dot />
-                <span class="gr-author">{c.author}</span>
-                <Dot />
-                <span class="gr-when">{when}</span>
-              </span>
-            </span>
+              <span class="gr-when" title={at}>
+                {when}
+              </span>{' '}
+              <span class="gr-author" title={c.author}>
+                {c.author}
+              </span>{' '}
+              {hash}
+            </>
           ) : (
             <span class="gr-text">
               <span class="gr-subject">{c.subject}</span>{' '}
               <span class="gr-meta">
-                <RefChips c={c} max={1} short />
+                <RefChips c={c} max={1} />
                 {c.refs.length > 0 && ' '}
                 {hash} <span class="gr-when">{when}</span>
               </span>
@@ -296,10 +294,23 @@ export function GraphScreen({ variant, folder, path, head, c, back }: GraphScree
   const t = now.value
   const tabAt = c && byHash.has(c) ? c : commits[0]?.hash
   const to = (hash: string) => h.href({ name: 'graph', folder, path, head, c: hash })
+  const pc = variant === 'pc'
   const rows = commits.length > 0 && (
     <ol class="gr-list" aria-label="커밋" ref={listRef} onClick={onClick} onKeyDown={onKey} onContextMenu={menu}>
       {commits.map((x, i) => (
-        <Row key={x.hash} c={x} i={i} g={g} svgW={svgW} sel={x.hash === c} tab={x.hash === tabAt} when={relTime(x.time_ms, t)} to={to(x.hash)} variant={variant} />
+        <Row
+          key={x.hash}
+          c={x}
+          i={i}
+          g={g}
+          svgW={svgW}
+          sel={x.hash === c}
+          tab={x.hash === tabAt}
+          when={pc ? dayClock(x.time_ms, t) : relTime(x.time_ms, t)}
+          at={pc ? commitTime(x.time_ms, t) : undefined}
+          to={to(x.hash)}
+          variant={variant}
+        />
       ))}
     </ol>
   )
@@ -339,7 +350,17 @@ export function GraphScreen({ variant, folder, path, head, c, back }: GraphScree
         </header>
         {rows ? (
           <>
-            <div class="gr-scroll">{rows}</div>
+            {/* The columns of VS Code Git Graph's table, each row's lined up under them (spec §3 #246). */}
+            <div class="gr-scroll" style={{ '--gr-graph': `${svgW}px` }}>
+              <div class="gr-cols" aria-hidden="true">
+                <span>그래프</span>
+                <span>설명</span>
+                <span class="gr-col-when">날짜</span>
+                <span class="gr-col-author">작성자</span>
+                <span>커밋</span>
+              </div>
+              {rows}
+            </div>
             <Foot log={log} />
           </>
         ) : (

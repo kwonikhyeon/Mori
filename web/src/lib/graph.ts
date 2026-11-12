@@ -6,8 +6,8 @@ import type { LogCommit } from './types'
 
 /** Room left of the first lane and right of the last. */
 export const MARGIN = 4
-/** The lane colours, --lane-0 … --lane-4, which the server's colour numbers cycle through. */
-export const COLORS = 5
+/** The lane colours, --lane-0 … --lane-11 (VS Code Git Graph's), which the server's colour numbers cycle through. */
+export const COLORS = 12
 /** What a lane narrows to at least when there are many of them. */
 export const LANE_MIN = 6
 /** Lanes narrow while the graph would take more of a row than this. */
@@ -20,18 +20,17 @@ export interface Size {
   lane: number
   h: number
   r: number
-  ring: number
 }
 
-export const PC: Size = { lane: 16, h: 44, r: 4, ring: 7 }
-export const PHONE: Size = { lane: 14, h: 56, r: 5, ring: 9 }
+// A PC row is one line as in VS Code Git Graph, --size-element-sm tall (graph.css).
+export const PC: Size = { lane: 16, h: 28, r: 4 }
+export const PHONE: Size = { lane: 14, h: 56, r: 5 }
 
 /** What every row of one graph is drawn with. */
 export interface Geom {
   w: number
   h: number
   r: number
-  ring: number
 }
 
 /** A line within a row from (x1, y1) to (x2, y2), in the colour the server gave it. */
@@ -52,10 +51,8 @@ export function laneWidth(lanes: number, rowWidth: number, base: number): number
 
 export function geom(size: Size, lanes: number, rowWidth: number): Geom {
   const w = laneWidth(lanes, rowWidth, size.lane)
-  if (w === size.lane) return { w, h: size.h, r: size.r, ring: size.ring }
-  const k = w / size.lane
-  const r = Math.max(2, round(size.r * k))
-  return { w, h: size.h, r, ring: Math.max(round(r * 1.5), round(size.ring * k)) }
+  if (w === size.lane) return { w, h: size.h, r: size.r }
+  return { w, h: size.h, r: Math.max(2, round((size.r * w) / size.lane)) }
 }
 
 export const laneX = (lane: number, w: number) => MARGIN + w * lane + w / 2

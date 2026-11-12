@@ -201,6 +201,19 @@ describe('the title bar', () => {
     expect(wco.get('.pc-head')).toMatch(/padding-right: calc\(100vw - env\(titlebar-area-x/)
     expect(wco.get('.pc-head :is(a, button, .menu-list)')).toMatch(/app-region: no-drag;/)
   })
+
+  // A maximized Windows window's title bar is 26 px: the bar keeps to it and its
+  // controls keep 1 px clear of its edges, up to astryx's sm (spec §3 #233).
+  it('is as high as the title bar, its controls inside it', () => {
+    const css = sheets['../views/shell.css']
+    const [[start, end]] = blocks(css, /@media \(display-mode: window-controls-overlay\) \{/g)
+    const wco = new Map(rules(css.slice(start, end)).map(([sel, body]) => [sel, body]))
+    expect(wco.get('.pc-head')).toMatch(/[^-]height: env\(titlebar-area-height,/)
+    expect(wco.get('.pc-head')).toMatch(/--titlebar-control: min\(var\(--size-element-sm\), calc\(env\(titlebar-area-height, var\(--size-element-lg\)\) - var\(--spacing-0-5\)\)\);/)
+    expect(wco.get('.pc-head :is(.pc-find, .btn-sm, .hostpick)')).toMatch(/height: var\(--titlebar-control\);/)
+    expect(wco.get('.pc-head .btn-icon.btn-sm')).toMatch(/width: var\(--titlebar-control\);/)
+    expect(wco.get('.pc-logo img')).toMatch(/height: min\(var\(--spacing-6\), var\(--titlebar-control\)\);/)
+  })
 })
 
 // The astryx guideline (AGENTS.md, spec §3 #201): every value comes from tokens.css.

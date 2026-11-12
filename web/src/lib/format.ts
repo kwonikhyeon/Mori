@@ -134,6 +134,19 @@ export function askText(t: TerminalView, kind: 'blocked' | 'error'): string {
   return ASKS[t.status?.kind ?? ''] ?? '응답을 기다립니다'
 }
 
+/** Claude Code's question: "answer: <question> (<a> · <b> · <c>)". */
+const QUESTION = /^answer:\s*([\s\S]*?)\s*(?:\((?:[^()]*·[^()]*)\))?\s*$/
+
+/**
+ * What a blocked program asks, for the approval bar: a question without its
+ * choices, as the terminal right above shows them (spec §3 #238).
+ */
+export function askLine(t: TerminalView): string {
+  const m = askText(t, 'blocked')
+  const q = QUESTION.exec(m)
+  return q && q[1] ? q[1] : m
+}
+
 const REASONS: Record<string, string> = {
   killed: '강제 종료',
   server_stop: '코어 종료',

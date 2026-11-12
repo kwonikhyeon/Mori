@@ -161,12 +161,12 @@ describe('the stylesheets', () => {
     }
   })
 
-  // With a window's list in a phone's approval bar, Esc is the one key left of
-  // four: it shares the row of 거절하고 지시, at a finger's height.
-  it("give Esc the row of 거절하고 지시 when a phone's approval bar holds a list", () => {
-    const css = new Map(rules(sheets['../views/terminal.css']).map(([sel, body]) => [sel, body]))
-    expect(css.get('.term-ask-grid.is-pick .term-ask-reject')).toMatch(/grid-column: 2 \/ -1;/)
-    expect(css.get('.term-ask-grid.is-pick .term-ask-key')).toMatch(/height: var\(--mori-size-touch\);/)
+  // The approval bar answers a window by its items' numbers, keys like its
+  // own, and draws no list: the terminal above shows what they say (spec §3 #238).
+  it('draw no list in the approval bar, only keys', () => {
+    const sels = rules(sheets['../views/terminal.css']).map(([sel]) => sel)
+    expect(sels.filter((s) => /term-ask.*(term-pick-body|term-pick-list|is-pick)/.test(s))).toEqual([])
+    expect(sels).toContain('.term-phone .term-ask-key')
   })
 
   // A column that wraps is as wide as its widest part (a row's title that does

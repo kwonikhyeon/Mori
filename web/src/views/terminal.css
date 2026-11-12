@@ -479,26 +479,15 @@ a.term-back {
   border-radius: var(--radius-container);
 }
 
-/* With a window's list in the bar, Esc is the one key left of the four: it
-   takes the row of 거절하고 지시, at a finger's height, not a quarter row of
-   its own. */
-.term-ask-grid.is-pick .term-ask-key {
-  height: var(--mori-size-touch);
-}
-
-.term-ask-grid.is-pick .term-ask-reject {
-  grid-column: 2 / -1;
-}
-
 /* ---------- a Claude Code window, read into a panel ---------- */
 /* What the program draws at the bottom of its screen (pickers design §6.5):
    a title, its list as astryx's List (.qrows, the cursor's row selected) and
    its keys as secondary buttons. It lies over the bottom of the terminal,
    which keeps its size, as Claude Code draws a list cut short on a terminal
    made shorter (§14 #44); it covers the window it stands for. Neutral, as
-   nothing is blocked on it; when the program is, the same list and keys sit
-   in the approval bar. Above the terminal's own parts (2–3) and under the
-   slash list (20). */
+   nothing is blocked on it; when the program is, the approval bar answers by
+   the items' numbers and the same keys (spec §3 #238). Above the terminal's
+   own parts (2–3) and under the slash list (20). */
 .term-pick {
   position: absolute;
   inset-inline: 0;
@@ -530,11 +519,6 @@ a.term-back {
   flex: none;
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-
-/* In the approval bar on a PC the list takes a line of its own. */
-.term-pc .term-ask > .term-pick-body {
-  flex: 1 1 100%;
 }
 
 /* A button drawn as a row of the list. */

@@ -21,12 +21,12 @@ import { copyText } from '../lib/copy'
 import { draftKey, loadDraft, saveDraft } from '../lib/drafts'
 import { coverExtra, fitSize, MAX_CELLS } from '../lib/fit'
 import { watchFocus } from '../lib/focus'
-import { appName, askText, chip, endText, place, type EndFacts } from '../lib/format'
+import { appName, askLine, chip, endText, place, type EndFacts } from '../lib/format'
 import type { Hint } from '../lib/hints'
 import { alike } from '../lib/pick'
 import { useChordSubmit } from '../lib/ime'
 import { isMod, namedBytes, NO_MODS, QUICK_KEYS, strayBytes } from '../lib/keys'
-import { choose as chooseItem, closeFor, tap, type Press } from '../lib/pickpress'
+import { choose as chooseItem, closeFor, reach, tap, type Press } from '../lib/pickpress'
 import { boxShown, setBoxShown } from '../lib/coverpref'
 import { pickOn } from '../lib/pickpref'
 import { isApple } from '../lib/platform'
@@ -46,7 +46,7 @@ import type { TerminalView } from '../lib/types'
 import { openScreen, type Screen } from '../lib/xterm'
 import { gitFrom } from './Git'
 import { ModeButton, StatusBand, useBox } from './Cover'
-import { PickHints, PickKept, PickList, PickPanel, usePick } from './Pick'
+import { PickHints, PickKept, PickPanel, usePick } from './Pick'
 import type { Mode } from '../lib/box'
 import { titleOf, type Variant } from './rows'
 import { useSlash } from './Slash'
@@ -745,14 +745,12 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       rejecting={rejecting !== null}
       onReject={ask ? reject : undefined}
       pick={
-        // a list the terminal cannot spare the room for, or drew cut short, is left there: the bar answers by its own keys
-        seen && seen.options.length > 0 && pick.cap > 0 && !seen.partial && cutAsk !== ask
+        // a list Claude Code drew cut short is left there: the bar answers by its own keys.
+        // The items are keys by their numbers; the terminal shows what they say (spec §3 #238).
+        seen && seen.options.length > 0 && !seen.partial && cutAsk !== ask
           ? {
-              list: (
-                <div class="term-pick-body" style={{ maxHeight: `${pick.cap}px` }}>
-                  <PickList seen={seen} blocked={blocked} disabled={answering || pick.stale} onChoose={choose} />
-                </div>
-              ),
+              options: seen.options.map((o) => ({ n: o.n, label: o.label, off: pick.stale || !reach(seen, o.n, blocked) })),
+              onChoose: choose,
               hints: <PickHints hints={seen.hints} disabled={answering || pick.stale} skip="esc" onHint={hint} />,
             }
           : undefined
@@ -1031,20 +1029,37 @@ interface AskBarProps {
   /** Starts or stops that; without it the question cannot be named (spec §3 #195). */
   onReject?: () => void
   /**
-   * The window's own list and keys, read from the screen, in place of the
-   * number keys and Enter (pickers design §6.5). Esc stays, as does turning
-   * the question down: neither needs the list read right.
+   * The window's own items and keys, read from the screen, in place of the
+   * number keys and Enter (pickers design §6.5). An item is a key by its
+   * number, as the terminal above shows what it says (spec §3 #238). Esc
+   * stays, as does turning the question down: neither needs the list read
+   * right.
    */
-  pick?: { list: ComponentChildren; hints: ComponentChildren }
+  pick?: { options: { n: number; label: string; off: boolean }[]; onChoose: (n: number) => void; hints: ComponentChildren }
 }
 
 /** What a blocked program asks, and the keys that answer it. */
 function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick }: AskBarProps) {
   const head = id + '-ask'
   const label = pick ? '승인 대기 — 골라서 응답' : '승인 대기 — 키로 응답'
-  const msg = askText(t, 'blocked')
+  const msg = askLine(t)
   const more = useMore(msg)
   const named = BLOCKED_KEYS[phone ? 'phone' : 'pc'].filter((k) => !pick || k.name === 'esc')
+  const items = (pick?.options ?? []).map((o) => (
+    <button
+      key={`item-${o.n}`}
+      type="button"
+      class="term-ask-key"
+      aria-label={`${o.n}. ${o.label}`}
+      title={o.label}
+      disabled={busy || o.off}
+      onPointerDown={keep}
+      onMouseDown={keep}
+      onClick={() => pick!.onChoose(o.n)}
+    >
+      {o.n}
+    </button>
+  ))
   const keys = named.map((k) => (
     <button
       key={k.name}
@@ -1058,6 +1073,7 @@ function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick }: AskBar
       {k.label}
     </button>
   ))
+  keys.unshift(...items)
   if (onReject) {
     keys.push(
       <button key="reject" type="button" class="term-ask-reject" aria-pressed={rejecting} disabled={busy} onClick={onReject}>
@@ -1094,8 +1110,7 @@ function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick }: AskBar
             {msg}
           </p>
         </div>
-        {pick?.list}
-        <div class={'term-ask-grid' + (pick ? ' is-pick' : '')}>{keys}</div>
+        <div class="term-ask-grid">{keys}</div>
         {pick?.hints}
       </section>
     )
@@ -1111,7 +1126,6 @@ function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick }: AskBar
           <span class="term-ask-msg"> · {msg}</span>
         </span>
       </p>
-      {pick?.list}
       <div class="term-ask-keys">
         {keys}
         {pick?.hints}

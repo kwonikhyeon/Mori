@@ -223,6 +223,15 @@ describe('Terminal on a PC', () => {
     expect(sent('/api/terminals/t1/keys')).toHaveLength(1)
   })
 
+  // A Claude Code question's choices are on the terminal right above: the bar
+  // says only what is asked (spec §3 #238).
+  it("says a question without its choices", async () => {
+    await mount(term({ status: status('blocked', { kind: 'question', msg: 'answer: 어떤 반려동물을 좋아하시나요? (Cat · Dog · Bird)' }), ask: '7.f01ce560' }))
+    const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
+    expect(ask.querySelector('.term-ask-msg')?.textContent).toBe(' · 어떤 반려동물을 좋아하시나요?')
+    expect(ask.textContent).not.toMatch(/Cat|answer:/)
+  })
+
   describe('a question the server names', () => {
     const ASK = '3.0badc0de'
     const asking = (ask = ASK) => term({ status: status('blocked', { kind: 'permission', msg: 'Bash(npm test)를 실행할까요?' }), ask })
@@ -1055,6 +1064,8 @@ describe('pickers', () => {
   const rowsOf = (el: HTMLElement) => [...el.querySelectorAll<HTMLButtonElement>('.term-pick-row')]
   const hintsOf = (el: HTMLElement) => [...el.querySelectorAll<HTMLButtonElement>('.term-pick-hints button')]
   const titles = (el: HTMLElement) => rowsOf(el).map((r) => r.querySelector('.qrow-title')?.textContent)
+  /** The approval bar's keys for a window's items: their numbers, named by what they say (spec §3 #238). */
+  const itemsOf = (el: HTMLElement) => [...el.querySelectorAll<HTMLButtonElement>('.term-ask-key[aria-label]')]
   const blockedTerm = () => term({ status: status('blocked', { kind: 'permission', msg: 'Bash(ls)를 실행할까요?' }), ask: ASK })
   /**
    * Heights a browser would lay out, by class, in px, or worked out from the
@@ -1118,19 +1129,21 @@ describe('pickers', () => {
     expect(capIn('.term-pick')).toBe('200px')
   })
 
-  it('takes the cap again when the approval bar takes the window', async () => {
-    const px = layOut({ 'term-stage': 300, 'term-pick': 200, 'term-ask': 260, 'term-pick-body': 100 })
+  // Blocked on it, the window goes from its panel to the approval bar, as
+  // keys by its items' numbers: no list, as the terminal shows it (spec §3 #238).
+  it('moves the window from its panel to the bar, as keys, when the program blocks on it', async () => {
+    layOut({ 'term-stage': 300, 'term-pick': 200, 'term-pick-body': 100 })
     const { ws } = await mount()
     await attach(ws)
     await show(SCREENS.permission)
     // 300 − (200 − 100)
     expect(capIn('.term-pick')).toBe('200px')
-    // the approval bar is 60px taller, and the stage gives them up
-    px['term-stage'] = 240
     act(() => load([blockedTerm()]))
     await frame()
-    // 240 + 260 − 17 × (6 + 2) − (260 − 100)
-    expect(capIn('.term-ask')).toBe('204px')
+    expect(panel()).toBeNull()
+    const ask = screen.getByRole('region', { name: '승인 대기 — 골라서 응답' })
+    expect(itemsOf(ask).map((b) => b.textContent)).toEqual(['1', '2', '3'])
+    expect(ask.querySelector('.term-pick-body, .term-pick-row')).toBeNull()
   })
 
   // A panel without its list would hide the window it stands for: where the
@@ -1155,14 +1168,15 @@ describe('pickers', () => {
     expect(capIn('.term-pick')).toBe('360px')
   })
 
-  it('answers a blocked list by the keys when the terminal cannot spare its room', async () => {
+  // The bar's keys need no list's room: a terminal that could not spare it
+  // still has the items' keys, and shows the list itself.
+  it('answers a blocked list by its items where the terminal cannot spare a list its room', async () => {
     layOut({ 'term-stage': 150, 'term-ask': 200, 'term-pick-body': 100 })
     const { ws } = await mount(blockedTerm())
     await attach(ws)
     await show(SCREENS.permission)
-    // 150 + 200 − 17 × (6 + 2) − (200 − 100) is under MIN_CAP: the bar's own keys, and the list on the terminal
-    const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
-    expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['1', '2', '3', 'Enter', 'Esc', '거절하고 지시'])
+    const ask = screen.getByRole('region', { name: '승인 대기 — 골라서 응답' })
+    expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['1', '2', '3', 'Esc', '거절하고 지시', 'Ctrl+E · explain'])
     expect(document.querySelector('.term-pick, .term-pick-row')).toBeNull()
   })
 
@@ -1199,21 +1213,6 @@ describe('pickers', () => {
     expect(hintsOf(panel()!).map((b) => b.textContent)).toEqual(['닫기', 'Ctrl+E · explain'])
   })
 
-  // The bar stands under the terminal, which gives it rows; the screen's
-  // cells sit inside the scroll box's padding, which is no room for the
-  // window's rows.
-  it('leaves the terminal its padding beside a blocked window', async () => {
-    layOut({ 'term-stage': 300, 'term-ask': 260, 'term-pick-body': 100 })
-    const { ws } = await mount(blockedTerm())
-    await attach(ws)
-    const sc = document.querySelector<HTMLElement>('.term-scroll')!
-    sc.style.paddingTop = '12px'
-    sc.style.paddingBottom = '16px'
-    await show(SCREENS.permission)
-    // 300 − (12 + 16) + 260 − 17 × (6 + 2) − (260 − 100)
-    expect(capIn('.term-ask')).toBe('236px')
-  })
-
   // Claude Code draws only part of a list on a terminal too short for it
   // (… +4 models): a panel would show that part, over the terminal's.
   it('shows no panel for a list Claude Code cut short', async () => {
@@ -1235,16 +1234,17 @@ describe('pickers', () => {
   it('keeps a blocked list cut short out of the bar for its question', async () => {
     const { ws } = await mount(blockedTerm())
     await attach(ws)
+    const items = () => itemsOf(document.querySelector<HTMLElement>('.term-ask')!).length
     await show(SCREENS['model-cc'])
-    expect(document.querySelectorAll('.term-ask .term-pick-row')).toHaveLength(5)
+    expect(items()).toBe(5)
     await show(SCREENS['model-cc-short'])
     expect(screen.getByRole('region', { name: '승인 대기 — 키로 응답' })).toBeTruthy()
     await show(SCREENS['model-cc'])
-    expect(document.querySelector('.term-ask .term-pick-row')).toBeNull()
-    // another question takes its list again
+    expect(items()).toBe(0)
+    // another question takes its items again
     act(() => load([term({ status: status('blocked', { kind: 'permission', msg: '다른 질문' }), ask: '4.0badc0de' })]))
     await frame()
-    expect(document.querySelectorAll('.term-ask .term-pick-row')).toHaveLength(5)
+    expect(items()).toBe(5)
   })
 
   it('shows nothing while idle', async () => {
@@ -1316,7 +1316,7 @@ describe('pickers', () => {
     const { ws } = await mount(blockedTerm())
     await attach(ws)
     await show(SCREENS.permission)
-    const rows = () => document.querySelectorAll('.term-ask .term-pick-row').length
+    const rows = () => itemsOf(document.querySelector<HTMLElement>('.term-ask')!).length
     expect(rows()).toBe(3)
     await frame(2000)
     await act(() => ws.json({ type: 'size', cols: 80, rows: 20 }))
@@ -1373,9 +1373,9 @@ describe('pickers', () => {
     await show(SCREENS['ask-preview'])
     await show(CHAT)
     const ask = screen.getByRole('region', { name: '승인 대기 — 골라서 응답' })
-    expect(rowsOf(ask)).toHaveLength(2)
+    expect(itemsOf(ask)).toHaveLength(2)
     // a blocked window takes the number, wherever its cursor stands
-    expect(rowsOf(ask).every((r) => !r.disabled)).toBe(true)
+    expect(itemsOf(ask).every((r) => !r.disabled)).toBe(true)
   })
 
   it('turns off with the setting', async () => {
@@ -1403,33 +1403,40 @@ describe('pickers', () => {
     expect(buttons.every((b) => b.disabled)).toBe(true)
   })
 
-  it('answers a blocked window by its list', async () => {
+  // The items are keys by their numbers, named by what they say; the
+  // terminal right above shows the list (spec §3 #238).
+  it('answers a blocked window by its items, as keys', async () => {
     const { ws } = await mount(blockedTerm())
     await attach(ws)
     await show(SCREENS.permission)
     const ask = screen.getByRole('region', { name: '승인 대기 — 골라서 응답' })
-    expect(rowsOf(ask)).toHaveLength(3)
-    expect(titles(ask)[0]).toBe('Yes')
-    expect(rowsOf(ask)[0].getAttribute('aria-current')).toBe('true')
+    expect(itemsOf(ask).map((b) => [b.textContent, b.getAttribute('aria-label'), b.title])).toEqual([
+      ['1', '1. Yes', 'Yes'],
+      ['2', "2. Yes, and don't ask again for ls commands in /tmp/mori-sample", "Yes, and don't ask again for ls commands in /tmp/mori-sample"],
+      ['3', '3. No, and tell Claude what to do differently (esc)', 'No, and tell Claude what to do differently (esc)'],
+    ])
+    expect(ask.querySelector('.term-pick-row, .qrow-title')).toBeNull()
     expect(within(ask).getByRole('button', { name: 'Esc' })).toBeTruthy()
     expect(within(ask).getByRole('button', { name: '거절하고 지시' })).toBeTruthy()
-    for (const name of ['1', '2', '3', 'Enter']) expect(within(ask).queryByRole('button', { name })).toBeNull()
+    // the bar's own number keys and Enter give way to the window's
+    expect(within(ask).queryByRole('button', { name: 'Enter' })).toBeNull()
+    expect(ask.querySelectorAll('.term-ask-key:not([aria-label])')).toHaveLength(1)
     // the window's Esc is the bar's own key
     expect(hintsOf(ask).map((b) => b.textContent)).toEqual(['Ctrl+E · explain'])
     // one bar, not a panel as well
     expect(panel()).toBeNull()
   })
 
-  // A phone's bar has four keys a row, 1, 2, 3 and Esc; with the list in the
-  // bar, Esc is the one left, and takes the row of 거절하고 지시.
-  it("puts Esc on the row of 거절하고 지시 when a phone's bar holds the list", async () => {
+  // A phone's bar has four keys a row: the window's items by their numbers,
+  // then Esc; 거절하고 지시 takes a row of its own.
+  it("puts the window's items in a phone's bar as keys, four a row", async () => {
     const { ws } = await mount(blockedTerm(), { variant: 'phone', back: '#/folders' })
     await attach(ws)
     await show(SCREENS.permission)
     const ask = screen.getByRole('region', { name: '승인 대기 — 골라서 응답' })
     const grid = ask.querySelector('.term-ask-grid')!
-    expect([...grid.children].map((b) => b.textContent)).toEqual(['Esc', '거절하고 지시'])
-    expect(grid.classList.contains('is-pick')).toBe(true)
+    expect([...grid.children].map((b) => b.textContent)).toEqual(['1', '2', '3', 'Esc', '거절하고 지시'])
+    expect(ask.querySelector('.term-pick-row')).toBeNull()
   })
 
   it('keeps the keys for a blocked hint-only window', async () => {
@@ -1472,7 +1479,7 @@ describe('pickers', () => {
       const { ws } = await mount(blockedTerm())
       await attach(ws)
       await show(SCREENS.permission)
-      fireEvent.click(rowsOf(bar())[1])
+      fireEvent.click(itemsOf(bar())[1])
       await vi.waitFor(() => expect(keys()).toEqual([{ keys: ['2'], expect: ASK }]))
       // not down the stream, where it could land on the next question
       expect(ws.input()).toEqual([])
@@ -1491,7 +1498,7 @@ describe('pickers', () => {
       const { ws } = await mount(blockedTerm())
       await attach(ws)
       await show(SCREENS['long-list'])
-      fireEvent.click(rowsOf(bar())[9])
+      fireEvent.click(itemsOf(bar())[9])
       await vi.waitFor(() => expect(keys()).toEqual([{ keys: Array(9).fill('down') }]))
       // no Enter until the cursor shows on it
       await frame()

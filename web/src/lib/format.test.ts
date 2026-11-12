@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { folder, status, term, worktree } from '../../test/fixtures'
-import { appName, askText, branchLine, branchOf, changeGroups, chip, commitItems, endText, fileParts, fileTotals, homeWorktree, place, shortHash, shortPath, since, splitMessage, versionText } from './format'
+import { appName, askLine, askText, branchLine, branchOf, changeGroups, chip, commitItems, endText, fileParts, fileTotals, homeWorktree, place, shortHash, shortPath, since, splitMessage, versionText } from './format'
 import type { Change, Commit, CommitFile, Preset } from './types'
 
 const presets: Preset[] = [
@@ -149,6 +149,21 @@ describe('askText', () => {
     expect(askText(term({ status: status('blocked', { kind: 'auth' }) }), 'blocked')).toBe('인증이 필요합니다')
     expect(askText(term({ status: status('blocked') }), 'blocked')).toBe('응답을 기다립니다')
     expect(askText(term({ status: status('error') }), 'error')).toBe('오류가 났습니다')
+  })
+})
+
+// The approval bar says what is asked, not its choices: the terminal above shows them (spec §3 #238).
+describe('askLine', () => {
+  it("drops a Claude Code question's choices and its answer: tag", () => {
+    const q = (msg: string) => askLine(term({ status: status('blocked', { kind: 'question', msg }) }))
+    expect(q('answer: 어떤 반려동물을 좋아하시나요? (Cat · Dog · Bird)')).toBe('어떤 반려동물을 좋아하시나요?')
+    expect(q('answer: 계속할까요?')).toBe('계속할까요?')
+    expect(q('answer: f(x)를 쓸까요? (예 · 아니요)')).toBe('f(x)를 쓸까요?')
+    // other words are left as they are
+    expect(q('approve plan')).toBe('approve plan')
+    expect(q('Bash(ls -la)를 실행할까요?')).toBe('Bash(ls -la)를 실행할까요?')
+    expect(q('answer: (A · B)')).toBe('answer: (A · B)')
+    expect(askLine(term({ status: status('blocked', { kind: 'question' }) }))).toBe('답을 기다립니다')
   })
 })
 

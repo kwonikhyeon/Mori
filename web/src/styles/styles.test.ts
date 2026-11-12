@@ -197,7 +197,8 @@ describe('the title bar', () => {
     const [[start, end]] = blocks(css, /@media \(display-mode: window-controls-overlay\) \{/g)
     const wco = new Map(rules(css.slice(start, end)).map(([sel, body]) => [sel, body]))
     expect(wco.get('.pc-head')).toMatch(/app-region: drag;/)
-    expect(wco.get('.pc-head')).toMatch(/padding-left: calc\(env\(titlebar-area-x/)
+    expect(wco.get('.pc-head')).toMatch(/--pc-head-start: max\(var\(--spacing-4\), calc\(env\(titlebar-area-x/)
+    expect(wco.get('.pc-head')).toMatch(/padding-left: var\(--pc-head-start\);/)
     expect(wco.get('.pc-head')).toMatch(/padding-right: calc\(100vw - env\(titlebar-area-x/)
     expect(wco.get('.pc-head :is(a, button, .menu-list)')).toMatch(/app-region: no-drag;/)
   })
@@ -213,6 +214,19 @@ describe('the title bar', () => {
     )
     expect(wco.get('.pc-head :is(.pc-find, .btn-sm, .hostpick)')).toMatch(/[^-]height: var\(--size-element-sm\);/)
     expect(wco.get('.pc-head .btn-icon.btn-sm')).toMatch(/width: var\(--size-element-sm\);/)
+  })
+
+  // The field starts where the main area does: the sidebar's width, then the
+  // header's gap as wide as the sidebar's handle (spec §3 #235).
+  it('starts the field over the main area', () => {
+    const css = sheets['../views/shell.css']
+    const [[start, end]] = blocks(css, /@media \(display-mode: window-controls-overlay\) \{/g)
+    const plain = new Map(rules(css).filter(([, , at]) => at < start || at >= end).map(([sel, body]) => [sel, body]))
+    expect(plain.get('.pc-head')).toMatch(/[^-]gap: var\(--spacing-4\);/)
+    expect(rules(sheets['./ui.css']).find(([sel]) => sel === '.splitter')?.[1]).toMatch(/width: 16px;/)
+    expect(plain.get('.pc-head.has-side')).toMatch(/grid-template-columns: var\(--pc-side\) minmax\(0, 360px\)/)
+    const wco = new Map(rules(css.slice(start, end)).map(([sel, body]) => [sel, body]))
+    expect(wco.get('.pc-head.has-side')).toMatch(/grid-template-columns: calc\(var\(--pc-side\) \+ var\(--spacing-4\) - var\(--pc-head-start\)\)/)
   })
 })
 
@@ -235,6 +249,8 @@ describe('the stylesheets, after astryx', () => {
     const defined = new Set([...strip(tokens).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))
     // Set from a script: the visual viewport's height (lib/viewport.ts).
     defined.add('--app-h')
+    // Set from a script: the sidebar's drawn width, for the PC header (Shell.tsx).
+    defined.add('--pc-side')
     const missing = Object.entries(sheets).flatMap(([file, css]) => {
       const own = new Set([...strip(css).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))
       return [...strip(css).matchAll(/var\((--[\w-]+)/g)].map((m) => m[1]).filter((v) => !defined.has(v) && !own.has(v)).map((v) => `${file} ${v}`)

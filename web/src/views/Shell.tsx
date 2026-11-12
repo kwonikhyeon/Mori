@@ -211,7 +211,7 @@ function PcShell() {
   )
   return (
     <div class="pc">
-      <PcHeader />
+      <PcHeader side={L.sidebar} />
       <ConnBanner class="pc-banner" list />
       <div class="pc-body">
         <nav id="pc-side" class="pc-side" aria-label="세션 대기열" style={{ width: `${L.sidebar}px` }}>
@@ -255,12 +255,13 @@ function PcShell() {
   )
 }
 
-function PcHeader() {
+/** side: the sidebar's drawn width, when there is one; the field then starts where the main area does (spec §3 #235). */
+function PcHeader({ side }: { side?: number }) {
   const h = useHost()
   const r = route.value
   const fresh = newBuild.value !== null
   return (
-    <header class="pc-head">
+    <header class={'pc-head' + (side ? ' has-side' : '')} style={side ? `--pc-side: ${side}px` : undefined}>
       <div class="pc-head-start">
         <a class="pc-logo" href={h.href({ name: 'queue' })} aria-label="Mori, 지금 볼 것" title="Mori">
           <img src="/icons/icon-192.png" alt="" width="24" height="24" />

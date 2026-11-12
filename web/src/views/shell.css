@@ -19,6 +19,15 @@
   background-color: var(--color-background-body);
 }
 
+/* Over the sidebar, the field starts where the main area does: the first
+   column is the sidebar's drawn width, the header's left padding is the
+   body's, and its 16 px gap is the sidebar's handle. The buttons' column
+   keeps their width and takes what is left; a narrow window narrows the
+   field (spec §3 #235). */
+.pc-head.has-side {
+  grid-template-columns: var(--pc-side) minmax(0, 360px) auto;
+}
+
 .pc-head-start {
   display: flex;
   align-items: center;
@@ -107,13 +116,20 @@
      bar's height at the top corner, 26 px on a maximized Windows window, so
      they sit above Mori's (spec §3 #233). */
   .pc-head {
+    /* The body's 16 px where nothing is in the way (Windows), past the traffic lights where they are (macOS). */
+    --pc-head-start: max(var(--spacing-4), calc(env(titlebar-area-x, var(--spacing-0)) + var(--spacing-3)));
     height: max(env(titlebar-area-height, var(--size-element-lg)), calc(var(--size-element-sm) + 2 * var(--spacing-1-5)));
     min-height: 0;
     padding-top: 0;
     padding-right: calc(100vw - env(titlebar-area-x, var(--spacing-0)) - env(titlebar-area-width, 100vw) + var(--spacing-3));
-    padding-left: calc(env(titlebar-area-x, var(--spacing-0)) + var(--spacing-3));
+    padding-left: var(--pc-head-start);
     -webkit-app-region: drag;
     app-region: drag;
+  }
+
+  /* The first column gives back what the traffic lights take, so the field still starts over the main area. */
+  .pc-head.has-side {
+    grid-template-columns: calc(var(--pc-side) + var(--spacing-4) - var(--pc-head-start)) minmax(0, 360px) auto;
   }
 
   .pc-head :is(a, button, .menu-list) {

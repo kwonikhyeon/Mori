@@ -132,12 +132,17 @@ describe('PC', () => {
     render(<Shell />)
     const side = screen.getByRole('navigation', { name: '세션 대기열' })
     expect(side.style.width).toBe('380px')
+    // The header's field follows the sidebar, to start over the main area (spec §3 #235).
+    const head = document.querySelector<HTMLElement>('.pc-head')!
+    expect(head.classList.contains('has-side')).toBe(true)
+    expect(head.style.getPropertyValue('--pc-side')).toBe('380px')
     const h = sidebar()
     expect(h.getAttribute('aria-controls')).toBe('pc-side')
     expect(h.getAttribute('aria-valuemin')).toBe('280')
     expect(h.getAttribute('aria-valuemax')).toBe('560')
     fireEvent.keyDown(h, { key: 'ArrowRight' })
     expect(side.style.width).toBe('396px')
+    expect(head.style.getPropertyValue('--pc-side')).toBe('396px')
     expect(localStorage.getItem('mori.sidebar')).toBe('396')
     fireEvent.dblClick(h)
     expect(side.style.width).toBe('380px')

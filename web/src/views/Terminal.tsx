@@ -77,6 +77,18 @@ export function pasteName(f: File, at: Date, i: number): string {
   const stamp = `${at.getFullYear()}${two(at.getMonth() + 1)}${two(at.getDate())}-${two(at.getHours())}${two(at.getMinutes())}${two(at.getSeconds())}`
   return `paste-${stamp}${i ? `-${i + 1}` : ''}.${ext}`
 }
+/**
+ * The files a paste brings, or none when its text is what was meant (spec
+ * §3 #220, #243): a spreadsheet's cells come with a picture of them, while
+ * an image copied from a page or a folder comes with no more than its
+ * address or its file's name.
+ */
+export function pastedFiles(cd: DataTransfer | null): File[] {
+  const files = Array.from(cd?.files ?? [])
+  const text = (cd?.getData('text/plain') ?? '').trim()
+  if (!files.length || !text) return files
+  return /^[a-z][\w+.-]*:\/\/\S+$/i.test(text) || files.some((f) => f.name === text) ? files : []
+}
 const ARROWS = new Set(['up', 'down', 'left', 'right'])
 const NO_END: EndFacts = { reason: null, exit_code: null, signal: null }
 const BROKEN: AttachNote = { kind: 'error', title: '터미널을 열 수 없습니다', detail: '화면을 그리지 못했습니다.', spin: false, late: false }
@@ -585,7 +597,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
         void upload(fs)
       }}
       onPasteCapture={(e) => {
-        const fs = Array.from(e.clipboardData?.files ?? [])
+        const fs = pastedFiles(e.clipboardData)
         if (!canType) return
         // with the cover, text pasted on the terminal (xterm holding the focus) goes to the box
         if (covered && fs.length === 0) {
@@ -830,16 +842,22 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) name = 'esc'
     else if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && /^[a-z]$/i.test(e.key) && e.key.toLowerCase() !== 'v') name = `ctrl+${e.key.toLowerCase()}`
     if (!name) return false
-    // On Windows and Linux Ctrl+C copies the terminal's selection, as from xterm itself (lib/xterm.ts)
-    if (name === 'ctrl+c' && !isApple()) {
-      const sel = screen.current?.takeSelection() ?? ''
-      if (sel) {
-        void copyText(sel)
-        return true
-      }
-    }
     const b = namedBytes(name, screen.current?.appCursor() ?? false)
     return b !== null && !!link?.send(b)
+  }
+  // ⌘C (Ctrl+C on Windows and Linux) with nothing chosen in the box copies
+  // what is chosen on the terminal: a drag on the covered terminal leaves the
+  // focus in the box (spec §3 #243). Ctrl+C then clears it, as xterm's own
+  // does (lib/xterm.ts), so the next one interrupts.
+  const copyKey = (e: KeyboardEvent): boolean => {
+    const apple = isApple()
+    if (e.key.toLowerCase() !== 'c' || e.altKey || e.shiftKey || (apple ? !e.metaKey || e.ctrlKey : !e.ctrlKey || e.metaKey)) return false
+    const box = e.currentTarget as HTMLTextAreaElement
+    if (box.selectionStart !== box.selectionEnd) return false
+    const sel = (apple ? screen.current?.selection() : screen.current?.takeSelection()) ?? ''
+    if (!sel) return false
+    void copyText(sel)
+    return true
   }
   const band = covered && rb && (
     <StatusBand box={rb} top={coverTop()} phone={phone} mode={reading.mode} onMode={nextMode} onFocus={() => !phone && focusBox()} onSheet={setSheet} />
@@ -866,6 +884,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       boxNote={boxNote}
       onSending={setSending}
       onTermKey={covered && !phone ? termKey : undefined}
+      onCopyKey={copyKey}
       bind={pathTo}
       hint={claudeOn && rb && rb.text === '' ? rb.hint : ''}
       sentKey={`${h.id}.${addr}.${t?.created_ms ?? 0}`}
@@ -1239,6 +1258,8 @@ interface ComposerProps {
   onSending?: (busy: boolean) => void
   /** With the cover on a PC: an empty box's Esc and Ctrl+letter go to the terminal; true when one went. */
   onTermKey?: (e: KeyboardEvent) => boolean
+  /** Copies what is chosen on the terminal for a copy key in the box; true when it did. */
+  onCopyKey?: (e: KeyboardEvent) => boolean
   /** Takes the box's insertion of text where the caret is, for paths uploaded with the cover up. */
   bind?: { current: ((text: string, word?: boolean) => void) | null }
   /** The grey hint of the terminal's empty box: the box's placeholder, and Tab takes it (claude-input design §6). */
@@ -1289,6 +1310,7 @@ function Composer({
   boxNote,
   onSending,
   onTermKey,
+  onCopyKey,
   bind,
   hint,
   sentKey,
@@ -1439,9 +1461,8 @@ function Composer({
     if (v) announce(brief(v))
   }
   const paste = (e: ClipboardEvent) => {
-    const cd = e.clipboardData
-    const files = Array.from(cd?.files ?? [])
-    if (!files.length || cd?.getData('text/plain')) return
+    const files = pastedFiles(e.clipboardData)
+    if (!files.length) return
     e.preventDefault()
     const el = e.currentTarget as HTMLTextAreaElement
     const at = el.selectionStart
@@ -1538,6 +1559,10 @@ function Composer({
           onSelect={track}
           onPaste={paste}
           onKeyDown={(e) => {
+            if (onCopyKey?.(e)) {
+              e.preventDefault()
+              return
+            }
             if (slash.onKeyDown(e)) return
             if (rejecting && e.key === 'Escape' && !e.isComposing) {
               e.preventDefault()

@@ -452,6 +452,23 @@ describe('Terminal on a PC', () => {
     expect(sent('/api/terminals/t1/files')).toEqual([])
   })
 
+  // An image copied from a page brings its address, one copied from a folder
+  // its file's name: the image is what was meant (spec §3 #243).
+  it('pastes an image that comes with only its address or its name', async () => {
+    reply = (c) => (c.url.endsWith('/files') ? Response.json({ path: '/up/a.png', bytes: 3 }) : undefined)
+    const { ws } = await mount()
+    await attach(ws)
+    const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+    for (const text of ['https://example.com/a.png', 'shot.png']) {
+      fireEvent.input(box, { target: { value: '' } })
+      const files = [new File(['png'], 'shot.png', { type: 'image/png' })]
+      const getData = (t: string) => (t === 'text/plain' ? text : '')
+      expect(fireEvent.paste(box, { clipboardData: { files, types: ['Files', 'text/plain'], getData } })).toBe(false)
+      await vi.waitFor(() => expect(box.value).toBe('/up/a.png '))
+    }
+    expect(sent('/api/terminals/t1/files').length).toBe(2)
+  })
+
   it('refuses a pasted image over 8 MB', async () => {
     const { ws } = await mount()
     await attach(ws)
@@ -2332,6 +2349,35 @@ describe('pickers', () => {
         expect(ws.input()).toEqual(['\x03'])
       } finally {
         delete (navigator as { clipboard?: unknown }).clipboard
+      }
+    })
+
+    // A drag on the covered terminal leaves the focus in the box: ⌘C there
+    // copies what the drag chose (spec §3 #243).
+    it('copies the terminal selection with ⌘C from the box on a Mac', async () => {
+      const writeText = vi.fn(async () => {})
+      vi.stubGlobal('isSecureContext', true)
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true })
+      Object.defineProperty(navigator, 'platform', { value: 'MacIntel', configurable: true })
+      try {
+        const { ws } = await mount()
+        await attach(ws)
+        await show(IDLE)
+        FakeScreen.last().selected = '고른 글'
+        const box = textbox()
+        box.focus()
+        expect(fireEvent.keyDown(box, { key: 'c', metaKey: true })).toBe(false)
+        await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('고른 글'))
+        expect(FakeScreen.last().selected).toBe('고른 글') // as a Mac's copy leaves it
+        // text chosen in the box is the box's to copy
+        fireEvent.input(box, { target: { value: '내 글' } })
+        box.setSelectionRange(0, 2)
+        expect(fireEvent.keyDown(box, { key: 'c', metaKey: true })).toBe(true)
+        expect(writeText).toHaveBeenCalledTimes(1)
+        expect(ws.input()).toEqual([])
+      } finally {
+        delete (navigator as { clipboard?: unknown }).clipboard
+        delete (navigator as { platform?: unknown }).platform
       }
     })
 

@@ -632,6 +632,10 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       )
     })
   useEffect(() => () => pastedRef.current.forEach((p) => URL.revokeObjectURL(p.url)), [])
+  // Claude Code counts the wheel's reports by their time (spec §3 #254)
+  useEffect(() => {
+    screen.current?.setPacedWheel(claudeHere)
+  }, [claudeHere, link])
   const upload = async (all: File[]) => {
     const pics = claudeHere ? all.filter(attachable) : []
     if (pics.length) attach(pics)

@@ -13,6 +13,8 @@ import type { Terminal } from '@xterm/xterm'
 export interface TouchScrollOptions {
   /** One row's height in CSS pixels, 0 before the first render. */
   rowHeight(): number
+  /** Takes rows of wheel for the program, down positive; false leaves them to xterm, a line each. */
+  wheel?: (down: number, x: number, y: number) => boolean
   // The clock and the animation frames, for tests.
   now?: () => number
   frame?: (fn: () => void) => number
@@ -26,7 +28,7 @@ const FRICTION = 0.005
 /** The last stretch of a drag its speed at release is taken over, in ms. */
 const RELEASE = 100
 /** The mouse modes that report the wheel to the program. */
-const WHEEL_MODES = new Set(['vt200', 'drag', 'any'])
+export const WHEEL_MODES = new Set(['vt200', 'drag', 'any'])
 /** xterm's scrollbars, each a track with a thumb. */
 const SCROLLBAR = '.xterm-scrollable-element > .scrollbar'
 
@@ -61,6 +63,7 @@ export function touchScroll(el: HTMLElement, term: Terminal, o: TouchScrollOptio
       term.scrollLines(-rows)
       return
     }
+    if (o.wheel?.(-rows, x, y)) return
     // A line each, as a wheel's clicks, sent where xterm listens for them.
     const xt = term.element
     if (!xt) return

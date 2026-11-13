@@ -110,6 +110,12 @@ export class FakeScreen implements Screen {
     this.input = on
   }
 
+  /** Whether the wheel goes as Claude Code counts it. */
+  pacedWheel = false
+  setPacedWheel(on: boolean): void {
+    this.pacedWheel = on
+  }
+
   setKeyboard(on: boolean): void {
     this.keyboard = on
   }

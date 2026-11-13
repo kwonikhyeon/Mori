@@ -10,7 +10,8 @@ import { osc52Text } from './copy'
 import { isApple } from './platform'
 import { LINE_HEIGHT, POWERLINE, followPixelRatio, loadPowerline } from './powerline'
 import { shotOf, type Shot } from './shot'
-import { touchScroll } from './touchscroll'
+import { touchScroll, WHEEL_MODES } from './touchscroll'
+import { newPace, pace, wheelRows } from './wheel'
 
 export interface Screen {
   readonly cols: number
@@ -25,6 +26,8 @@ export interface Screen {
   setTheme(t: ITheme): void
   /** Whether keys typed into the screen reach the program. */
   setInput(on: boolean): void
+  /** Whether the wheel's rows go as Claude Code counts its reports, 1:1 (lib/wheel.ts, spec §3 #254). */
+  setPacedWheel(on: boolean): void
   /**
    * Whether a touch on the screen may bring up the device's keyboard. xterm
    * takes a touch's focus itself; off, its field asks for no keyboard
@@ -183,7 +186,35 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     if (!s || !term.cols || !term.rows) return [0, 0]
     return [s.width / term.cols, s.height / term.rows]
   }
-  const untouch = touchScroll(el, term, { rowHeight: () => cell()[1] })
+  // Claude Code counts wheel reports by their time: a wheel or a finger moves
+  // it its rows, 1:1, as line clicks xterm sends on (lib/wheel.ts, spec §3 #254)
+  let paced = false
+  const wp = newPace()
+  const reports = () => paced && WHEEL_MODES.has(term.modes.mouseTrackingMode)
+  const lineClicks = (down: number, x: number, y: number) => {
+    const xt = term.element
+    if (!xt) return
+    for (const s of pace(wp, down, performance.now())) {
+      xt.dispatchEvent(new WheelEvent('wheel', { deltaY: s, deltaMode: WheelEvent.DOM_DELTA_LINE, clientX: x, clientY: y, bubbles: true, cancelable: true }))
+    }
+  }
+  term.attachCustomWheelEventHandler((ev) => {
+    // its own line clicks, a sideways wheel and a program counted otherwise go as xterm sends them
+    if (!ev.isTrusted || ev.shiftKey || !reports()) return true
+    const h = cell()[1]
+    if (!h) return true
+    const rows = wheelRows(wp, ev, h, term.rows)
+    if (rows) lineClicks(rows, ev.clientX, ev.clientY)
+    return false
+  })
+  const untouch = touchScroll(el, term, {
+    rowHeight: () => cell()[1],
+    wheel: (down, x, y) => {
+      if (!reports()) return false
+      lineClicks(down, x, y)
+      return true
+    },
+  })
   // a zoom or another screen changes the rows' height in device pixels
   const unfollow = followPixelRatio(() => void loadPowerline(FONT, size))
   const off = (d: { dispose(): void }) => () => d.dispose()
@@ -221,6 +252,9 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     },
     setInput: (on) => {
       term.options.disableStdin = !on
+    },
+    setPacedWheel: (on) => {
+      paced = on
     },
     focus: () => term.focus(),
     scrollToBottom: () => {

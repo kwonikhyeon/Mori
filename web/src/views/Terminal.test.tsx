@@ -468,6 +468,17 @@ describe('Terminal on a PC', () => {
     await vi.waitFor(() => expect(sent('/api/terminals/t1/send').map((c) => c.body)).toEqual([{ text: '/up/p.png' }]))
   })
 
+  // Claude Code counts the wheel's reports by their time; a shell's wheel goes as xterm sends it (spec §3 #254).
+  it('paces the wheel for Claude Code only', async () => {
+    const { ws } = await mount()
+    await attach(ws)
+    expect(FakeScreen.last().pacedWheel).toBe(true)
+    cleanup()
+    const shell = await mount(term({ argv: ['zsh'] }))
+    await attach(shell.ws)
+    expect(FakeScreen.last().pacedWheel).toBe(false)
+  })
+
   // One line high, as its button; it grows with its text (spec §3 #222).
   it('starts the box one line high', async () => {
     const { ws } = await mount()

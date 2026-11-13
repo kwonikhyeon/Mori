@@ -1,10 +1,12 @@
 // What Claude Code draws at the bottom of its screen while no window shows
 // (claude-input design §3, §4.2): its input box, the status line below it,
 // set by the person, and its mode line. The box is empty while what it holds
-// is one grey only, a hint or a suggestion; any other colour is text a send
-// would carry, so a reading that errs, errs toward text. Claude Code's cursor
-// is no colour of what the box holds: while the terminal has the focus, it
-// draws its hint's first letter inverted (spec §3 #249).
+// is one grey only, or faint (SGR 2): a hint or a suggestion; any other
+// colour is text a send would carry, so a reading that errs, errs toward
+// text. Claude Code 2.1.323 draws them with chalk's dim, which its renderer
+// sends as SGR 2 with no colour. Its cursor is no colour of what the box
+// holds: while the terminal has the focus, it draws the first letter
+// inverted (spec §3 #249).
 
 import { inputBox, look } from './pick'
 import type { Shot } from './shot'
@@ -95,7 +97,7 @@ export function readBox(shot: Shot): BoxLook | null {
     })
   }
   const said = lines.join('\n').trim()
-  const hinted = inks.length > 0 && inks.every((i) => i === inks[0]) && isGrey(inks[0])
+  const hinted = inks.length > 0 && inks.every((i) => i === inks[0]) && (inks[0] === 'dim' || isGrey(inks[0]))
   const below = texts.slice(bottom + 1).map((t) => t.trim()).filter(Boolean)
   const mode = below.length ? readMode(below[below.length - 1]) : null
   return {

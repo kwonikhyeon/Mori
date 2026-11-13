@@ -38,6 +38,16 @@ describe('readBox', () => {
     expect(readBox(boxWith('abc', (x) => (x === 1 ? 'inverse' : '')))!.text).toBe('abc')
   })
 
+  // as 2.1.323 draws a suggestion: chalk's dim, its first letter the cursor while the terminal has the focus
+  it('takes faint text for a hint', () => {
+    expect(readBox(boxWith('run the tests', () => 'dim'))!.hint).toBe('run the tests')
+    const b = readBox(boxWith('run the tests', (x) => (x === 0 ? 'inverse' : 'dim')))!
+    expect(b.text).toBe('')
+    expect(b.hint).toBe('run the tests')
+    // faint and plain mixed is text
+    expect(readBox(boxWith('ab', (x) => (x ? 'dim' : '')))!.text).toBe('ab')
+  })
+
   it('takes default text for text', () => {
     const b = readBox(boxWith('abc', () => ''))!
     expect(b.text).toBe('abc')

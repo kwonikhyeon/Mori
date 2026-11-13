@@ -37,6 +37,15 @@ describe('shotOf', () => {
     for (const l of s.ink) expect(l).toHaveLength(20)
   })
 
+  // Claude Code 2.1.323 draws a suggestion faint, SGR 2 with no colour (spec §3 #249).
+  it('marks a faint cell, whatever its colour', async () => {
+    const t = term(20, 2)
+    await write(t, '\x1b[2mrun\x1b[22m \x1b[2;38;2;153;153;153mx\x1b[0m')
+    const s = shotOf(t, 2)
+    expect(s.ink[0].slice(0, 3)).toEqual(['dim', 'dim', 'dim'])
+    expect(s.ink[0][4]).toBe('dim')
+  })
+
   // Claude Code draws its cursor on a hint's first letter as SGR 7 (spec §3 #249).
   it('marks a cell drawn inverted', async () => {
     const t = term(20, 2)

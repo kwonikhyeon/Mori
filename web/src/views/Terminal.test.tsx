@@ -2173,12 +2173,15 @@ describe('pickers', () => {
       expect(ws.input()).toEqual([])
     })
 
-    it('gives way to text that will not clear, and says so once', async () => {
+    it('gives way to text that will not clear, takes it back out of the box, and says so once', async () => {
       const { ws } = await mount()
       await attach(ws)
       await show(withText('abc'))
       expect(band()).not.toBeNull()
+      const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+      expect(box.value).toBe('abc')
       await frame(2000) // TAKE_MS
+      expect(box.value).toBe('')
       expect(band()).toBeNull()
       expect(document.querySelector('.term-boxnote')?.textContent).toBe(NOTE)
       await frame()
@@ -2605,6 +2608,27 @@ describe('pickers', () => {
       await frame()
       expect(textbox().placeholder).toBe(`${HINT} · →`)
       expect(screen.queryByRole('region', { name: 'Claude Code 상태' })).not.toBeNull()
+    })
+
+    // As 2.1.323 draws a suggestion: chalk's dim, SGR 2 with no colour. It stays
+    // a hint: no text taken into the box, and the cover stays (spec §3 #249).
+    it('keeps the cover for a faint suggestion, and takes nothing', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      act(() => FakeScreen.last().show(IDLE.replace('\n❯ \n', `\n❯ ${HINT}\n`), 'alternate', (y, x) => (y === 3 && x === 2 ? 'inverse' : y === 3 && x > 2 ? 'dim' : '')))
+      await frame()
+      const box = textbox()
+      expect(box.placeholder).toBe(`${HINT} · →`)
+      expect(box.value).toBe('')
+      expect(screen.queryByRole('region', { name: 'Claude Code 상태' })).not.toBeNull()
+      expect(document.querySelector('.term-boxnote')).toBeNull()
+      expect(ws.input()).toEqual([])
+      // typing writes over it; emptied, it shows again
+      fireEvent.input(box, { target: { value: '내 글' } })
+      expect(box.value).toBe('내 글')
+      fireEvent.input(box, { target: { value: '' } })
+      expect(box.placeholder).toBe(`${HINT} · →`)
     })
 
     it('takes the hint with the quick key Tab on a phone', async () => {

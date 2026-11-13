@@ -406,14 +406,23 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     const el = document.getElementById(id + '-send') as HTMLTextAreaElement | null
     const cur = el?.value ?? ''
     // already there, as a send that came back: once is enough
-    if (!cur.includes(took)) {
+    const put = cur.includes(took) ? null : cur ? `${took}\n${cur}` : took
+    if (put !== null) {
       el?.setSelectionRange(0, cur.length)
-      pathTo.current?.(cur ? `${took}\n${cur}` : took, false)
+      pathTo.current?.(put, false)
     }
     // Ctrl+U clears to the line's start, and from there the line break before: twice a line
     const n = 2 * took.split('\n').length + 2
     if (!link?.send('\x15'.repeat(n))) h.api.terminals.keys(addr, Array<string>(n).fill('ctrl+u')).catch(fail('터미널 입력칸을 비우지 못했습니다'))
-    const timer = setTimeout(() => setLeft(took), TAKE_MS)
+    // what will not clear was no text of the box's, or will not go: Mori's box gets back what it held, untouched since
+    const timer = setTimeout(() => {
+      const now = document.getElementById(id + '-send') as HTMLTextAreaElement | null
+      if (put !== null && now?.value === put) {
+        now.setSelectionRange(0, put.length)
+        pathTo.current?.(cur, false)
+      }
+      setLeft(took)
+    }, TAKE_MS)
     return () => clearTimeout(timer)
   }, [took])
   useEffect(() => {

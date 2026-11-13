@@ -13,6 +13,7 @@ import { useHost } from '../lib/scope'
 import { commitTime, relTime } from '../lib/time'
 import { toast } from '../lib/toast'
 import type { Commit } from '../lib/types'
+import { tip } from '../lib/tip'
 import { DiffPane } from './Git'
 import { FileLabel, fileContext } from './GitChanges'
 import { RefChips } from './RefChips'
@@ -55,7 +56,7 @@ function CopyHash({ hash, size }: { hash: string; size: number }) {
     else toast('복사하지 못했습니다', 'error')
   }
   return (
-    <button type="button" class="btn btn-icon btn-ghost cm-copy" aria-label="전체 해시 복사" title="전체 해시 복사" onClick={copy}>
+    <button type="button" class="btn btn-icon btn-ghost cm-copy" {...tip('전체 해시 복사')} onClick={copy}>
       <Icon name="copy" size={size} />
     </button>
   )
@@ -234,7 +235,7 @@ export function CommitPanel({ r, onClose }: CommitProps) {
           {shortHash(rev)}
         </span>
         <CopyHash hash={rev} size={16} />
-        <button type="button" class="btn btn-icon btn-ghost cm-close" aria-label="커밋 닫기" title="커밋 닫기" onClick={onClose}>
+        <button type="button" class="btn btn-icon btn-ghost cm-close" {...tip('커밋 닫기')} onClick={onClose}>
           <Icon name="close" size={18} />
         </button>
       </header>
@@ -368,7 +369,7 @@ export function CommitSheet({ r, onClose, focus = true }: CommitSheetProps) {
       <div class="cs-grab" aria-hidden="true" />
       <header class="cs-head">
         {item && (
-          <button ref={backBtn} type="button" class="btn btn-icon btn-ghost cs-back" aria-label="파일 목록으로" title="파일 목록으로" onClick={back}>
+          <button ref={backBtn} type="button" class="btn btn-icon btn-ghost cs-back" {...tip('파일 목록으로')} onClick={back}>
             <Icon name="back" size={20} />
           </button>
         )}
@@ -377,7 +378,7 @@ export function CommitSheet({ r, onClose, focus = true }: CommitSheetProps) {
         </h2>
         <span class="mono cs-hash">{shortHash(rev)}</span>
         <CopyHash hash={rev} size={18} />
-        <button type="button" class="btn btn-icon btn-ghost cs-close" aria-label="커밋 닫기" title="커밋 닫기" onClick={onClose}>
+        <button type="button" class="btn btn-icon btn-ghost cs-close" {...tip('커밋 닫기')} onClick={onClose}>
           <Icon name="close" size={20} />
         </button>
       </header>

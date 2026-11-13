@@ -69,6 +69,10 @@
   width: var(--size-element-md);
 }
 
+.btn-icon.btn-xs {
+  width: var(--size-element-sm);
+}
+
 .btn-block {
   width: 100%;
 }
@@ -431,6 +435,26 @@ html.is-resizing * {
   font-size: var(--text-body-size);
   line-height: var(--text-body-leading);
   pointer-events: auto;
+}
+
+/* The tooltip (astryx Tooltip, lib/tip.ts, spec §3 #247): inverted, as a
+   toast is. A manual popover in the top layer; where there are no popovers,
+   at the toasts' place in the z-index ladder. */
+.tip {
+  position: fixed;
+  inset: auto;
+  z-index: 50;
+  max-width: 300px;
+  margin: 0;
+  padding: var(--spacing-1) var(--spacing-2);
+  overflow: visible;
+  border: 0;
+  border-radius: var(--radius-container);
+  background-color: var(--color-background-inverted);
+  color: var(--mori-on-inverted);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
+  overflow-wrap: anywhere;
 }
 
 .toast-error {

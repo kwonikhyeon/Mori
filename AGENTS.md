@@ -59,7 +59,8 @@ Reuse these classes before writing new ones. A new control maps to an astryx com
 | `.btn-ghost` | Button, `ghost` | |
 | `.btn-danger` | Button, `destructive` | As the neutral theme paints it: the error-muted fill. |
 | `.btn-danger-fill` | Button, `destructive` | The core paint, the error fill: for the last step of a delete, in a confirm. |
-| `.btn-icon` | IconButton | A square. It needs an `aria-label`. |
+| `.btn-icon` | IconButton | A square. Give it `{...tip(name)}` (`lib/tip.ts`): its `aria-label`, and its name in the tooltip on hover or keyboard focus. |
+| `.tip` (`lib/tip.ts`) | Tooltip | The page's one tooltip, for any control with `data-tip`. Inverted, above the control. A finger never opens it. |
 | `.chip`, `.chip-*` | Badge | A terminal's state; see Status and counts. |
 | `.count-pill`, `.tab-badge`, `.others` | Badge (a count) | |
 | `.bar` | ProgressBar | |
@@ -160,6 +161,7 @@ Reuse these classes before writing new ones. A new control maps to an astryx com
 
   | z-index | What |
   |---|---|
+  | top layer | the tooltip, as a manual popover (z-index 50 where there are no popovers) |
   | 50 | toasts |
   | 30 | menus |
   | 20 | the slash-command list |

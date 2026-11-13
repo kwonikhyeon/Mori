@@ -4,6 +4,7 @@
 // same list at the pointer.
 import { Fragment, type ComponentChildren, type JSX, type Ref } from 'preact'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
+import { tip } from '../lib/tip'
 import { Icon, type IconName } from './Icon'
 import { useLayer } from './useLayer'
 
@@ -186,8 +187,7 @@ export function Menu({ label, items, icon = 'more', iconSize = 20, buttonClass =
         ref={btn}
         type="button"
         class={buttonClass}
-        aria-label={label}
-        title={label}
+        {...tip(label)}
         aria-haspopup="menu"
         aria-expanded={!!open}
         aria-controls={open ? id : undefined}

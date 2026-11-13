@@ -12,6 +12,7 @@ import { branchLine, changeGroups, fileParts, shortPath, wtLabel, type ChangeGro
 import { href, route } from '../lib/router'
 import { useHost, type HostScope } from '../lib/scope'
 import { toast, toastError } from '../lib/toast'
+import { tip } from '../lib/tip'
 import { DiffView } from './Diff'
 import { ChangeCards, ChangeList } from './GitChanges'
 import { WorktreeList } from './GitWorktrees'
@@ -35,7 +36,7 @@ function useChanges(g: GitData) {
 
 function Refresh({ g, size = 16 }: { g: GitData; size?: number }) {
   return (
-    <button type="button" class="btn btn-icon btn-ghost gp-refresh" aria-label="새로 고침" title="새로 고침" disabled={g.state !== 'ok'} onClick={g.refresh}>
+    <button type="button" class="btn btn-icon btn-ghost gp-refresh" {...tip('새로 고침')} disabled={g.state !== 'ok'} onClick={g.refresh}>
       <Icon name="refresh" size={size} />
     </button>
   )
@@ -44,9 +45,10 @@ function Refresh({ g, size = 16 }: { g: GitData; size?: number }) {
 /**
  * 가져오기: git fetch in the worktree at path, then onDone reads again (spec
  * §3 #227). While it runs it stays focusable and the same size, as astryx's
- * busy Button does, and a second press does nothing.
+ * busy Button does, and a second press does nothing. On a PC it is its icon,
+ * its name in the tooltip (spec §3 #247); a phone, with no hover, keeps the word.
  */
-export function FetchButton({ path, onDone, class: cls = '' }: { path: string; onDone: () => void; class?: string }) {
+export function FetchButton({ path, onDone, class: cls = '', icon = false }: { path: string; onDone: () => void; class?: string; icon?: boolean }) {
   const h = useHost()
   const [busy, setBusy] = useState(false)
   const run = async () => {
@@ -63,9 +65,16 @@ export function FetchButton({ path, onDone, class: cls = '' }: { path: string; o
     }
   }
   return (
-    <button type="button" class={'btn btn-sm gp-fetch ' + cls} title="원격에서 가져오기 (git fetch)" disabled={!path} aria-busy={busy} onClick={run}>
-      <Icon name={busy ? 'refresh' : 'download'} size={15} class={busy ? 'spin' : undefined} />
-      가져오기
+    <button
+      type="button"
+      class={(icon ? 'btn btn-sm btn-icon btn-ghost gp-fetch ' : 'btn btn-sm gp-fetch ') + cls}
+      {...(icon ? tip('원격에서 가져오기 (git fetch)') : { title: '원격에서 가져오기 (git fetch)' })}
+      disabled={!path}
+      aria-busy={busy}
+      onClick={run}
+    >
+      <Icon name={busy ? 'refresh' : 'download'} size={icon ? 16 : 15} class={busy ? 'spin' : undefined} />
+      {!icon && '가져오기'}
     </button>
   )
 }
@@ -122,11 +131,10 @@ function BranchRow({ g }: { g: GitData }) {
         </div>
         <span class="gp-branch-sub">{line.sub ? line.sub + ' · 보기만 합니다' : '보기만 합니다'}</span>
       </div>
-      {g.shown && <FetchButton path={g.shown} onDone={g.refresh} />}
+      {g.shown && <FetchButton path={g.shown} onDone={g.refresh} icon />}
       {g.shown && (
-        <a class="btn btn-sm gp-graph" href={graphHref(h, g)} onClick={fromHere(h, g)}>
-          <Icon name="graph" size={15} />
-          그래프
+        <a class="btn btn-sm btn-icon btn-ghost gp-graph" href={graphHref(h, g)} onClick={fromHere(h, g)} {...tip('커밋 그래프')}>
+          <Icon name="graph" size={16} />
         </a>
       )}
     </section>
@@ -234,7 +242,7 @@ export function GitPanel({ folder, path, pulse, onClose }: GitPanelProps) {
         <h2 class="gp-title">Git</h2>
         {g.f && <span class="gp-folder">{g.f.name}</span>}
         <Refresh g={g} />
-        <button type="button" class="btn btn-icon btn-ghost gp-close" aria-label="Git 닫기" title="Git 닫기" onClick={onClose}>
+        <button type="button" class="btn btn-icon btn-ghost gp-close" {...tip('Git 닫기')} onClick={onClose}>
           <Icon name="close" size={18} />
         </button>
       </header>

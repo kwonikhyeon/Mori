@@ -16,6 +16,7 @@ import { initPress } from './lib/press'
 import { initRouter, navigate, parseHash } from './lib/router'
 import { totalNeeds } from './lib/scope'
 import { initTheme } from './lib/theme'
+import { initTips } from './lib/tip'
 import { trackViewport } from './lib/viewport'
 import { startWake } from './lib/wake'
 
@@ -26,6 +27,7 @@ initRouter()
 initBackstack()
 initAnnounce()
 initPress()
+initTips()
 startClock()
 startWake()
 effect(() => showNeeds(totalNeeds.value))

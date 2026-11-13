@@ -15,6 +15,7 @@ import { useHost } from '../lib/scope'
 import { planOf, worktreeRequest } from '../lib/slug'
 import { errorText, toast, toastError } from '../lib/toast'
 import type { Branches, FolderView, Worktree } from '../lib/types'
+import { tip } from '../lib/tip'
 import { BranchFields } from './BranchFields'
 import type { Variant } from './rows'
 import type { GitData } from './useGit'
@@ -85,9 +86,8 @@ export function WorktreeList({ variant, g, own, onShow, onMade, onRemoved }: Wor
           워크트리 {g.ws.length}
         </Head>
         {pc ? (
-          <button type="button" class="btn btn-xs gw-add" aria-label="워크트리 추가" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={13} />
-            추가
+          <button type="button" class="btn btn-xs btn-icon btn-ghost gw-add" {...tip('워크트리 추가')} onClick={() => setAdding(true)}>
+            <Icon name="plus" size={16} />
           </button>
         ) : (
           <button type="button" class="gw-add-phone" onClick={() => setAdding(true)}>

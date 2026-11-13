@@ -16,6 +16,7 @@ import { parseHash, plainClick } from '../lib/router'
 import { useHost } from '../lib/scope'
 import { commitTime, dayClock, relTime } from '../lib/time'
 import type { LogCommit } from '../lib/types'
+import { tip } from '../lib/tip'
 import { CommitSheet } from './Commit'
 import { FetchButton } from './Git'
 import { RefChips } from './RefChips'
@@ -189,9 +190,8 @@ function BackLink({ folder, path }: { folder: string; path?: string }) {
   const from = graphFrom.value
   const to = from && from.host === h.id && from.folder === folder ? from.href : h.href({ name: 'git', folder, path })
   return (
-    <a class="btn btn-sm gr-back" href={to}>
-      <Icon name="back" size={15} />
-      {parseHash(to).name === 'terminal' ? '작업 화면으로' : 'Git 화면으로'}
+    <a class="btn btn-sm btn-icon btn-ghost gr-back" href={to} {...tip(parseHash(to).name === 'terminal' ? '작업 화면으로' : 'Git 화면으로')}>
+      <Icon name="back" size={16} />
     </a>
   )
 }
@@ -326,7 +326,7 @@ export function GraphScreen({ variant, folder, path, head, c, back }: GraphScree
     />
   )
   const refresh = (cls: string, size: number) => (
-    <button type="button" class={'btn btn-icon ' + cls} aria-label="새로 고침" title="새로 고침" disabled={!repo.shown} onClick={log.refresh}>
+    <button type="button" class={'btn btn-icon ' + cls} {...tip('새로 고침')} disabled={!repo.shown} onClick={log.refresh}>
       <Icon name="refresh" size={size} />
     </button>
   )
@@ -343,8 +343,8 @@ export function GraphScreen({ variant, folder, path, head, c, back }: GraphScree
           </div>
           <div class="gr-tools">
             {scope}
-            <FetchButton path={repo.shown} onDone={log.refresh} />
-            {refresh('btn-sm gr-refresh', 16)}
+            <FetchButton path={repo.shown} onDone={log.refresh} icon />
+            {refresh('btn-sm btn-ghost gr-refresh', 16)}
             <BackLink folder={folder} path={path} />
           </div>
         </header>

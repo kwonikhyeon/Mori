@@ -129,11 +129,6 @@
   line-height: var(--text-label-leading);
 }
 
-.gr-back {
-  gap: var(--spacing-1-5);
-  padding: 0 var(--spacing-3);
-}
-
 /* ---------- the list ---------- */
 
 .gr-scroll {

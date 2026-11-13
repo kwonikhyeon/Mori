@@ -386,76 +386,18 @@ a.term-back {
   color: var(--color-text-primary);
 }
 
-.term-ask-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-0-5);
-  min-width: 0;
-  padding: 0 var(--spacing-1);
-}
-
-.term-ask-head h2 {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  color: var(--color-text-warning);
-  font-size: var(--text-heading-4-size);
-  line-height: var(--text-heading-4-leading);
-  font-weight: var(--text-heading-4-weight);
-}
-
-.term-ask-top {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  min-width: 0;
-}
-
-.term-ask-top h2 {
-  flex: 1;
-  min-width: 0;
-}
-
-/* Two lines of the question, the rest a press away (spec §3 #184). */
-.term-ask-head .term-ask-msg {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--color-text-secondary);
-  font-size: var(--text-supporting-size);
-  line-height: var(--text-supporting-leading);
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-}
-
-.term-ask-head .term-ask-msg.is-open {
-  position: relative;
-  display: block;
-  max-height: 40vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  white-space: pre-line;
-}
-
-/* A 44 px target that leaves the title's line as it is. */
-.term-ask-more {
-  flex: none;
-  height: var(--mori-size-touch);
-  margin: calc(-1 * var(--spacing-3)) calc(-1 * var(--spacing-1)) calc(-1 * var(--spacing-3)) 0;
-  padding: 0 var(--spacing-1);
-  border: 0;
-  background-color: transparent;
-  color: var(--color-text-accent);
-  font-size: var(--text-label-size);
-  line-height: var(--text-label-leading);
-  font-weight: var(--text-label-weight);
-}
-
+/* A phone's question keys, typed into the terminal: ↑ ↓ ← → Enter Esc (spec §3 #250).
+   Six to a row: a key's name keeps one line. */
 .term-ask-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--spacing-2);
+}
+
+.term-ask-grid .term-ask-key {
+  min-width: 0;
+  padding: 0;
+  white-space: nowrap;
 }
 
 .term-phone .term-ask-key {
@@ -470,13 +412,6 @@ a.term-back {
   font-size: var(--text-label-size);
   font-weight: var(--text-label-weight);
   line-height: var(--text-label-leading);
-}
-
-.term-phone .term-ask-reject {
-  grid-column: 1 / -1;
-  justify-content: center;
-  height: var(--mori-size-touch);
-  border-radius: var(--radius-container);
 }
 
 /* ---------- a Claude Code window, read into a panel ---------- */
@@ -630,6 +565,16 @@ a.term-back {
    that the rows the sheet does not need go below the stage, so the band
    above the sheet, the terminal's own blank, is less than a row (#228).
    The picker panel's layer (4): the two never show together. */
+/* Claude Code's status lines under a window's hint line, covered with the
+   terminal's own ground (spec §3 #250); the window's panel lies above. */
+.term-under {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 3;
+  background-color: var(--term-bg);
+}
+
 .term-cover {
   position: absolute;
   inset-inline: 0;
@@ -1062,6 +1007,18 @@ textarea.term-send-input::placeholder {
 }
 
 .term-dock:empty {
+  display: none;
+}
+
+/* Only an empty box gone while a window's panel shows: the dock keeps the
+   phone's bottom safe area, under the panel's keys (spec §3 #250). */
+.term-dock:not(:empty):not(:has(> :not([hidden]))) {
+  gap: 0;
+  padding: 0 0 env(safe-area-inset-bottom, 0);
+  border-radius: 0;
+}
+
+.term-dock:not(:empty):not(:has(> :not([hidden])))::before {
   display: none;
 }
 

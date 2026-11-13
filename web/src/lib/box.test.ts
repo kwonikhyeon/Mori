@@ -28,6 +28,16 @@ describe('readBox', () => {
     expect(b.hint).toBe('describe a task for a new session')
   })
 
+  // While the terminal has the focus, Claude Code draws its cursor on the hint's
+  // first letter, inverted; that cell is no colour of the box's (spec §3 #249).
+  it("takes a hint whose first letter is Claude Code's cursor", () => {
+    const b = readBox(boxWith('run the tests', (x) => (x === 0 ? 'inverse' : GREY)))!
+    expect(b.text).toBe('')
+    expect(b.hint).toBe('run the tests')
+    // typed text with the cursor on a letter is still text
+    expect(readBox(boxWith('abc', (x) => (x === 1 ? 'inverse' : '')))!.text).toBe('abc')
+  })
+
   it('takes default text for text', () => {
     const b = readBox(boxWith('abc', () => ''))!
     expect(b.text).toBe('abc')

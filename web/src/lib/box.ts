@@ -2,7 +2,9 @@
 // (claude-input design §3, §4.2): its input box, the status line below it,
 // set by the person, and its mode line. The box is empty while what it holds
 // is one grey only, a hint or a suggestion; any other colour is text a send
-// would carry, so a reading that errs, errs toward text.
+// would carry, so a reading that errs, errs toward text. Claude Code's cursor
+// is no colour of what the box holds: while the terminal has the focus, it
+// draws its hint's first letter inverted (spec §3 #249).
 
 import { inputBox, look } from './pick'
 import type { Shot } from './shot'
@@ -88,7 +90,8 @@ export function readBox(shot: Shot): BoxLook | null {
     const from = y === top + 1 ? cells.indexOf('❯') + 2 : 2
     lines.push(cells.slice(from).join('').trimEnd())
     cells.forEach((c, x) => {
-      if (x >= from && c !== ' ' && c !== '') inks.push(shot.ink[y]?.[x] ?? '')
+      const ink = shot.ink[y]?.[x] ?? ''
+      if (x >= from && c !== ' ' && c !== '' && ink !== 'inverse') inks.push(ink)
     })
   }
   const said = lines.join('\n').trim()

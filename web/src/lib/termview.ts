@@ -45,11 +45,8 @@ const ANSWERS: Record<string, AnswerKey> = {
   esc: { label: 'Esc', bytes: '\x1b', name: 'esc' },
 }
 
-/** The keys a blocked program is answered with (B-PC, B-Terminal). */
-export const BLOCKED_KEYS: Record<'pc' | 'phone', AnswerKey[]> = {
-  pc: [ANSWERS[1], ANSWERS[2], ANSWERS[3], ANSWERS.enter, ANSWERS.esc],
-  phone: [ANSWERS[1], ANSWERS[2], ANSWERS[3], ANSWERS.esc],
-}
+/** The keys a blocked program is answered with on a PC (B-PC, B-Terminal); a phone types its own (spec §3 #250). */
+export const BLOCKED_KEYS: AnswerKey[] = [ANSWERS[1], ANSWERS[2], ANSWERS[3], ANSWERS.enter, ANSWERS.esc]
 
 /** An uploaded file's path as a shell reads it as one word. */
 export function quotePath(p: string): string {

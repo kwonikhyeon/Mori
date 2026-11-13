@@ -18,9 +18,8 @@ describe('attachNote', () => {
 
 describe('BLOCKED_KEYS', () => {
   it('answers with the keys the boards show', () => {
-    expect(BLOCKED_KEYS.pc.map((k) => k.label)).toEqual(['1', '2', '3', 'Enter', 'Esc'])
-    expect(BLOCKED_KEYS.phone.map((k) => k.label)).toEqual(['1', '2', '3', 'Esc'])
-    expect(BLOCKED_KEYS.pc.map((k) => [k.bytes, k.name])).toEqual([
+    expect(BLOCKED_KEYS.map((k) => k.label)).toEqual(['1', '2', '3', 'Enter', 'Esc'])
+    expect(BLOCKED_KEYS.map((k) => [k.bytes, k.name])).toEqual([
       ['1', '1'], ['2', '2'], ['3', '3'], ['\r', 'enter'], ['\x1b', 'esc'],
     ])
   })

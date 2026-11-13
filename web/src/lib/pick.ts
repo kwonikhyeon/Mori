@@ -37,6 +37,8 @@ export interface Seen {
   body: string
   /** From the window's first line to its hint line. */
   rows: number
+  /** The lines written under its hint line: Claude Code's status and mode lines, which stay. */
+  below: number
   /**
    * The terminal is too short for the whole list: Claude Code shows some of
    * its items, how many more there are ("… +4 models"), and scrolls them with
@@ -190,6 +192,10 @@ function joined(rows: string[]): string {
   return acc
 }
 
+// Claude Code's own lines under a window, never a hint line's (spec §3 #250):
+// a status line's │, and the mode line
+const FOOTER = /│|^\s*(?:⏵⏵|⏸)\s|^\s*\?\s+for shortcuts\b/
+
 /** The bottom-most hint line that starts at lo or below and ends at from or below. */
 function hintAt(texts: string[], lo: number, from: number): HintBlock | null {
   for (let e = texts.length - 1; e >= from; e--) {
@@ -198,7 +204,7 @@ function hintAt(texts: string[], lo: number, from: number): HintBlock | null {
       const s = e - n + 1
       if (s < lo) continue
       const rows = texts.slice(s, e + 1)
-      if (rows.some((t) => !t.trim())) continue
+      if (rows.some((t) => !t.trim() || FOOTER.test(t))) continue
       const text = joined(rows)
       const parts = hintLine(text)
       if (parts) return { s, e, parts, text }
@@ -278,6 +284,7 @@ function make(id: string, form: string, title: string, options: Option[], cursor
     hints: readHints(h.parts),
     body: clean(texts.slice(top, h.s)),
     rows: h.e - top + 1,
+    below: texts.length - h.e - 1,
     partial: drawn.some((t) => CUT.test(t)),
   }
 }

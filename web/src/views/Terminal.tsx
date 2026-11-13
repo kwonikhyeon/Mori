@@ -373,23 +373,52 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const holding = sending || Date.now() < settleUntil.current
   const rb = reading.box
   const boxable = !!rb && !boxShown.value && canType && sameSize && reading.alternate
-  const coverNow = boxable && reading.end && reading.row >= 0 && rb.text === ''
+  // Text Claude Code puts in its own box, as a prompt it gives back on an
+  // interrupt, goes to Mori's box, and the terminal's box is cleared: the
+  // cover stays (spec §3 #251). A paste or an image it holds only by name
+  // stays there, and so does text that will not clear: the cover gives way.
+  const [left, setLeft] = useState<string | null>(null)
+  const taking = boxable && reading.end && reading.row >= 0 && rb.text !== '' && !holding && rb.text !== left && !HELD_BY_NAME.test(rb.text)
+  const coverNow = boxable && reading.end && reading.row >= 0 && (rb.text === '' || taking)
   const coverWas = useRef(false)
   // held as it was, but a box read empty again brings the cover back at once
   if (!holding || coverNow) coverWas.current = coverNow
   const covered = coverWas.current && !!rb && !seen
   const coverRef = useRef(covered)
   coverRef.current = covered
+  const blockedRef = useRef(blocked)
+  blockedRef.current = blocked
+  // a window's ↑, ↓ and Enter: true when it took the key
+  const pickKeyRef = useRef<(k: PickKey) => boolean>(() => false)
   const focusRef = useRef(() => {})
   // the box's own insertion, for a path uploaded while the cover is up
   const pathTo = useRef<((text: string, word?: boolean) => void) | null>(null)
   // the box takes the terminal's hint for the quick key Tab, while it is empty: true when it did
   const takeTab = useRef<(() => boolean) | null>(null)
   // text in the terminal's box: what the next send would follow
-  const boxNote = boxable && rb.text !== '' && !holding
+  const boxNote = boxable && rb.text !== '' && !holding && !taking
   useEffect(() => {
     if (boxNote) announce(BOX_NOTE)
   }, [boxNote])
+  const took = taking ? rb.text : ''
+  useEffect(() => {
+    if (!took) return
+    const el = document.getElementById(id + '-send') as HTMLTextAreaElement | null
+    const cur = el?.value ?? ''
+    // already there, as a send that came back: once is enough
+    if (!cur.includes(took)) {
+      el?.setSelectionRange(0, cur.length)
+      pathTo.current?.(cur ? `${took}\n${cur}` : took, false)
+    }
+    // Ctrl+U clears to the line's start, and from there the line break before: twice a line
+    const n = 2 * took.split('\n').length + 2
+    if (!link?.send('\x15'.repeat(n))) h.api.terminals.keys(addr, Array<string>(n).fill('ctrl+u')).catch(fail('터미널 입력칸을 비우지 못했습니다'))
+    const timer = setTimeout(() => setLeft(took), TAKE_MS)
+    return () => clearTimeout(timer)
+  }, [took])
+  useEffect(() => {
+    if (rb?.text === '' && left !== null) setLeft(null)
+  }, [rb?.text])
   // a new mode is read out once
   const modeSaid = useRef<string | null>(null)
   useEffect(() => {
@@ -420,6 +449,16 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     const sc = scroll.current
     if (sc && tallView) sc.scrollTop = covered ? 0 : sc.scrollHeight
   }, [tallView, covered, size?.rows])
+  // Under a window's hint line Claude Code keeps its status lines: the
+  // terminal's own ground lies over them, from that row down (spec §3 #250).
+  const underEl = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = underEl.current
+    const sc = scroll.current
+    if (!el || !sc) return
+    const pad = parseFloat(getComputedStyle(sc).paddingTop) || 0
+    el.style.top = `${pad + reading.under * (screen.current?.cell()[1] ?? 0) - sc.scrollTop}px`
+  })
   const coverTop = () => {
     const sc = scroll.current
     const pad = sc ? parseFloat(getComputedStyle(sc).paddingTop) || 0 : 0
@@ -445,6 +484,15 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       if (a && a !== document.body && a !== document.documentElement) {
         if (a.closest(OWN_KEYS) || !a.closest('.term-pc')) return
         if ([...e.key].length !== 1 || e.key === ' ') return
+      }
+      // A question is answered by its bar's keys: with the empty box gone, a
+      // key that lands on the page must not approve it (spec §3 #250).
+      if (blockedRef.current) return
+      // a window's ↑, ↓ and Enter go to it, as they did from the empty box (pickers design §14 #45)
+      const k = PICK_KEYS[e.key]
+      if (k && !e.isComposing && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey && pickKeyRef.current(k)) {
+        e.preventDefault()
+        return
       }
       const paste = e.key.toLowerCase() === 'v' && !e.altKey && (isApple() ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey)
       // With the cover a letter goes to the box, and nothing else to the terminal (claude-input design §4.1)
@@ -482,6 +530,17 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     }
     if (link?.send(k.bytes)) return
     h.api.terminals.keys(addr, [k.name]).catch(fail('키를 보내지 못했습니다'))
+  }
+  // A phone's key for a question goes as typed: a move down the stream, an
+  // answer through the question the server names, as the panel's keys do (spec §3 #194)
+  const typeKey = (name: string) => {
+    // one answer at a time where it goes through the question; down the stream keys keep their order
+    const final = !!ask && (name === 'enter' || name === 'esc')
+    if (final && answering) return
+    if (final) setAnswering(true)
+    sendKeys([name], final)
+      .then(toEnd, fail('키를 보내지 못했습니다'))
+      .finally(() => final && setAnswering(false))
   }
   const reject = () => {
     if (rejecting !== null) {
@@ -784,6 +843,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     press.move([k]).catch(fail('키를 보내지 못했습니다'))
     return true
   }
+  pickKeyRef.current = pickKey
   // the item a key moved the cursor to is read out
   useEffect(() => {
     if (!moved.current || !seen?.cursor) return
@@ -800,6 +860,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       onKey={answer}
       rejecting={rejecting !== null}
       onReject={ask ? reject : undefined}
+      onType={typeKey}
       pick={
         // a list Claude Code drew cut short is left there: the bar answers by its own keys.
         // The items are keys by their numbers; the terminal shows what they say (spec §3 #238).
@@ -830,6 +891,11 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
         onKey={pickKey}
       />
     ))
+  // While Mori shows a choice's buttons, an empty box below goes, and on a
+  // phone the quick keys too: the buttons alone stay (spec §3 #250). A window
+  // the terminal keeps has no buttons.
+  const choosing = !!(blocked && t) || (!!seen && pick.cap >= 0 && !seen.partial)
+  const under = seen && reading.under >= 0 && <div ref={underEl} class="term-under" aria-hidden="true" />
   // the window a send closes first: the panel's, or one its own cut keeps out of it
   // Shift+Tab moves Claude Code to its next mode (claude-input design §3.3)
   const nextMode = () => {
@@ -837,6 +903,10 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   }
   const focusBox = () => document.getElementById(id + '-send')?.focus()
   focusRef.current = focusBox
+  // the box comes back to turn a question down: it takes the focus once it shows
+  useEffect(() => {
+    if (rejecting !== null && !phone) focusBox()
+  }, [rejecting])
   // On a phone a touch on the covered terminal brings up no keyboard (claude-input design §4.1)
   useEffect(() => {
     screen.current?.setKeyboard(!(covered && phone))
@@ -900,6 +970,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       hint={claudeOn && rb && rb.text === '' ? rb.hint : ''}
       sentKey={`${h.id}.${addr}.${t?.created_ms ?? 0}`}
       takeTab={takeTab}
+      away={choosing}
     />
   )
 
@@ -950,6 +1021,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
         </header>
         {stageWith(
           <>
+            {under}
             {!askBar && pickPanel}
             {band}
           </>,
@@ -1014,6 +1086,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       <div class="term-body">
         {stageWith(
           <>
+            {under}
             {!askBar && pickPanel}
             {band}
           </>,
@@ -1022,7 +1095,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
           {askBar}
           {observeBar}
           {endBar}
-          {canType && <QuickKeys link={link} open={open} take={(k) => k === 'tab' && covered && !!takeTab.current?.()} />}
+          {canType && !choosing && <QuickKeys link={link} open={open} take={(k) => k === 'tab' && covered && !!takeTab.current?.()} />}
           {composer}
         </div>
       </div>
@@ -1065,15 +1138,19 @@ interface AskBarProps {
    * right.
    */
   pick?: { options: { n: number; label: string; off: boolean }[]; onChoose: (n: number) => void; hints: ComponentChildren }
+  /** A phone's keys type into the terminal as they are named: up, down, left, right, enter, esc. */
+  onType?: (name: string) => void
 }
 
+/** A phone's keys for a question: the terminal moves and answers as they type (spec §3 #250). */
+const PHONE_ASK_KEYS = (['up', 'down', 'left', 'right', 'enter', 'esc'] as const).map((k) => QUICK_KEYS.find((q) => q.key === k)!)
+
 /** What a blocked program asks, and the keys that answer it. */
-function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick }: AskBarProps) {
+function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick, onType }: AskBarProps) {
   const head = id + '-ask'
   const label = pick ? '승인 대기 — 골라서 응답' : '승인 대기 — 키로 응답'
   const msg = askLine(t)
-  const more = useMore(msg)
-  const named = BLOCKED_KEYS[phone ? 'phone' : 'pc'].filter((k) => !pick || k.name === 'esc')
+  const named = BLOCKED_KEYS.filter((k) => !pick || k.name === 'esc')
   const items = (pick?.options ?? []).map((o) => (
     <button
       key={`item-${o.n}`}
@@ -1103,7 +1180,7 @@ function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick }: AskBar
     </button>
   ))
   keys.unshift(...items)
-  if (onReject) {
+  if (onReject && !phone) {
     keys.push(
       <button key="reject" type="button" class="term-ask-reject" aria-pressed={rejecting} disabled={busy} onClick={onReject}>
         <Icon name="pencil" size={phone ? 17 : 15} />
@@ -1111,36 +1188,32 @@ function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick }: AskBar
       </button>,
     )
   }
+  // A phone shows keys alone, typed into the terminal, which shows the question and its cursor (spec §3 #250).
   if (phone) {
-    const text = id + '-ask-msg'
     return (
-      <section class="term-ask" aria-labelledby={head}>
-        <div class="term-ask-head">
-          <div class="term-ask-top">
-            <h2 id={head}>
-              <Icon name="warning" size={18} />
-              {label}
-            </h2>
-            {(more.long || more.open) && (
-              <button
-                type="button"
-                class="term-ask-more"
-                aria-expanded={more.open}
-                aria-controls={text}
-                onPointerDown={keep}
-                onMouseDown={keep}
-                onClick={() => more.setOpen(!more.open)}
-              >
-                {more.open ? '접기' : '전체 보기'}
-              </button>
-            )}
-          </div>
-          <p ref={more.ref} id={text} class={'term-ask-msg' + (more.open ? ' is-open' : '')}>
-            {msg}
-          </p>
+      <section class="term-ask" aria-labelledby={head} aria-describedby={id + '-ask-msg'}>
+        <h2 id={head} class="sr-only">
+          {label}
+        </h2>
+        <p id={id + '-ask-msg'} class="sr-only">
+          {msg}
+        </p>
+        <div class="term-ask-grid">
+          {PHONE_ASK_KEYS.map((q) => (
+            <button
+              key={q.key}
+              type="button"
+              class={'term-ask-key' + (q.text.length > 1 ? ' is-word' : '')}
+              aria-label={q.label !== q.text ? q.label : undefined}
+              disabled={busy && (q.key === 'enter' || q.key === 'esc')}
+              onPointerDown={keep}
+              onMouseDown={keep}
+              onClick={() => onType?.(q.key)}
+            >
+              {q.text}
+            </button>
+          ))}
         </div>
-        <div class="term-ask-grid">{keys}</div>
-        {pick?.hints}
       </section>
     )
   }
@@ -1161,29 +1234,6 @@ function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick }: AskBar
       </div>
     </section>
   )
-}
-
-/**
- * A phone's message from a blocked program shows two lines until it is
- * opened (spec §3 #184): long, when it has more than that.
- */
-function useMore(msg: string) {
-  const ref = useRef<HTMLParagraphElement>(null)
-  const [open, setOpen] = useState(false)
-  const [long, setLong] = useState(false)
-  // a new question starts closed
-  useEffect(() => setOpen(false), [msg])
-  useEffect(() => {
-    const el = ref.current
-    if (!el || open) return
-    const check = () => setLong(el.scrollHeight > el.clientHeight + 1)
-    check()
-    if (typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(check)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [msg, open])
-  return { ref, open, long, setOpen }
 }
 
 /**
@@ -1273,18 +1323,27 @@ interface ComposerProps {
   onCopyKey?: (e: KeyboardEvent) => boolean
   /** Takes the box's insertion of text where the caret is, for paths uploaded with the cover up. */
   bind?: { current: ((text: string, word?: boolean) => void) | null }
-  /** The grey hint of the terminal's empty box: the box's placeholder, and Tab takes it (claude-input design §6). */
+  /** The grey hint of the terminal's empty box: the box's placeholder, and → or Tab takes it (claude-input design §6). */
   hint?: string
   /** Where this device keeps what it sends to this terminal: host, address and start. */
   sentKey: string
   /** Takes the box's fill of the hint, for a phone's quick key Tab; true when it filled the box. */
   takeTab?: { current: (() => boolean) | null }
+  /**
+   * A choice's buttons show: an empty box goes, as typing would go to the
+   * terminal; a box with text stays, and so does one turning a question down (spec §3 #250).
+   */
+  away?: boolean
 }
 
 const same = (a: Size | null, b: Size | null) => !!a && !!b && a.cols === b.cols && a.rows === b.rows
 
 /** How long the cover stays as it was after a send ends (claude-input design §3.2). */
 const SEND_SETTLE_MS = 1000
+/** How long the terminal's box has to clear after its text went to Mori's box (spec §3 #251). */
+const TAKE_MS = 2000
+/** A paste or an image Claude Code shows by name only: what it stands for is not on the screen. */
+const HELD_BY_NAME = /\[(?:Pasted text|Image) #\d+/
 
 /** What the box says when the terminal's own box holds text (claude-input design §3.2). */
 const BOX_NOTE = '터미널 입력칸에 글이 있습니다 — 보내면 그 뒤에 이어 붙습니다'
@@ -1326,6 +1385,7 @@ function Composer({
   hint,
   sentKey,
   takeTab,
+  away = false,
 }: ComposerProps) {
   const h = useHost()
   const draft = draftKey(h.id, addr)
@@ -1500,7 +1560,7 @@ function Composer({
   }
   const sendLabel = rejecting ? '거절하고 보내기' : closeFirst ? '닫고 보내기' : '보내기'
   return (
-    <div class="term-compose">
+    <div class="term-compose" hidden={away && text === '' && rejecting === null}>
       {slash.view}
       {rejecting && (
         <div class="term-reject" role="status" aria-labelledby={field + '-reject'}>
@@ -1550,7 +1610,7 @@ function Composer({
                 ? // a phone has no Tab for the box: its quick key Tab takes the hint
                   phone
                   ? hint
-                  : `${hint} · Tab`
+                  : `${hint} · →`
                 : phone
                   ? '여러 줄로 보내기'
                   : `여러 줄로 보내기 · ${apple ? '⌘Enter' : 'Ctrl+Enter'}`
@@ -1593,8 +1653,8 @@ function Composer({
               e.preventDefault()
               return
             }
-            // Tab in an empty box takes the terminal's hint (claude-input design §6)
-            if (e.key === 'Tab' && hint && text === '' && !busy && !e.isComposing && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+            // → or Tab in an empty box takes the terminal's hint as text (claude-input design §6, spec §3 #249)
+            if ((e.key === 'ArrowRight' || e.key === 'Tab') && hint && text === '' && !busy && !e.isComposing && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
               e.preventDefault()
               recalled(hint)
               return

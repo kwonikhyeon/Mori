@@ -309,7 +309,8 @@ describe('Terminal on a PC', () => {
       fireEvent.click(turn())
       fireEvent.click(within(note()!).getByRole('button', { name: '취소' }))
       expect(note()).toBeNull()
-      expect(screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' })).toBeTruthy()
+      // the empty box goes again while the question stays (spec §3 #250)
+      expect(screen.queryByRole('textbox', { name: '터미널에 여러 줄 보내기' })).toBeNull()
 
       fireEvent.click(turn())
       fireEvent.keyDown(screen.getByRole('textbox', { name: '거절하고 대신 보낼 글' }), { key: 'Escape' })
@@ -327,9 +328,11 @@ describe('Terminal on a PC', () => {
 
     it('offers to turn it down with the text a send could not deliver', async () => {
       reply = (c) => (c.url.endsWith('/send') ? conflict('blocked', '승인을 기다립니다') : undefined)
-      await mount(asking())
+      await mount()
       const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
       fireEvent.input(box, { target: { value: 'go on' } })
+      // the question comes while the box holds text: the box stays (spec §3 #250)
+      await act(() => load([asking()]))
       fireEvent.click(screen.getByRole('button', { name: '보내기' }))
       const held = await screen.findByRole('alert')
       expect(held.textContent).toContain('승인 대기 중 — 키로 응답')
@@ -971,27 +974,44 @@ describe('Terminal on a phone', () => {
     expect(ws.input()).toEqual(['\x03', '\x01', '\x05', '\x1b[1;3D', 'b'])
   })
 
-  it('shows two lines of a long question until it is opened', async () => {
-    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(80)
-    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(36)
-    const long = 'Bash(rm -rf node_modules && npm ci && npm test -- --run --reporter verbose)를 실행할까요?'
-    await phone(term({ status: status('blocked', { msg: long }) }))
+  // A phone answers with keys typed into the terminal, which shows the
+  // question and its cursor; the rest of the dock goes (spec §3 #250).
+  it('answers a question with keys typed into the terminal, and nothing else below', async () => {
+    const { ws } = await phone(term({ status: status('blocked', { msg: '파일을 고칠까요?' }) }))
+    await attach(ws)
     const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
-    const more = within(ask).getByRole('button', { name: '전체 보기' })
-    const msg = within(ask).getByText(long)
-    expect(more.getAttribute('aria-expanded')).toBe('false')
-    expect(more.getAttribute('aria-controls')).toBe(msg.id)
-    fireEvent.click(more)
-    expect(more.textContent).toBe('접기')
-    expect(more.getAttribute('aria-expanded')).toBe('true')
-    expect(msg.classList.contains('is-open')).toBe(true)
-    fireEvent.click(more)
-    expect(msg.classList.contains('is-open')).toBe(false)
+    expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['↑', '↓', '←', '→', 'Enter', 'Esc'])
+    // the question is read out, not drawn
+    expect(within(ask).getByText('파일을 고칠까요?').classList.contains('sr-only')).toBe(true)
+    expect(screen.queryByRole('region', { name: '빠른 키' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: '터미널에 여러 줄 보내기' })).toBeNull()
+    for (const name of ['아래 화살표', '위 화살표', '오른쪽 화살표', '왼쪽 화살표', 'Enter', 'Esc']) fireEvent.click(within(ask).getByRole('button', { name }))
+    await vi.waitFor(() => expect(ws.input()).toEqual(['\x1b[B', '\x1b[A', '\x1b[C', '\x1b[D', '\r', '\x1b']))
   })
 
-  it('has nothing to open for a short question', async () => {
-    await phone(term({ status: status('blocked', { msg: '파일을 고칠까요?' }) }))
-    expect(screen.queryByRole('button', { name: '전체 보기' })).toBeNull()
+  // With the question the server names, the keys go through it in order: an answer only while it still asks (spec §3 #194)
+  it('sends a named question\'s keys through it', async () => {
+    const { ws } = await phone(term({ status: status('blocked', { msg: '파일을 고칠까요?' }), ask: '2.0badc0de' }))
+    await attach(ws)
+    const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
+    expect(within(ask).queryByRole('button', { name: '거절하고 지시' })).toBeNull()
+    fireEvent.click(within(ask).getByRole('button', { name: '아래 화살표' }))
+    await vi.waitFor(() => expect(sent('/api/terminals/t1/keys')).toHaveLength(1))
+    fireEvent.click(within(ask).getByRole('button', { name: 'Enter' }))
+    await vi.waitFor(() =>
+      expect(sent('/api/terminals/t1/keys').map((c) => c.body)).toEqual([{ keys: ['down'] }, { keys: ['enter'], expect: '2.0badc0de' }]),
+    )
+    expect(ws.input()).toEqual([])
+  })
+
+  // Back when the question goes: the quick keys and the box.
+  it('brings the quick keys and the box back when the question goes', async () => {
+    const { ws } = await phone(term({ status: status('blocked', { msg: '파일을 고칠까요?' }) }))
+    await attach(ws)
+    expect(screen.queryByRole('region', { name: '빠른 키' })).toBeNull()
+    await act(() => load([term()]))
+    expect(screen.getByRole('region', { name: '빠른 키' })).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' })).toBeTruthy()
   })
 
   it('changes the letters\' size from its menu, and the terminal follows the cells', async () => {
@@ -1017,22 +1037,6 @@ describe('Terminal on a phone', () => {
     fireEvent.click(within(sizes).getByRole('button', { name: '12' }))
     await vi.waitFor(() => expect(FakeScreen.last().fontSize).toBe(12))
     expect(JSON.parse(localStorage.getItem('mori.font')!)).toEqual({})
-  })
-
-  it('answers a blocked program from four big keys', async () => {
-    await phone(term({ status: status('blocked', { msg: '파일을 고칠까요?' }) }))
-    const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
-    expect(within(ask).getByText('파일을 고칠까요?')).toBeTruthy()
-    expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['1', '2', '3', 'Esc'])
-  })
-
-  it('turns a question down from a wide key under the four', async () => {
-    await phone(term({ status: status('blocked', { msg: '파일을 고칠까요?' }), ask: '2.0badc0de' }))
-    const ask = screen.getByRole('region', { name: '승인 대기 — 키로 응답' })
-    expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['1', '2', '3', 'Esc', '거절하고 지시'])
-    fireEvent.click(within(ask).getByRole('button', { name: '거절하고 지시' }))
-    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: '거절하고 대신 보낼 글' }))
-    expect(screen.getByRole('button', { name: '거절하고 보내기' })).toBeTruthy()
   })
 
   it('keeps the other tools in its menu', async () => {
@@ -1449,16 +1453,28 @@ describe('pickers', () => {
     expect(panel()).toBeNull()
   })
 
-  // A phone's bar has four keys a row: the window's items by their numbers,
-  // then Esc; 거절하고 지시 takes a row of its own.
-  it("puts the window's items in a phone's bar as keys, four a row", async () => {
+  // A phone's bar for a window it reads has the same typed keys: the
+  // terminal above shows the items and the cursor (spec §3 #250).
+  it("gives a phone's bar the typed keys for a window's items", async () => {
     const { ws } = await mount(blockedTerm(), { variant: 'phone', back: '#/folders' })
     await attach(ws)
     await show(SCREENS.permission)
     const ask = screen.getByRole('region', { name: '승인 대기 — 골라서 응답' })
     const grid = ask.querySelector('.term-ask-grid')!
-    expect([...grid.children].map((b) => b.textContent)).toEqual(['1', '2', '3', 'Esc', '거절하고 지시'])
+    expect([...grid.children].map((b) => b.textContent)).toEqual(['↑', '↓', '←', '→', 'Enter', 'Esc'])
     expect(ask.querySelector('.term-pick-row')).toBeNull()
+  })
+
+  // The status lines Claude Code keeps under a window lie under the terminal's own ground (spec §3 #250).
+  it('covers the lines under a window', async () => {
+    const { ws } = await mount(blockedTerm())
+    await attach(ws)
+    await show(SCREENS.permission)
+    expect(document.querySelector('.term-under')).toBeNull()
+    await show(SCREENS.permission + '  sample-model · 41% · main\n  ⏵⏵ accept edits on (shift+tab to cycle)\n')
+    expect(document.querySelector('.term-under')).not.toBeNull()
+    await show(SCREENS.idle)
+    expect(document.querySelector('.term-under')).toBeNull()
   })
 
   it('keeps the keys for a blocked hint-only window', async () => {
@@ -1620,6 +1636,11 @@ describe('pickers', () => {
     it('names the send button for an open window', async () => {
       const { ws } = await mount()
       await attach(ws)
+      // an empty box goes while the window's panel shows (spec §3 #250)
+      await show(SCREENS.model)
+      expect(screen.queryByRole('textbox', { name: '터미널에 여러 줄 보내기' })).toBeNull()
+      await show(SCREENS.idle)
+      fireEvent.input(textbox(), { target: { value: 'go on' } })
       await show(SCREENS.model)
       expect(screen.getByRole('button', { name: '닫고 보내기' })).toBeTruthy()
       expect(screen.queryByRole('button', { name: '보내기' })).toBeNull()
@@ -1631,9 +1652,10 @@ describe('pickers', () => {
     it('closes, waits for the box, then sends', async () => {
       const { ws } = await mount()
       await attach(ws)
-      await show(SCREENS.model)
+      // written before the window came: the box stays with its text
       const box = textbox()
       fireEvent.input(box, { target: { value: '테스트 돌려줘' } })
+      await show(SCREENS.model)
       fireEvent.click(screen.getByRole('button', { name: '닫고 보내기' }))
       await vi.waitFor(() => expect(ws.input()).toEqual(['\x1b']))
       // nothing goes while the window shows
@@ -1672,9 +1694,9 @@ describe('pickers', () => {
     it('keeps the text when the window stays', async () => {
       const { ws } = await mount()
       await attach(ws)
-      await show(SCREENS.model)
       const box = textbox()
       fireEvent.input(box, { target: { value: 'go on' } })
+      await show(SCREENS.model)
       fireEvent.click(screen.getByRole('button', { name: '닫고 보내기' }))
       await vi.waitFor(() => expect(ws.input()).toEqual(['\x1b']))
       await frame(2000) // CLOSE_MS
@@ -1701,12 +1723,13 @@ describe('pickers', () => {
     it('keeps the blocked path', async () => {
       reply = (c) =>
         c.url.endsWith('/send') ? Response.json({ error: { kind: 'blocked', message: '승인을 기다립니다' } }, { status: 409 }) : undefined
-      const { ws } = await mount(blockedTerm())
+      const { ws } = await mount()
       await attach(ws)
-      await show(SCREENS.permission)
-      expect(screen.queryByRole('button', { name: '닫고 보내기' })).toBeNull()
       const box = textbox()
       fireEvent.input(box, { target: { value: 'go on' } })
+      await act(() => load([blockedTerm()]))
+      await show(SCREENS.permission)
+      expect(screen.queryByRole('button', { name: '닫고 보내기' })).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: '보내기' }))
       await vi.waitFor(() => expect(document.querySelector('div.term-held')?.textContent).toContain('승인 대기 중 — 키로 응답'))
       expect(sends()).toEqual([{ text: 'go on' }])
@@ -1719,7 +1742,8 @@ describe('pickers', () => {
   })
 
   // ↑, ↓ and Enter in an empty box go to the window, as on the terminal; the
-  // panel follows the terminal's cursor (pickers design §14 #45).
+  // panel follows the terminal's cursor (pickers design §14 #45). While the
+  // panel shows, the empty box is gone and they go from the page (spec §3 #250).
   describe('keys from the box', () => {
     const UP = '\x1b[A'
     const DOWN = '\x1b[B'
@@ -1730,16 +1754,16 @@ describe('pickers', () => {
       return box
     }
 
-    it('moves the cursor with the arrows and chooses with Enter', async () => {
+    it('moves the cursor with the arrows and chooses with Enter, from the page', async () => {
       const { ws } = await mount()
       await attach(ws)
       await show(SCREENS.model)
-      const box = textbox()
-      // handled: the box does not move its own caret
-      expect(fireEvent.keyDown(box, { key: 'ArrowDown' })).toBe(false)
-      expect(fireEvent.keyDown(box, { key: 'ArrowUp' })).toBe(false)
+      expect(screen.queryByRole('textbox', { name: '터미널에 여러 줄 보내기' })).toBeNull()
+      const page = document.body
+      expect(fireEvent.keyDown(page, { key: 'ArrowDown' })).toBe(false)
+      expect(fireEvent.keyDown(page, { key: 'ArrowUp' })).toBe(false)
       expect(ws.input()).toEqual([DOWN, UP])
-      expect(fireEvent.keyDown(box, { key: 'Enter' })).toBe(false)
+      expect(fireEvent.keyDown(page, { key: 'Enter' })).toBe(false)
       await vi.waitFor(() => expect(ws.input()).toEqual([DOWN, UP, '\r']))
     })
 
@@ -1773,7 +1797,7 @@ describe('pickers', () => {
       await attach(ws)
       await show(SCREENS.model)
       await frame()
-      fireEvent.keyDown(textbox(), { key: 'ArrowDown' })
+      fireEvent.keyDown(document.body, { key: 'ArrowDown' })
       await show(cursorAt(SCREENS.model, 2))
       await frame()
       expect(said()).toBe('2. Sonnet')
@@ -1802,11 +1826,13 @@ describe('pickers', () => {
     it('leaves the keys to the box with text, a modifier or a word being composed', async () => {
       const { ws } = await mount()
       await attach(ws)
-      await show(SCREENS.model)
+      // a window the terminal keeps leaves the empty box there
+      await show(SCREENS['model-cc-short'])
       const box = textbox()
       expect(fireEvent.keyDown(box, { key: 'ArrowDown', shiftKey: true })).toBe(true)
       expect(fireEvent.keyDown(box, { key: 'Enter', isComposing: true })).toBe(true)
       fireEvent.input(box, { target: { value: 'go' } })
+      await show(SCREENS.model)
       expect(fireEvent.keyDown(box, { key: 'ArrowDown' })).toBe(true)
       expect(fireEvent.keyDown(box, { key: 'Enter' })).toBe(true)
       expect(ws.input()).toEqual([])
@@ -1821,14 +1847,15 @@ describe('pickers', () => {
       expect(ws.input()).toEqual([])
     })
 
-    // An Enter in an empty box would approve what the program asks: a
-    // question is answered by the approval bar's own keys.
-    it('leaves the keys to the box while the program is blocked', async () => {
+    // An Enter in an empty box, or on the page once the box is gone, would
+    // approve what the program asks: a question is answered by the approval
+    // bar's own keys (spec §3 #250).
+    it('sends no key from the page while the program is blocked', async () => {
       const { ws } = await mount(blockedTerm())
       await attach(ws)
       await show(SCREENS.permission)
-      expect(fireEvent.keyDown(textbox(), { key: 'ArrowDown' })).toBe(true)
-      expect(fireEvent.keyDown(textbox(), { key: 'Enter' })).toBe(true)
+      expect(screen.queryByRole('textbox', { name: '터미널에 여러 줄 보내기' })).toBeNull()
+      for (const key of ['ArrowDown', 'Enter', '1', 'y']) expect(fireEvent.keyDown(document.body, { key })).toBe(true)
       expect(ws.input()).toEqual([])
       expect(sent('/api/terminals/t1/keys')).toEqual([])
     })
@@ -2031,8 +2058,8 @@ describe('pickers', () => {
       await show(IDLE)
       expect(band()!.style.top).toBe(`${(28 - 9 + 2) * 17}px`)
       expect(scroller().classList.contains('is-tall')).toBe(true)
-      // text in the box takes the cover down, not the rows
-      await show(withText('안녕'))
+      // text in the box that stays there takes the cover down, not the rows
+      await show(withText('[Pasted text #1 +3 lines]'))
       expect(band()).toBeNull()
       // nor a stage a few pixels taller without the cover: 414px fits 24 rows still, so 28 stay
       layOut({ 'term-stage': 414, 'term-cover-sheet': 40 })
@@ -2104,10 +2131,54 @@ describe('pickers', () => {
       expect(said()).toBe('모드: 계획')
     })
 
-    it('shows the box with text in it, and says so once', async () => {
+    // Text Claude Code puts in its own box goes to Mori's, and the
+    // terminal's box is cleared with Ctrl+U, twice a line: the cover stays (spec §3 #251).
+    it("takes the text Claude Code puts in its box into Mori's box, and clears it", async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+      await show(withText('다시 해 줘'))
+      expect(band()).not.toBeNull()
+      expect(document.querySelector('.term-boxnote')).toBeNull()
+      expect(box.value).toBe('다시 해 줘')
+      expect(ws.input()).toEqual(['\x15'.repeat(4)])
+      // cleared: nothing more goes
+      await show(IDLE)
+      expect(band()).not.toBeNull()
+      expect(ws.input()).toEqual(['\x15'.repeat(4)])
+    })
+
+    it('puts it before what the box holds, and not twice', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+      fireEvent.input(box, { target: { value: '새 글' } })
+      await show(withText('예전 글'))
+      expect(box.value).toBe('예전 글\n새 글')
+      await show(IDLE)
+      await show(withText('예전 글'))
+      expect(box.value).toBe('예전 글\n새 글')
+    })
+
+    // A paste Claude Code holds by name: what it stands for is not on the screen, and clearing would lose it.
+    it('leaves a paste held by name, and says so', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(withText('[Pasted text #1 +12 lines]'))
+      expect(band()).toBeNull()
+      expect(document.querySelector('.term-boxnote')?.textContent).toBe(NOTE)
+      expect((screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement).value).toBe('')
+      expect(ws.input()).toEqual([])
+    })
+
+    it('gives way to text that will not clear, and says so once', async () => {
       const { ws } = await mount()
       await attach(ws)
       await show(withText('abc'))
+      expect(band()).not.toBeNull()
+      await frame(2000) // TAKE_MS
       expect(band()).toBeNull()
       expect(document.querySelector('.term-boxnote')?.textContent).toBe(NOTE)
       await frame()
@@ -2153,10 +2224,12 @@ describe('pickers', () => {
       await frame(50)
       expect(band()).not.toBeNull()
       expect(document.querySelector('.term-boxnote')).toBeNull()
-      // text that stays past the moment is text: the note shows
+      // text that stays past the moment comes back to the box, and the terminal's is cleared (spec §3 #251)
       await frame(1000)
-      expect(band()).toBeNull()
-      expect(document.querySelector('.term-boxnote')?.textContent).toBe(NOTE)
+      expect(band()).not.toBeNull()
+      expect(document.querySelector('.term-boxnote')).toBeNull()
+      expect((box as HTMLTextAreaElement).value).toBe('hi')
+      expect(ws.input()).toEqual(['\x15'.repeat(4)])
     })
 
     // a stage that changed asks for a new size: the band stays until it comes back (spec §3 #228)
@@ -2181,7 +2254,7 @@ describe('pickers', () => {
       reply = (c) => (c.url.endsWith('/send') ? new Promise<Response>(() => {}) : undefined)
       const { ws } = await mount()
       await attach(ws)
-      await show(withText('안녕'))
+      await show(withText('[Pasted text #1 +3 lines]'))
       expect(band()).toBeNull()
       fireEvent.input(screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }), { target: { value: 'hi' } })
       fireEvent.click(screen.getByRole('button', { name: '보내기' }))
@@ -2221,9 +2294,11 @@ describe('pickers', () => {
       expect(band()).not.toBeNull()
       await show(SCREENS.model)
       expect(band()).toBeNull()
+      // the empty box and its mode button go while the window shows (spec §3 #250)
+      expect(screen.queryByRole('button', { name: '모드: 묻지 않음' })).toBeNull()
+      await show(IDLE)
       // the PC button keeps the last mode
       expect(screen.getByRole('button', { name: '모드: 묻지 않음' })).toBeTruthy()
-      await show(IDLE)
       act(() => setPickOn(false))
       await frame()
       expect(band()).toBeNull()
@@ -2364,6 +2439,8 @@ describe('pickers', () => {
       await show(IDLE)
       const mode = () => screen.getByRole('button', { name: '모드: 묻지 않음' }) as HTMLButtonElement
       expect(mode().disabled).toBe(false)
+      // with text the box stays while the window shows, its mode button off
+      fireEvent.input(textbox(), { target: { value: 'go' } })
       await show(SCREENS.model)
       expect(mode().disabled).toBe(true)
       fireEvent.click(mode())
@@ -2431,7 +2508,8 @@ describe('pickers', () => {
     it('keeps the keys in the box without the cover', async () => {
       const { ws } = await mount()
       await attach(ws)
-      await show(SCREENS.idle.replace('❯', '❯ x'))
+      // a paste held by name stays in the terminal's box, and the cover with it
+      await show(SCREENS.idle.replace('❯', '❯ [Pasted text #1 +3 lines]'))
       const box = textbox()
       box.focus()
       expect(fireEvent.keyDown(box, { key: 'Escape' })).toBe(true)
@@ -2462,8 +2540,8 @@ describe('pickers', () => {
     })
   })
 
-  // The grey hint of the terminal's empty box shows in Mori's box, and Tab
-  // takes it (claude-input design §6, spec §3 #225).
+  // The grey hint of the terminal's empty box shows in Mori's box, and → or
+  // Tab takes it (claude-input design §6, spec §3 #225, #249).
   describe('the hint', () => {
     const IDLE = SCREENS['box-idle']
     const HINT = 'describe a task for a new session'
@@ -2482,7 +2560,7 @@ describe('pickers', () => {
       expect(plain).toMatch(/^여러 줄로 보내기 · /)
       await hinted()
       const box = textbox()
-      expect(box.placeholder).toBe(`${HINT} · Tab`)
+      expect(box.placeholder).toBe(`${HINT} · →`)
       // still covered: a hint is no text
       expect(screen.queryByRole('region', { name: 'Claude Code 상태' })).not.toBeNull()
       box.focus()
@@ -2496,6 +2574,39 @@ describe('pickers', () => {
     })
 
     // a phone has no Tab for the box: the hint shows alone, and the quick key Tab takes it
+    // As in Claude Code: → takes the suggestion as text, and typing writes over it (spec §3 #249)
+    it('takes the hint with →, and typing leaves it', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      await hinted()
+      const box = textbox()
+      box.focus()
+      expect(fireEvent.keyDown(box, { key: 'ArrowRight' })).toBe(false)
+      expect(box.value).toBe(HINT)
+      expect(box.selectionStart).toBe(HINT.length)
+      // with text → moves the caret as ever
+      expect(fireEvent.keyDown(box, { key: 'ArrowRight' })).toBe(true)
+      fireEvent.input(box, { target: { value: '' } })
+      fireEvent.input(box, { target: { value: 'x' } })
+      expect(box.value).toBe('x')
+      expect(fireEvent.keyDown(box, { key: 'ArrowRight' })).toBe(true)
+      expect(box.value).toBe('x')
+      expect(ws.input()).toEqual([])
+    })
+
+    // While the terminal has the focus, Claude Code draws its cursor on the
+    // first letter, inverted: still a hint, and the cover stays.
+    it('keeps the cover for a hint under Claude Code\'s cursor', async () => {
+      const { ws } = await mount()
+      await attach(ws)
+      await show(IDLE)
+      act(() => FakeScreen.last().show(IDLE.replace('\n❯ \n', `\n❯ ${HINT}\n`), 'alternate', (y, x) => (y === 3 && x === 2 ? 'inverse' : y === 3 && x > 2 ? 'rgb:153,153,153' : '')))
+      await frame()
+      expect(textbox().placeholder).toBe(`${HINT} · →`)
+      expect(screen.queryByRole('region', { name: 'Claude Code 상태' })).not.toBeNull()
+    })
+
     it('takes the hint with the quick key Tab on a phone', async () => {
       const { ws } = await mount(undefined, { variant: 'phone', back: '#/folders' })
       await attach(ws)
@@ -2515,7 +2626,7 @@ describe('pickers', () => {
       await attach(ws)
       act(() => setBoxShown(true))
       await hinted()
-      expect(textbox().placeholder).toBe(`${HINT} · Tab`)
+      expect(textbox().placeholder).toBe(`${HINT} · →`)
     })
   })
 })

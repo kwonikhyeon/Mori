@@ -37,6 +37,15 @@ describe('shotOf', () => {
     for (const l of s.ink) expect(l).toHaveLength(20)
   })
 
+  // Claude Code draws its cursor on a hint's first letter as SGR 7 (spec §3 #249).
+  it('marks a cell drawn inverted', async () => {
+    const t = term(20, 2)
+    await write(t, '\x1b[7mr\x1b[27m\x1b[38;2;153;153;153mun tests\x1b[0m')
+    const s = shotOf(t, 2)
+    expect(s.ink[0][0]).toBe('inverse')
+    expect(s.ink[0].slice(1, 9)).toEqual(Array(8).fill('rgb:153,153,153'))
+  })
+
   it('gives the line the view starts at', async () => {
     const t = term(20, 4)
     await write(t, Array.from({ length: 30 }, (_, i) => `line ${i}`).join('\r\n'))

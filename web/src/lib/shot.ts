@@ -16,7 +16,8 @@ export interface Shot {
   lines: string[][]
   /**
    * Each cell's letter colour, as lines: '' the default, 'rgb:R,G,B', or
-   * 'p:N' from the palette. A wide letter's second cell takes the first's.
+   * 'p:N' from the palette; 'inverse' for a cell drawn inverted, as a
+   * program draws its own cursor. A wide letter's second cell takes the first's.
    */
   ink: string[][]
   /** The buffer line the view starts at, wherever it is scrolled to. */
@@ -25,6 +26,7 @@ export interface Shot {
 
 /** A cell's letter colour, as Shot.ink says it. */
 export function inkOf(c: IBufferCell): string {
+  if (c.isInverse()) return 'inverse'
   if (c.isFgDefault()) return ''
   const v = c.getFgColor()
   return c.isFgRGB() ? `rgb:${(v >> 16) & 255},${(v >> 8) & 255},${v & 255}` : `p:${v}`

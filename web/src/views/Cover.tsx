@@ -8,7 +8,7 @@
 import type { JSX } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { readBox, type BoxLook, type Mode } from "../lib/box";
-import { DEPTH } from "../lib/pick";
+import { DEPTH, look } from "../lib/pick";
 import { readStatus } from "../lib/status";
 import type { Screen } from "../lib/xterm";
 
@@ -22,6 +22,11 @@ export interface BoxReading {
   end: boolean;
   /** The last mode read, kept while the box is away. */
   mode: Mode | null;
+  /**
+   * The row on the screen of the first line under a window's hint line, -1
+   * for none: Claude Code keeps its status lines there (spec §3 #250).
+   */
+  under: number;
 }
 
 const NONE: BoxReading = {
@@ -30,6 +35,7 @@ const NONE: BoxReading = {
   alternate: false,
   end: true,
   mode: null,
+  under: -1,
 };
 
 /** A box with no mode line under it: Claude Code's default mode (pickers design §9.5). */
@@ -60,6 +66,7 @@ export function useBox({
       frame = null;
       const shot = s.shot(DEPTH);
       const box = readBox(shot);
+      const seen = look(shot).seen;
       // a box read with no mode line is the default mode; with no box the last one stays
       if (box) mode.current = box.mode ?? DEFAULT_MODE;
       const next: BoxReading = {
@@ -68,6 +75,7 @@ export function useBox({
         alternate: shot.kind === "alternate",
         end: s.atEnd(),
         mode: mode.current,
+        under: seen && seen.below > 0 ? shot.top + shot.lines.length - seen.below - shot.view : -1,
       };
       const key = JSON.stringify(next);
       if (key === last.current) return;

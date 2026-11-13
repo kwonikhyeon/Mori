@@ -118,6 +118,25 @@ describe('look', () => {
     expect(l.box).not.toBeNull()
   })
 
+  // Claude Code 2.1 keeps its status and mode lines under a window (spec §3 #250).
+  it('counts the lines written under the hint line', () => {
+    expect(seen(SCREENS.permission)!.below).toBe(0)
+    const under = SCREENS.permission + '  sample-model · 41% · main\n  ⏵⏵ accept edits on (shift+tab to cycle)\n'
+    const s = seen(under)!
+    expect(s.below).toBe(2)
+    expect(s.options.map((o) => o.n)).toEqual([1, 2, 3])
+  })
+
+  // right under the hint line, they are not its wrapped rows
+  it('reads no status or mode line into the hint line', () => {
+    const IDLE_FOOT = SCREENS['box-idle'].trimEnd().split('\n').slice(-4).join('\n') + '\n'
+    const s = seen(SCREENS.permission + IDLE_FOOT)!
+    expect(s.below).toBe(4)
+    expect(s.hints.map((h) => h.label)).toEqual(seen(SCREENS.permission)!.hints.map((h) => h.label))
+    // the mode line alone under it, too
+    expect(seen(SCREENS.permission + '  ⏵⏵ accept edits on (shift+tab to cycle)\n')!.below).toBe(1)
+  })
+
   it('no panel for a typed list', () => {
     expect(seen(SCREENS['typed-list'])).toBeNull()
   })

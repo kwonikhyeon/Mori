@@ -1,6 +1,6 @@
 import { closeContext, ContextMenuHost } from '../components/ContextMenu'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/preact'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeScreen } from '../../test/fakeScreen'
 import { FakeWebSocket } from '../../test/fakeWs'
 import { folder, status, term } from '../../test/fixtures'
@@ -107,6 +107,13 @@ afterEach(() => {
   route.value = { name: 'queue' }
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+})
+
+
+// jsdom makes no object URLs: a picture's preview stands in by its file's name
+beforeAll(() => {
+  URL.createObjectURL = (b: Blob) => `blob:${(b as File).name ?? ''}`
+  URL.revokeObjectURL = () => {}
 })
 
 describe('Terminal on a PC', () => {
@@ -399,42 +406,66 @@ describe('Terminal on a PC', () => {
   })
 
   it('types an uploaded file\'s path where the cursor is, and refuses one over 8 MB', async () => {
-    reply = (c) => (c.url.endsWith('/files') ? Response.json({ path: '/Users/me/dev/Mori/.mori/up/a b.png', bytes: 3 }) : undefined)
+    reply = (c) => (c.url.endsWith('/files') ? Response.json({ path: '/Users/me/dev/Mori/.mori/up/a b.txt', bytes: 3 }) : undefined)
     const { ws } = await mount()
     await attach(ws)
     const input = document.querySelector<HTMLInputElement>('input[type=file]')!
-    const small = new File(['png'], 'a b.png', { type: 'image/png' })
+    const small = new File(['txt'], 'a b.txt', { type: 'text/plain' })
     const big = new File(['x'], 'big.bin')
     Object.defineProperty(big, 'size', { value: 9 << 20 })
     fireEvent.change(input, { target: { files: [big, small] } })
-    await vi.waitFor(() => expect(ws.input()).toEqual(['"/Users/me/dev/Mori/.mori/up/a b.png" ']))
+    await vi.waitFor(() => expect(ws.input()).toEqual(['"/Users/me/dev/Mori/.mori/up/a b.txt" ']))
     const up = sent('/api/terminals/t1/files')
     expect(up).toHaveLength(1)
-    expect(((up[0].body as FormData).get('file') as File).name).toBe('a b.png')
+    expect(((up[0].body as FormData).get('file') as File).name).toBe('a b.txt')
     expect(toasts.value.map((t) => [t.text, t.kind])).toEqual([['big.bin: 8 MB를 넘는 파일은 올릴 수 없습니다', 'error']])
   })
 
-  // An image copied to the clipboard, pasted into the box: it is uploaded, and
-  // its path goes where the caret is, for Claude Code to read (spec §3 #220).
-  it('pastes an image into the box as the path it is uploaded to', async () => {
+  // An image copied to the clipboard, pasted into the box: it goes up and
+  // waits, shown small and removable; a send carries its path on a line of its
+  // own, which Claude Code takes in as the picture itself (spec §3 #220, #252).
+  it('pastes images as pictures that go with the send, each path on a line of its own', async () => {
     let n = 0
     reply = (c) => (c.url.endsWith('/files') ? Response.json({ path: `/Users/me/dev/Mori/.mori/up/p${++n}.png`, bytes: 3 }) : undefined)
     const { ws } = await mount()
     await attach(ws)
     const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
     fireEvent.input(box, { target: { value: '이 둘을 봐' } })
-    box.setSelectionRange(5, 5)
     const shot = (name: string) => new File(['png'], name, { type: 'image/png' })
-    const files = [shot('image.png'), shot('image.png')]
-    expect(fireEvent.paste(box, { clipboardData: { files, types: ['Files'], getData: () => '' } })).toBe(false)
-    await vi.waitFor(() => expect(box.value).toBe('이 둘을 /Users/me/dev/Mori/.mori/up/p1.png /Users/me/dev/Mori/.mori/up/p2.png 봐'))
+    expect(fireEvent.paste(box, { clipboardData: { files: [shot('image.png'), shot('image.png')], types: ['Files'], getData: () => '' } })).toBe(false)
+    const group = screen.getByRole('group', { name: '보낼 그림' })
+    const pics = () => within(group).queryAllByRole('group')
+    expect(pics()).toHaveLength(2)
+    // going up: the send waits for them
+    expect((screen.getByRole('button', { name: '보내기' }) as HTMLButtonElement).disabled).toBe(true)
+    await vi.waitFor(() => expect(pics().every((g) => !g.hasAttribute('aria-busy'))).toBe(true))
+    // the text stays as it was
+    expect(box.value).toBe('이 둘을 봐')
     // named by the time, as a clipboard calls every image image.png
     const names = sent('/api/terminals/t1/files').map((c) => ((c.body as FormData).get('file') as File).name)
     expect(names[0]).toMatch(/^paste-\d{8}-\d{6}\.png$/)
     expect(names[1]).toBe(names[0].replace('.png', '-2.png'))
-    // nothing typed into the terminal, and the text stays this device's draft
+    expect(pics().map((g) => g.getAttribute('aria-label'))).toEqual(names)
+    // its x takes the second back
+    fireEvent.click(within(group).getByRole('button', { name: `${names[1]} 빼기` }))
+    expect(pics()).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+    await vi.waitFor(() => expect(sent('/api/terminals/t1/send').map((c) => c.body)).toEqual([{ text: '이 둘을 봐\n/Users/me/dev/Mori/.mori/up/p1.png' }]))
+    await vi.waitFor(() => expect(screen.queryByRole('group', { name: '보낼 그림' })).toBeNull())
+    expect(box.value).toBe('')
     expect(ws.input()).toEqual([])
-    expect(sent('/api/terminals/t1/send')).toEqual([])
+  })
+
+  // A picture alone goes too.
+  it('sends a picture with no text', async () => {
+    reply = (c) => (c.url.endsWith('/files') ? Response.json({ path: '/up/p.png', bytes: 3 }) : undefined)
+    const { ws } = await mount()
+    await attach(ws)
+    const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
+    fireEvent.paste(box, { clipboardData: { files: [new File(['png'], 'image.png', { type: 'image/png' })], types: ['Files'], getData: () => '' } })
+    await vi.waitFor(() => expect((screen.getByRole('button', { name: '보내기' }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name: '보내기' }))
+    await vi.waitFor(() => expect(sent('/api/terminals/t1/send').map((c) => c.body)).toEqual([{ text: '/up/p.png' }]))
   })
 
   // One line high, as its button; it grows with its text (spec §3 #222).
@@ -463,12 +494,13 @@ describe('Terminal on a PC', () => {
     await attach(ws)
     const box = screen.getByRole('textbox', { name: '터미널에 여러 줄 보내기' }) as HTMLTextAreaElement
     for (const text of ['https://example.com/a.png', 'shot.png']) {
-      fireEvent.input(box, { target: { value: '' } })
       const files = [new File(['png'], 'shot.png', { type: 'image/png' })]
       const getData = (t: string) => (t === 'text/plain' ? text : '')
       expect(fireEvent.paste(box, { clipboardData: { files, types: ['Files', 'text/plain'], getData } })).toBe(false)
-      await vi.waitFor(() => expect(box.value).toBe('/up/a.png '))
     }
+    // the pictures wait, the text stays out
+    await vi.waitFor(() => expect(within(screen.getByRole('group', { name: '보낼 그림' })).getAllByRole('group')).toHaveLength(2))
+    expect(box.value).toBe('')
     expect(sent('/api/terminals/t1/files').length).toBe(2)
   })
 
@@ -2531,14 +2563,19 @@ describe('pickers', () => {
       expect(ws.input()).toEqual([])
     })
 
-    it('puts the path of a file pasted on the terminal into the box', async () => {
-      reply = (c) => (c.url.endsWith('/files') ? Response.json({ path: '/Users/me/dev/Mori/.mori/up/a.png', bytes: 3 }) : undefined)
+    // a picture waits at the band's right, over its rows; another file goes in by its path (spec §3 #252)
+    it('shows a picture pasted on the terminal at the band, and puts another file\'s path into the box', async () => {
+      reply = (c) =>
+        c.url.endsWith('/files') ? Response.json({ path: `/Users/me/dev/Mori/.mori/up/${((c.body as FormData).get('file') as File).name}`, bytes: 3 }) : undefined
       const { ws } = await mount()
       await attach(ws)
       await show(IDLE)
-      const files = [new File(['png'], 'a.png', { type: 'image/png' })]
+      const files = [new File(['png'], 'a.png', { type: 'image/png' }), new File(['txt'], 'b.txt', { type: 'text/plain' })]
       fireEvent.paste(stage(), { clipboardData: { files, types: ['Files'], getData: () => '' } })
-      await vi.waitFor(() => expect(textbox().value).toBe('/Users/me/dev/Mori/.mori/up/a.png '))
+      await vi.waitFor(() => expect(textbox().value).toBe('/Users/me/dev/Mori/.mori/up/b.txt '))
+      const band = screen.getByRole('region', { name: 'Claude Code 상태' })
+      expect(within(band).getByRole('group', { name: '보낼 그림' })).toBeTruthy()
+      expect(band.querySelector('.term-cover-aside img')?.getAttribute('src')).toMatch(/^blob:/)
       expect(ws.input()).toEqual([])
     })
   })

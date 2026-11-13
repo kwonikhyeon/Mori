@@ -555,6 +555,111 @@ a.term-back {
   }
 }
 
+/* ---------- the pictures waiting to go with the next send ---------- */
+/* As astryx's Thumbnail (spec §3 #252): a 64px square in --radius-element on
+   the neutral tint, the picture cover-fitted under a 1px inset border, a
+   scrim and a spinner while it goes up, and the remove button in the top end
+   corner on the overlay scrim, always shown: 20px to a mouse, 24px to a
+   finger, 44px of reach on a phone. */
+.term-shots {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.term-shot {
+  position: relative;
+  flex: none;
+  width: calc(var(--spacing-12) + var(--spacing-4));
+  height: calc(var(--spacing-12) + var(--spacing-4));
+  border-radius: var(--radius-element);
+  background-color: var(--color-neutral);
+}
+
+.term-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.term-shot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  pointer-events: none;
+}
+
+.term-shot-busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background-color: var(--color-overlay);
+  color: var(--color-on-dark);
+}
+
+.term-shot-remove {
+  position: absolute;
+  top: var(--spacing-1);
+  inset-inline-end: var(--spacing-1);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: var(--spacing-5);
+  height: var(--spacing-5);
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--radius-element) - var(--spacing-1));
+  background-color: var(--color-overlay);
+  color: var(--color-on-dark);
+}
+
+@media (pointer: coarse) {
+  .term-shot-remove {
+    width: var(--spacing-6);
+    height: var(--spacing-6);
+  }
+}
+
+@media (hover: hover) {
+  .term-shot-remove:hover {
+    background-image: var(--mori-overlay-hover-image);
+  }
+}
+
+@media (max-width: 767px) {
+  /* the reach a finger needs, beyond the corner it is drawn in */
+  .term-shot-remove::before {
+    content: '';
+    position: absolute;
+    inset: calc((var(--spacing-6) - 44px) / 2);
+  }
+}
+
+/* In the band: at its right, over its rows, which keep their height and so
+   the terminal its size (spec §3 #228). */
+.term-cover-aside {
+  position: absolute;
+  right: var(--spacing-4);
+  bottom: var(--spacing-2);
+  z-index: 1;
+}
+
+/* Without the band: above the box, at its end, in line with the form's own inset. */
+.term-shots-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--spacing-3) var(--spacing-4) 0;
+}
+
+.term-phone .term-shots-row {
+  padding: 0 0 var(--spacing-2);
+}
+
 /* ---------- Claude Code's status band over its input box ---------- */
 /* What Claude Code draws at the bottom while it waits for a message, its
    input box, status line and mode line, lies under this band (claude-input

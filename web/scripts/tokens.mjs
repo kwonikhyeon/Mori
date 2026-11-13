@@ -175,6 +175,7 @@ const COLOURS = [
   ['--color-overlay', 'rgba(28, 27, 25, .32)', 'rgba(0, 0, 0, .5)'],
   ['--color-overlay-hover', 'rgba(28, 27, 25, .05)', 'rgba(236, 234, 229, .05)'],
   ['--color-overlay-pressed', 'rgba(28, 27, 25, .10)', 'rgba(236, 234, 229, .10)'],
+  ['--color-on-dark', '#FFFFFF', '#FFFFFF'],
   ['/* Lines. The emphasized border edges a field, a switch and a grabber. */', null, null],
   ['--color-border', '#E4E1DA', '#34322E'],
   ['--color-border-emphasized', '#C9C4BA', '#4A4843'],

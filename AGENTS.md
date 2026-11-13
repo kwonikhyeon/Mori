@@ -61,6 +61,7 @@ Reuse these classes before writing new ones. A new control maps to an astryx com
 | `.btn-danger-fill` | Button, `destructive` | The core paint, the error fill: for the last step of a delete, in a confirm. |
 | `.btn-icon` | IconButton | A square. Give it `{...tip(name)}` (`lib/tip.ts`): its `aria-label`, and its name in the tooltip on hover or keyboard focus. |
 | `.tip` (`lib/tip.ts`) | Tooltip | The page's one tooltip, for any control with `data-tip`. Inverted, above the control. A finger never opens it. |
+| `.term-shot` (`PastedShots` in `views/Terminal.tsx`) | Thumbnail | A picture waiting to go with the next send; its remove button always shows. |
 | `.chip`, `.chip-*` | Badge | A terminal's state; see Status and counts. |
 | `.count-pill`, `.tab-badge`, `.others` | Badge (a count) | |
 | `.bar` | ProgressBar | |

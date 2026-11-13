@@ -5,7 +5,7 @@
 // line, the person's own, is drawn as astryx Badges and ProgressBars; the
 // mode is a button that sends Shift+Tab.
 
-import type { JSX } from "preact";
+import type { ComponentChildren, JSX } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { readBox, type BoxLook, type Mode } from "../lib/box";
 import { DEPTH, look } from "../lib/pick";
@@ -140,6 +140,7 @@ export function StatusBand({
   onMode,
   onFocus,
   onSheet,
+  aside,
 }: {
   box: BoxLook;
   top: number;
@@ -148,6 +149,8 @@ export function StatusBand({
   onMode: () => void;
   onFocus: () => void;
   onSheet: (px: number) => void;
+  /** Shown at the band's right, over its rows, which keep their height: the pictures waiting (spec §3 #252). */
+  aside?: ComponentChildren;
 }): JSX.Element {
   const parts = readStatus(box.status);
   const extras = mode?.extras ?? [];
@@ -238,6 +241,7 @@ export function StatusBand({
           ),
         )}
       </div>
+      {aside && <div class="term-cover-aside">{aside}</div>}
     </section>
   );
 }

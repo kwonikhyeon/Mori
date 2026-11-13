@@ -90,6 +90,20 @@ export function pastedFiles(cd: DataTransfer | null): File[] {
   return /^[a-z][\w+.-]*:\/\/\S+$/i.test(text) || files.some((f) => f.name === text) ? files : []
 }
 const ARROWS = new Set(['up', 'down', 'left', 'right'])
+
+/** The pictures Claude Code takes in from a pasted path: png, jpeg, gif and webp (spec §3 #252). */
+const attachable = (f: File) => /^image\/(?:png|jpeg|gif|webp)$/.test(f.type)
+
+/** A picture that waits to go with the next send: shown small, then its path on a line of its own. */
+interface Pasted {
+  id: number
+  /** Its file's name, as it goes up. */
+  name: string
+  /** The picture itself, on this device. */
+  url: string
+  /** Where it went up; null while it goes. */
+  path: string | null
+}
 const NO_END: EndFacts = { reason: null, exit_code: null, signal: null }
 const BROKEN: AttachNote = { kind: 'error', title: '터미널을 열 수 없습니다', detail: '화면을 그리지 못했습니다.', spin: false, late: false }
 
@@ -588,8 +602,40 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     setRenaming(false)
     if (next !== null) h.api.terminals.rename(addr, next).catch(fail('이름을 바꾸지 못했습니다'))
   }
-  const upload = async (files: File[]) => {
-    for (const f of files) {
+  // A picture for Claude Code goes up beside the terminal and waits, shown
+  // small, until a send carries its path on a line of its own, which Claude
+  // Code takes in as the picture itself (spec §3 #252). Anything else goes in by its path.
+  const claudeHere = !!t && isClaude(t)
+  const [pasted, setPasted] = useState<Pasted[]>([])
+  const pastedRef = useRef(pasted)
+  pastedRef.current = pasted
+  const pasteSeq = useRef(0)
+  const unpaste = (ids: number[]) => {
+    for (const p of pastedRef.current) if (ids.includes(p.id)) URL.revokeObjectURL(p.url)
+    setPasted((l) => l.filter((p) => !ids.includes(p.id)))
+  }
+  const attach = (files: File[], when = new Date()) =>
+    files.forEach((f, i) => {
+      if (f.size > MAX_UPLOAD) {
+        toast(`${f.name}: 8 MB를 넘는 파일은 올릴 수 없습니다`, 'error')
+        return
+      }
+      const id = ++pasteSeq.current
+      const name = pasteName(f, when, i)
+      setPasted((l) => [...l, { id, name, url: URL.createObjectURL(f), path: null }])
+      h.api.terminals.upload(addr, new File([f], name, { type: f.type })).then(
+        (r) => setPasted((l) => l.map((p) => (p.id === id ? { ...p, path: r.path } : p))),
+        (e) => {
+          unpaste([id])
+          toastError(e, '이미지를 올리지 못했습니다')
+        },
+      )
+    })
+  useEffect(() => () => pastedRef.current.forEach((p) => URL.revokeObjectURL(p.url)), [])
+  const upload = async (all: File[]) => {
+    const pics = claudeHere ? all.filter(attachable) : []
+    if (pics.length) attach(pics)
+    for (const f of all.filter((x) => !pics.includes(x))) {
       if (f.size > MAX_UPLOAD) {
         toast(`${f.name}: 8 MB를 넘는 파일은 올릴 수 없습니다`, 'error')
         continue
@@ -949,8 +995,20 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
     void copyText(sel)
     return true
   }
+  // the pictures waiting: on a PC at the band's right, else above the box
+  const shots = pasted.length > 0 && <PastedShots items={pasted} onRemove={(id) => unpaste([id])} />
+  const shotsInBand = !phone && covered
   const band = covered && rb && (
-    <StatusBand box={rb} top={coverTop()} phone={phone} mode={reading.mode} onMode={nextMode} onFocus={() => !phone && focusBox()} onSheet={setSheet} />
+    <StatusBand
+      box={rb}
+      top={coverTop()}
+      phone={phone}
+      mode={reading.mode}
+      onMode={nextMode}
+      onFocus={() => !phone && focusBox()}
+      onSheet={setSheet}
+      aside={shotsInBand ? shots : null}
+    />
   )
   const toClose = seen ?? pick.held
   const observeBar = observing && active && <ObserveBar onOff={() => observe(false)} />
@@ -980,6 +1038,7 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
       sentKey={`${h.id}.${addr}.${t?.created_ms ?? 0}`}
       takeTab={takeTab}
       away={choosing}
+      pics={claudeHere ? { list: pasted, onAdd: attach, onSent: unpaste, view: shotsInBand ? null : shots } : undefined}
     />
   )
 
@@ -1246,6 +1305,41 @@ function AskBar({ t, phone, id, busy, onKey, rejecting, onReject, pick, onType }
 }
 
 /**
+ * The pictures waiting to go with the next send, as astryx's Thumbnail: a
+ * 64px square, a scrim with a spinner while it goes up, and its remove
+ * button always shown in the top end corner (spec §3 #252).
+ */
+function PastedShots({ items, onRemove }: { items: Pasted[]; onRemove: (id: number) => void }) {
+  return (
+    <div class="term-shots" role="group" aria-label="보낼 그림">
+      {items.map((p) => (
+        <div key={p.id} class="term-shot" role="group" aria-label={p.name} aria-busy={p.path === null ? 'true' : undefined}>
+          <img src={p.url} alt="붙여 넣은 그림" />
+          {p.path === null && (
+            <span class="term-shot-busy" aria-hidden="true">
+              <Icon name="refresh" size={16} class="spin" />
+            </span>
+          )}
+          <button
+            type="button"
+            class="term-shot-remove"
+            aria-label={`${p.name} 빼기`}
+            onPointerDown={keep}
+            onMouseDown={keep}
+            onClick={(e) => {
+              e.stopPropagation()
+              onRemove(p.id)
+            }}
+          >
+            <Icon name="close" size={12} />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
  * The keys a phone keyboard does not have, typed down the stream. Ctrl and
  * Alt hold for the next key, or stay on when tapped twice (spec §3 #186).
  */
@@ -1343,6 +1437,12 @@ interface ComposerProps {
    * terminal; a box with text stays, and so does one turning a question down (spec §3 #250).
    */
   away?: boolean
+  /**
+   * Pictures for Claude Code (spec §3 #252): a pasted one is added, a send
+   * carries their paths, each on a line of its own, and then they go; view
+   * shows them above the box, where the band does not.
+   */
+  pics?: { list: Pasted[]; onAdd: (files: File[], when: Date) => void; onSent: (ids: number[]) => void; view: ComponentChildren }
 }
 
 const same = (a: Size | null, b: Size | null) => !!a && !!b && a.cols === b.cols && a.rows === b.rows
@@ -1395,6 +1495,7 @@ function Composer({
   sentKey,
   takeTab,
   away = false,
+  pics,
 }: ComposerProps) {
   const h = useHost()
   const draft = draftKey(h.id, addr)
@@ -1444,8 +1545,13 @@ function Composer({
   useEffect(() => {
     if (!closing) setStuck(false)
   }, [closing])
+  const going = pics?.list ?? []
+  const picsUp = going.some((p) => p.path === null)
   const submit = async (value: string, against: string | null) => {
-    if (busy || value.trim() === '') return
+    // the pictures as their paths, each on a line of its own: Claude Code takes such a line in as the picture (spec §3 #252)
+    const sent = going.filter((p) => p.path !== null)
+    if (busy || picsUp || (value.trim() === '' && !sent.length)) return
+    const full = [value.replace(/\s+$/, ''), ...sent.map((p) => quotePath(p.path!))].filter(Boolean).join('\n')
     setBusy(true)
     setHeld(false)
     setStuck(false)
@@ -1456,8 +1562,9 @@ function Composer({
         announce(STUCK, 'assertive')
         return
       }
-      if (against) await h.api.terminals.reject(addr, value, against)
-      else await h.api.terminals.send(addr, value)
+      if (against) await h.api.terminals.reject(addr, full, against)
+      else await h.api.terminals.send(addr, full)
+      if (sent.length) pics?.onSent(sent.map((p) => p.id))
       if (claude) noteSlash(value)
       if (claude) rememberSent(sentKey, value)
       recall.sent(value)
@@ -1541,13 +1648,18 @@ function Composer({
     if (v) announce(brief(v))
   }
   const paste = (e: ClipboardEvent) => {
-    const files = pastedFiles(e.clipboardData)
-    if (!files.length) return
+    const all = pastedFiles(e.clipboardData)
+    if (!all.length) return
     e.preventDefault()
+    const when = new Date()
+    // a picture for Claude Code waits to go with the send; anything else goes in by its path
+    const added = pics ? all.filter(attachable) : []
+    if (added.length) pics!.onAdd(added, when)
+    const files = all.filter((f) => !added.includes(f))
+    if (!files.length) return
     const el = e.currentTarget as HTMLTextAreaElement
     const at = el.selectionStart
     const end = el.selectionEnd
-    const when = new Date()
     setPasting((n) => n + 1)
     void (async () => {
       const paths: string[] = []
@@ -1569,7 +1681,7 @@ function Composer({
   }
   const sendLabel = rejecting ? '거절하고 보내기' : closeFirst ? '닫고 보내기' : '보내기'
   return (
-    <div class="term-compose" hidden={away && text === '' && rejecting === null}>
+    <div class="term-compose" hidden={away && text === '' && rejecting === null && !going.length}>
       {slash.view}
       {rejecting && (
         <div class="term-reject" role="status" aria-labelledby={field + '-reject'}>
@@ -1592,6 +1704,7 @@ function Composer({
       )}
       {stuck && <p class="term-held">{STUCK}</p>}
       {boxNote && <p class="term-held term-boxnote">{BOX_NOTE}</p>}
+      {pics?.view && <div class="term-shots-row">{pics.view}</div>}
       <form
         class="term-send"
         onSubmit={(e) => {
@@ -1710,7 +1823,7 @@ function Composer({
           type="submit"
           class="btn btn-primary term-send-btn"
           aria-label={phone ? sendLabel : undefined}
-          disabled={busy || pasting > 0 || text.trim() === ''}
+          disabled={busy || pasting > 0 || picsUp || (text.trim() === '' && !going.length)}
         >
           <Icon name="send" size={phone ? 20 : 16} stroke={2} />
           {!phone && sendLabel}

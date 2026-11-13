@@ -7,6 +7,12 @@
 // together, a row each, and a report alone goes only once 3 rows wait, as it
 // moves 3.
 
+/**
+ * A row for this many rows' worth of a wheel's pixels. A PC's trackpad and
+ * mouse already scroll with the system's acceleration and momentum: at 1:1
+ * they ran too fast (2026-11-13). A finger on a phone stays 1:1 (touchscroll.ts).
+ */
+export const WHEEL_SPEED = 0.5
 /** Close enough to count as 1 row: under Claude Code's 40 ms, for the way there. */
 export const CLOSE_MS = 30
 /** The rows a report alone moves. */
@@ -25,7 +31,7 @@ export const newPace = (): Pace => ({ px: 0, rows: 0, last: -Infinity })
 
 /** The whole rows a wheel event moves, down positive; what is short of a row waits. */
 export function wheelRows(p: Pace, ev: { deltaY: number; deltaMode: number }, rowH: number, pageRows: number): number {
-  const px = ev.deltaMode === 1 ? ev.deltaY * rowH : ev.deltaMode === 2 ? ev.deltaY * pageRows * rowH : ev.deltaY
+  const px = ev.deltaMode === 1 ? ev.deltaY * rowH : ev.deltaMode === 2 ? ev.deltaY * pageRows * rowH : ev.deltaY * WHEEL_SPEED
   p.px += px
   const rows = Math.trunc(p.px / rowH)
   p.px -= rows * rowH

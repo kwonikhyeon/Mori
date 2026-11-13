@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { copyText } from './copy'
+import { copyText, osc52Text } from './copy'
 
 let exec: ReturnType<typeof vi.fn>
 let copied: string[]
@@ -59,5 +59,20 @@ describe('copyText', () => {
     })
     expect(await copyText('x')).toBe(false)
     expect(document.querySelector('textarea')).toBeNull()
+  })
+})
+
+describe('osc52Text', () => {
+  const b64 = (t: string) => btoa(String.fromCharCode(...new TextEncoder().encode(t)))
+  it('decodes what a program copies, Korean included', () => {
+    expect(osc52Text('c;' + b64('고른 글 copy me'))).toBe('고른 글 copy me')
+    expect(osc52Text(';' + b64('x'))).toBe('x')
+    expect(osc52Text('c;')).toBe('')
+  })
+  it('never answers a read, and drops what does not decode', () => {
+    expect(osc52Text('c;?')).toBeNull()
+    expect(osc52Text('c')).toBeNull()
+    expect(osc52Text('c;@@@')).toBeNull()
+    expect(osc52Text('c;' + btoa('\xff\xfe'))).toBeNull()
   })
 })

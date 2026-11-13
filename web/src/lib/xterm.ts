@@ -6,6 +6,7 @@ import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal, type ITheme } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
+import { osc52Text } from './copy'
 import { isApple } from './platform'
 import { LINE_HEIGHT, POWERLINE, followPixelRatio, loadPowerline } from './powerline'
 import { shotOf, type Shot } from './shot'
@@ -32,7 +33,10 @@ export interface Screen {
   setKeyboard(on: boolean): void
   /** What is selected on the screen, '' for nothing; the selection is cleared. */
   takeSelection(): string
-  /** What is selected on the screen, '' for nothing; the selection stays. */
+  /**
+   * What is selected on the screen, else what the program last copied (OSC
+   * 52) since the last press on it; '' for nothing. The selection stays.
+   */
   selection(): string
   selectAll(): void
   /** Types text as a paste: marked as one when the program asked (bracketed paste). */
@@ -117,6 +121,9 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     scrollback: 5000,
     cursorBlink: false,
     allowProposedApi: true,
+    // Over a program that takes the mouse, Option+drag chooses text on a Mac,
+    // as in iTerm2; Windows and Linux have Shift+drag (spec §3 #248).
+    macOptionClickForcesSelection: true,
   })
   term.loadAddon(new Unicode11Addon())
   term.unicode.activeVersion = '11'
@@ -136,6 +143,26 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     })
   }
   term.open(el)
+  // A program that takes the mouse, as Claude Code does, chooses text itself
+  // and copies it with OSC 52 (spec §3 #248). A page may write the clipboard
+  // only in a person's copy, so the text waits for one: ⌘C on the screen
+  // here, or a copy key and 복사 through selection(). A press on the screen
+  // starts a new choice and drops it.
+  let copied = ''
+  const offOsc = term.parser.registerOscHandler(52, (data) => {
+    copied = osc52Text(data) ?? copied
+    return true
+  })
+  const press = (e: MouseEvent) => {
+    if (e.button === 0) copied = ''
+  }
+  el.addEventListener('mousedown', press, true)
+  const copy = (e: ClipboardEvent) => {
+    if (term.hasSelection() || !copied || !e.clipboardData) return
+    e.clipboardData.setData('text/plain', copied)
+    e.preventDefault()
+  }
+  el.addEventListener('copy', copy)
   let size = o.fontSize
   let gone = false
   const views = new Set<(wrote: boolean) => void>()
@@ -166,6 +193,7 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
     write: (d) => term.write(d),
     reset: () => {
       term.reset()
+      copied = ''
       tell(false)
     },
     resize: (c, r) => {
@@ -184,7 +212,7 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
       term.clearSelection()
       return s
     },
-    selection: () => (term.hasSelection() ? term.getSelection() : ''),
+    selection: () => (term.hasSelection() ? term.getSelection() : copied),
     selectAll: () => term.selectAll(),
     paste: (text) => term.paste(text),
     setKeyboard: (on) => {
@@ -232,6 +260,9 @@ export async function openScreen(el: HTMLElement, o: ScreenOptions): Promise<Scr
       views.clear()
       offScroll.dispose()
       offWrite.dispose()
+      offOsc.dispose()
+      el.removeEventListener('mousedown', press, true)
+      el.removeEventListener('copy', copy)
       unfollow()
       untouch()
       term.dispose()

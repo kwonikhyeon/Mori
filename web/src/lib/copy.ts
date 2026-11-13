@@ -34,6 +34,22 @@ export async function copyText(text: string): Promise<boolean> {
   return ok
 }
 
+/**
+ * The text a program asks to copy with OSC 52 ("c;<base64>"), '' for its
+ * clear, or null for a read ("?") or what does not decode. Reads are never
+ * answered: a program may write the clipboard, never see it.
+ */
+export function osc52Text(data: string): string | null {
+  const at = data.indexOf(';')
+  const b64 = at < 0 ? null : data.slice(at + 1)
+  if (b64 === null || b64 === '?') return null
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)))
+  } catch {
+    return null
+  }
+}
+
 /** Copies text and says so in a toast, or that it could not. */
 export async function copyAndTell(text: string, done: string): Promise<void> {
   if (await copyText(text)) toast(done)

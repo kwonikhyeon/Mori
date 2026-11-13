@@ -1,8 +1,8 @@
 // The list of slash commands above the composer of a Claude Code terminal
 // (spec §3 #197). It opens while a "/" at the start of the box is being
-// typed, and a choice puts "/name " in the box: sending it stays the user's,
-// as Enter in the box makes a new line and a command like /clear does not
-// undo.
+// typed. ↑ and ↓ move through it; Tab or a tap puts "/name " in the box, to
+// go on writing after it; Enter sends the command at once, as Claude Code's
+// own list does (spec §3 #253).
 
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
@@ -37,6 +37,8 @@ export interface SlashOptions {
   id: string
   /** Puts text in the box with the caret at caret. */
   apply: (text: string, caret: number) => void
+  /** Sends text as the box's send does. */
+  send: (text: string) => void
 }
 
 export interface Slash {
@@ -50,7 +52,7 @@ export interface Slash {
 
 type Got = { list: CommandList } | { error: string }
 
-export function useSlash({ on, text, caret, host, addr, api, id, apply }: SlashOptions): Slash {
+export function useSlash({ on, text, caret, host, addr, api, id, apply, send }: SlashOptions): Slash {
   const want = on && caret !== null ? slashAt(text, caret) : null
   // Esc closes the list until the text changes. The Esc is forgotten as soon as
   // the text differs, so the same text typed again (a "/" taken out and put
@@ -97,6 +99,14 @@ export function useSlash({ on, text, caret, host, addr, api, id, apply }: SlashO
     }
   }
 
+  // the command as chosen, sent now: the box shows it until the send clears it
+  const go = (c: SlashCommand) => {
+    if (!want) return
+    const r = insert(text, want.end, c.name)
+    apply(r.text, r.caret)
+    send(r.text.trimEnd())
+  }
+
   const onKeyDown = (e: KeyboardEvent): boolean => {
     if (!typing || e.isComposing || e.keyCode === 229) return false
     if (e.key === 'Escape') {
@@ -111,9 +121,14 @@ export function useSlash({ on, text, caret, host, addr, api, id, apply }: SlashO
       setSel({ q: typing.q, i: (at + (e.key === 'ArrowDown' ? 1 : n - 1)) % n })
       return true
     }
-    if (e.key === 'Enter' || e.key === 'Tab') {
+    if (e.key === 'Tab') {
       e.preventDefault()
       choose(shown[at])
+      return true
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      go(shown[at])
       return true
     }
     return false

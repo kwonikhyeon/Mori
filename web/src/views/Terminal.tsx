@@ -1526,6 +1526,7 @@ function Composer({
     addr,
     api: h.api,
     id: id + '-slash',
+    send: (v) => void submit(v, rejecting),
     apply: (v, at) => {
       edit(v)
       setHeld(false)

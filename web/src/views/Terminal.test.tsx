@@ -708,7 +708,8 @@ describe('The slash list', () => {
     expect(sent('/api/terminals/t1/commands', 'GET')).toHaveLength(1) // kept a while
   })
 
-  it('moves with the arrows and puts the name in the box with Enter, without sending it', async () => {
+  // ↑ and ↓ move; Tab puts the name in the box to write on after it (spec §3 #253)
+  it('moves with the arrows and puts the name in the box with Tab, without sending it', async () => {
     await mount()
     type('/')
     const lb = await screen.findByRole('listbox')
@@ -719,13 +720,16 @@ describe('The slash list', () => {
     expect(within(lb).getAllByRole('option')[4].getAttribute('aria-selected')).toBe('true')
     fireEvent.keyDown(box(), { key: 'ArrowUp' })
     fireEvent.keyDown(box(), { key: 'ArrowUp' })
-    fireEvent.keyDown(box(), { key: 'Enter' })
+    fireEvent.keyDown(box(), { key: 'Tab' })
     expect(box().value).toBe('/model ')
     expect(box().selectionStart).toBe(7)
     expect(screen.queryByRole('listbox')).toBeNull()
     expect(toasts.value.map((t) => t.text)).toEqual(['/model: 보내면 아래에 고르는 목록이 뜹니다'])
     expect(sent('/api/terminals/t1/send')).toEqual([])
-    // Tab does the same, and a tap; what came after the word stays
+    // and the words after it go with it
+    fireEvent.input(box(), { target: { value: '/model sonnet' } })
+    expect(screen.queryByRole('listbox')).toBeNull()
+    // a tap does the same; what came after the word stays
     type('/co')
     await screen.findByRole('listbox')
     fireEvent.keyDown(box(), { key: 'Tab' })
@@ -737,6 +741,19 @@ describe('The slash list', () => {
     expect(box().value).toBe('/deploy 지금')
   })
 
+  // Enter sends the command chosen at once, as Claude Code's own list does (spec §3 #253).
+  it('sends the command chosen with Enter', async () => {
+    await mount()
+    type('/')
+    const lb = await screen.findByRole('listbox')
+    fireEvent.keyDown(box(), { key: 'ArrowDown' })
+    expect(within(lb).getAllByRole('option')[1].getAttribute('aria-selected')).toBe('true')
+    expect(fireEvent.keyDown(box(), { key: 'Enter' })).toBe(false)
+    await vi.waitFor(() => expect(sent('/api/terminals/t1/send').map((c) => c.body)).toEqual([{ text: '/clear' }]))
+    await vi.waitFor(() => expect(box().value).toBe(''))
+    expect(screen.queryByRole('listbox')).toBeNull()
+  })
+
   // A window the panel does not read yet opens in the terminal (pickers design §12).
   it('tells a window the list will not show', async () => {
     const config = { name: 'config', desc: '설정을 엽니다', source: 'builtin', menu: true }
@@ -745,7 +762,7 @@ describe('The slash list', () => {
     await mount()
     type('/conf')
     await screen.findByRole('listbox')
-    fireEvent.keyDown(box(), { key: 'Enter' })
+    fireEvent.keyDown(box(), { key: 'Tab' })
     expect(box().value).toBe('/config ')
     expect(toasts.value.map((t) => t.text)).toEqual(['/config: 보내면 터미널에 창이 열립니다'])
   })
@@ -755,7 +772,7 @@ describe('The slash list', () => {
     await mount()
     type('/mo')
     await screen.findByRole('listbox')
-    fireEvent.keyDown(box(), { key: 'Enter' })
+    fireEvent.keyDown(box(), { key: 'Tab' })
     expect(box().value).toBe('/model ')
     expect(toasts.value.map((t) => t.text)).toEqual(['/model: 보내면 터미널에 창이 열립니다'])
   })

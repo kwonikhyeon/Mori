@@ -19,6 +19,7 @@ import { ApiError } from '../lib/api'
 import type { Closed, Size } from '../lib/attach'
 import { now } from '../lib/clock'
 import { copyText } from '../lib/copy'
+import { fitImage } from '../lib/image'
 import { draftKey, loadDraft, saveDraft } from '../lib/drafts'
 import { coverExtra, fitSize, MAX_CELLS } from '../lib/fit'
 import { watchFocus } from '../lib/focus'
@@ -90,6 +91,18 @@ export function pastedFiles(cd: DataTransfer | null): File[] {
   return /^[a-z][\w+.-]*:\/\/\S+$/i.test(text) || files.some((f) => f.name === text) ? files : []
 }
 const ARROWS = new Set(['up', 'down', 'left', 'right'])
+
+/**
+ * The file under the core's 8 MB a put: a picture over it made smaller, and
+ * said so; null, said so, when it cannot be (spec §3 #255).
+ */
+async function fitted(f: File): Promise<File | null> {
+  if (f.size <= MAX_UPLOAD) return f
+  const g = await fitImage(f, MAX_UPLOAD)
+  if (g) toast(`${f.name}: 8 MB가 넘어 줄여서 올립니다`)
+  else toast(`${f.name}: 8 MB를 넘는 파일은 올릴 수 없습니다`, 'error')
+  return g
+}
 
 /** The pictures Claude Code takes in from a pasted path: png, jpeg, gif and webp (spec §3 #252). */
 const attachable = (f: File) => /^image\/(?:png|jpeg|gif|webp)$/.test(f.type)
@@ -616,20 +629,21 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   }
   const attach = (files: File[], when = new Date()) =>
     files.forEach((f, i) => {
-      if (f.size > MAX_UPLOAD) {
-        toast(`${f.name}: 8 MB를 넘는 파일은 올릴 수 없습니다`, 'error')
-        return
-      }
       const id = ++pasteSeq.current
-      const name = pasteName(f, when, i)
-      setPasted((l) => [...l, { id, name, url: URL.createObjectURL(f), path: null }])
-      h.api.terminals.upload(addr, new File([f], name, { type: f.type })).then(
-        (r) => setPasted((l) => l.map((p) => (p.id === id ? { ...p, path: r.path } : p))),
-        (e) => {
+      setPasted((l) => [...l, { id, name: pasteName(f, when, i), url: URL.createObjectURL(f), path: null }])
+      void (async () => {
+        const g = await fitted(f)
+        if (!g) return unpaste([id])
+        // made smaller, it may go as a JPEG: its name follows
+        const name = pasteName(g, when, i)
+        try {
+          const r = await h.api.terminals.upload(addr, new File([g], name, { type: g.type }))
+          setPasted((l) => l.map((p) => (p.id === id ? { ...p, name, path: r.path } : p)))
+        } catch (e) {
           unpaste([id])
           toastError(e, '이미지를 올리지 못했습니다')
-        },
-      )
+        }
+      })()
     })
   useEffect(() => () => pastedRef.current.forEach((p) => URL.revokeObjectURL(p.url)), [])
   // Claude Code counts the wheel's reports by their time (spec §3 #254)
@@ -639,11 +653,9 @@ export function Terminal({ addr, variant, git = false, back }: TerminalProps) {
   const upload = async (all: File[]) => {
     const pics = claudeHere ? all.filter(attachable) : []
     if (pics.length) attach(pics)
-    for (const f of all.filter((x) => !pics.includes(x))) {
-      if (f.size > MAX_UPLOAD) {
-        toast(`${f.name}: 8 MB를 넘는 파일은 올릴 수 없습니다`, 'error')
-        continue
-      }
+    for (const x of all.filter((x) => !pics.includes(x))) {
+      const f = await fitted(x)
+      if (!f) continue
       try {
         const r = await h.api.terminals.upload(addr, f)
         // The path goes where the cursor is; a person sees it typed. With the cover, into the box.
@@ -1668,11 +1680,9 @@ function Composer({
     setPasting((n) => n + 1)
     void (async () => {
       const paths: string[] = []
-      for (const [i, f] of files.entries()) {
-        if (f.size > MAX_UPLOAD) {
-          toast(`${f.name}: 8 MB를 넘는 파일은 올릴 수 없습니다`, 'error')
-          continue
-        }
+      for (const [i, x] of files.entries()) {
+        const f = await fitted(x)
+        if (!f) continue
         try {
           const r = await h.api.terminals.upload(addr, new File([f], pasteName(f, when, i), { type: f.type }))
           paths.push(quotePath(r.path))

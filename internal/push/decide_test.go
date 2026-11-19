@@ -29,6 +29,13 @@ func finished(t *hc.Terminal, code int) *hc.Terminal {
 	return &c
 }
 
+// withJob is t with a background job its program reports apart, in state.
+func withJob(t *hc.Terminal, state string) *hc.Terminal {
+	c := *t
+	c.Records = map[string]hc.Status{"b1": {State: state, Title: "npm test"}}
+	return &c
+}
+
 func event(typ, data string) *hc.Event {
 	return &hc.Event{Type: typ, Terminal: "t1", Data: json.RawMessage(data)}
 }
@@ -52,6 +59,8 @@ func TestDecide(t *testing.T) {
 		{"turn idle", core.Change{Address: "t1", Old: term("t1", "idle", 2, ""), New: term("t1", "idle", 3, ""), Event: event("turn", `{"state":"idle","turn":3}`)}, false, push.KindWaiting},
 		{"turn blocked is not waiting", core.Change{Address: "t1", Old: term("t1", "blocked", 0, ""), New: term("t1", "blocked", 1, ""), Event: event("turn", `{"state":"blocked","turn":1}`)}, false, ""},
 		{"turn error is not waiting", core.Change{Address: "t1", Old: term("t1", "error", 0, ""), New: term("t1", "error", 1, ""), Event: event("turn", `{"state":"error","turn":1}`)}, false, ""},
+		{"turn with a background shell working", core.Change{Address: "t1", Old: term("t1", "idle", 2, ""), New: withJob(term("t1", "idle", 3, ""), "working"), Event: event("turn", `{"state":"idle","turn":3}`)}, false, ""},
+		{"turn with a background shell done", core.Change{Address: "t1", Old: term("t1", "idle", 2, ""), New: withJob(term("t1", "idle", 3, ""), "done"), Event: event("turn", `{"state":"idle","turn":3}`)}, false, push.KindWaiting},
 		{"turn without a state reads the record", core.Change{Address: "t1", Old: term("t1", "done", 0, ""), New: term("t1", "done", 1, ""), Event: event("turn", `{"turn":1}`)}, false, push.KindWaiting},
 		{"finished", core.Change{Address: "t1", Old: term("t1", "idle", 0, ""), New: finished(term("t1", "idle", 0, ""), 0), Event: event("finished", `{"reason":"exited","exit_code":0}`)}, false, push.KindExited},
 		{"lost", core.Change{Address: "t1", Old: term("t1", "idle", 0, ""), New: term("t1", "idle", 0, ""), Event: event("lost", `{"reason":"signaled","signal":9}`)}, false, ""},
@@ -62,6 +71,7 @@ func TestDecide(t *testing.T) {
 		{"removed", core.Change{Address: "t1", Old: term("t1", "blocked", 0, ""), Event: event("removed", `{}`)}, false, ""},
 		{"snapshot blocked", core.Change{Address: "t1", Old: term("t1", "working", 0, ""), New: term("t1", "blocked", 1, "")}, false, push.KindBlocked},
 		{"snapshot turn", core.Change{Address: "t1", Old: term("t1", "working", 1, ""), New: term("t1", "done", 2, "")}, false, push.KindWaiting},
+		{"snapshot turn with a background shell working", core.Change{Address: "t1", Old: term("t1", "working", 1, ""), New: withJob(term("t1", "done", 2, ""), "working")}, false, ""},
 		{"snapshot same turn", core.Change{Address: "t1", Old: term("t1", "done", 2, ""), New: term("t1", "done", 2, "")}, false, ""},
 		{"snapshot finished", core.Change{Address: "t1", Old: term("t1", "blocked", 0, ""), New: finished(term("t1", "blocked", 0, ""), 1)}, false, push.KindExited},
 		{"snapshot new terminal", core.Change{Address: "t1", New: term("t1", "blocked", 0, "")}, false, ""},

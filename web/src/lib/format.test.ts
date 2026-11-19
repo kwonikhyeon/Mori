@@ -19,6 +19,14 @@ describe('chip', () => {
     expect(chip(term())).toEqual({ kind: 'none', label: '상태 없음' })
     expect(chip(term({ state: 'finished', status: status('working') }))).toEqual({ kind: 'exited', label: '종료' })
   })
+
+  it('keeps a turn that ended with a background shell still running at work (spec §3 #257)', () => {
+    const bg = (state: string) => ({ b1: status(state, { title: 'npm test' }) })
+    expect(chip(term({ status: status('idle'), records: bg('working') }))).toEqual({ kind: 'working', label: '작업 중' })
+    expect(chip(term({ status: status('done'), records: bg('working') }))).toEqual({ kind: 'working', label: '작업 중' })
+    expect(chip(term({ status: status('idle'), records: bg('done') }))).toEqual({ kind: 'waiting', label: '입력 대기' })
+    expect(chip(term({ status: status('blocked'), records: bg('working') }))).toEqual({ kind: 'blocked', label: '승인 대기' })
+  })
 })
 
 describe('since', () => {

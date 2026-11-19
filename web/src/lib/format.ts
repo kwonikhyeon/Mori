@@ -12,14 +12,20 @@ export interface ChipInfo {
   label: string
 }
 
-/** The state of a live terminal as its queue group knows it (spec §3 #122). */
+/**
+ * A job the program reports apart still runs: Claude Code's background
+ * shells are records of their own (spec §3 #257).
+ */
+const busy = (t: TerminalView) => Object.values(t.records ?? {}).some((r) => r.state === 'working')
+
+/** The state of a live terminal as its queue group knows it (spec §3 #122); a turn that ended with a job still running stays working (#257). */
 export function stateKind(t: TerminalView): ChipKind {
   if (t.state === 'finished') return 'exited'
   switch (t.status?.state) {
     case 'blocked': return 'blocked'
     case 'error': return 'error'
     case 'done':
-    case 'idle': return 'waiting'
+    case 'idle': return busy(t) ? 'working' : 'waiting'
     case 'working': return 'working'
     default: return 'none'
   }

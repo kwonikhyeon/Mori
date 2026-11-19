@@ -49,8 +49,9 @@ func (k Kind) Label() string {
 // A terminal on another machine (an address with "/") is left to the Mori
 // of that machine. A status event notifies when the program enters blocked
 // or error. A done or idle turn waits for the turn event that follows the
-// status, so a turn that ends notifies once. Two snapshots compared after
-// a reconnect notify by the same rules, from the records alone.
+// status, so a turn that ends notifies once, and not while a job the
+// program reports apart still runs (spec §3 #257). Two snapshots compared
+// after a reconnect notify by the same rules, from the records alone.
 func Decide(c core.Change, children bool) Kind {
 	if c.Old == nil || c.New == nil || strings.Contains(c.Address, "/") {
 		return ""
@@ -65,7 +66,7 @@ func Decide(c core.Change, children bool) Kind {
 		if k := entered(c.Old, c.New); k != "" {
 			return k
 		}
-		if c.New.Turn > c.Old.Turn && waiting(state(c.New)) {
+		if c.New.Turn > c.Old.Turn && waiting(state(c.New)) && !busy(c.New) {
 			return KindWaiting
 		}
 		return ""
@@ -74,7 +75,7 @@ func Decide(c core.Change, children bool) Kind {
 	case "status":
 		return entered(c.Old, c.New)
 	case "turn":
-		if waiting(turnState(c)) {
+		if waiting(turnState(c)) && !busy(c.New) {
 			return KindWaiting
 		}
 	case "finished":
@@ -130,3 +131,15 @@ func turnState(c core.Change) string {
 }
 
 func waiting(s string) bool { return s == "done" || s == "idle" }
+
+// busy is whether a job t's program reports apart still works: Claude Code
+// reports each background shell as a record of its own, so a turn that
+// ends with one running waits for that, not for a person (spec §3 #257).
+func busy(t *hc.Terminal) bool {
+	for _, r := range t.Records {
+		if r.State == "working" {
+			return true
+		}
+	}
+	return false
+}

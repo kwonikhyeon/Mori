@@ -82,14 +82,20 @@ export interface TermRowProps {
   sub: string
 }
 
-export function TermRow({ t, p, sub }: TermRowProps) {
+/** The link that opens dir in VS Code on this device; a Windows path takes forward slashes. */
+export const vscodeHref = (dir: string) =>
+  'vscode://file/' + encodeURI(dir.replace(/\\/g, '/').replace(/^\/+/, '')).replace(/[#?]/g, encodeURIComponent)
+
+/**
+ * A session's context menu (spec §3 #242), for its row and its card: the
+ * handler, the name field drawn in its place while renaming, and the ask
+ * before ending it.
+ */
+export function useTermMenu(t: TerminalView, p: ListProps) {
   const h = useHost()
   const [renaming, setRenaming] = useState(false)
   const [killing, setKilling] = useState(false)
   const [killBusy, setKillBusy] = useState(false)
-  const sel = p.selected === t.address
-  const fresh = unseen(h.id, t, now.value)
-  const cls = 'qrow' + (sel ? ' is-selected' : '') + (fresh ? ' is-unseen' : '')
   const href = termHref(h, t, p)
   const title = titleOf(t, h.presets.value)
 
@@ -113,6 +119,11 @@ export function TermRow({ t, p, sub }: TermRowProps) {
     return [
       { label: '열기', icon: 'terminal', onSelect: () => h.go({ name: 'terminal', addr: t.address, git: !!p.git }) },
       { label: '새 창에서 열기', icon: 'external', onSelect: () => window.open(href, '_blank', 'noopener') },
+      // shortcut: takes the hub for this browser's own computer (the Mac app, labtop's own page); a browser on
+      // another computer opens its own VS Code at a path it may lack. Upgrade: the host runs `code` (spec §3 #256).
+      ...(t.cwd && h.id === ''
+        ? [{ label: 'VS Code에서 열기', icon: 'code', onSelect: () => void window.open(vscodeHref(t.cwd), '_self') } satisfies MenuItem]
+        : []),
       { label: '이름 바꾸기', icon: 'pencil', sep: true, onSelect: () => setRenaming(true) },
       ...(t.cwd ? [{ label: '작업 폴더 경로 복사', icon: 'copy', onSelect: () => void copyAndTell(t.cwd, '경로를 복사했습니다') } satisfies MenuItem] : []),
       ...(live
@@ -124,14 +135,38 @@ export function TermRow({ t, p, sub }: TermRowProps) {
     ]
   }
 
+  return {
+    onContextMenu: onContext(title, items),
+    field: renaming ? <RenameField initial={t.labels?.['mori.title'] ?? title} onDone={rename} /> : null,
+    confirm: (
+      <Confirm
+        open={killing}
+        title="이 세션을 종료할까요?"
+        text="먼저 종료를 요청하고, 끝나지 않으면 강제로 끝냅니다."
+        confirm="종료"
+        danger
+        busy={killBusy}
+        onConfirm={() => void kill()}
+        onCancel={() => setKilling(false)}
+      />
+    ),
+  }
+}
+
+export function TermRow({ t, p, sub }: TermRowProps) {
+  const h = useHost()
+  const m = useTermMenu(t, p)
+  const sel = p.selected === t.address
+  const fresh = unseen(h.id, t, now.value)
+  const cls = 'qrow' + (sel ? ' is-selected' : '') + (fresh ? ' is-unseen' : '')
+  const title = titleOf(t, h.presets.value)
+
   return (
     <li>
-      {renaming ? (
-        <div class={cls + ' is-renaming'}>
-          <RenameField initial={t.labels?.['mori.title'] ?? title} onDone={rename} />
-        </div>
+      {m.field ? (
+        <div class={cls + ' is-renaming'}>{m.field}</div>
       ) : (
-        <a class={cls} href={href} aria-current={sel ? 'true' : undefined} onContextMenu={onContext(title, items)}>
+        <a class={cls} href={termHref(h, t, p)} aria-current={sel ? 'true' : undefined} onContextMenu={m.onContextMenu}>
           <span class="qrow-main">
             <span class="qrow-title">
               {fresh && <span class="qrow-dot" aria-hidden="true" />}
@@ -146,16 +181,7 @@ export function TermRow({ t, p, sub }: TermRowProps) {
           </span>
         </a>
       )}
-      <Confirm
-        open={killing}
-        title="이 세션을 종료할까요?"
-        text="먼저 종료를 요청하고, 끝나지 않으면 강제로 끝냅니다."
-        confirm="종료"
-        danger
-        busy={killBusy}
-        onConfirm={() => void kill()}
-        onCancel={() => setKilling(false)}
-      />
+      {m.confirm}
     </li>
   )
 }

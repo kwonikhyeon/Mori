@@ -225,8 +225,9 @@
   outline-offset: calc(-1 * var(--focus-outline-width));
 }
 
-/* The name being changed from the row's context menu (spec §3 #242). */
-.qrow.is-renaming .term-rename {
+/* The name being changed from the row's or the card's context menu (spec §3 #242). */
+.qrow.is-renaming .term-rename,
+.qcard.is-renaming .term-rename {
   flex: 1;
   max-width: none;
 }

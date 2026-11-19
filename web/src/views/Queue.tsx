@@ -9,7 +9,7 @@ import { groupQueue, type GroupKey, type QueueGroup } from '../lib/queue'
 import { useHost } from '../lib/scope'
 import type { HostStore } from '../lib/store'
 import type { TerminalView } from '../lib/types'
-import { ListFrame, Loading, Since, TermRow, termHref, titleOf, type ListProps } from './rows'
+import { ListFrame, Loading, Since, TermRow, termHref, titleOf, useTermMenu, type ListProps } from './rows'
 import './lists.css'
 
 const appPlace = (h: HostStore, t: TerminalView) => `${appName(t, h.presets.value)} · ${place(t, h.folders.value)}`
@@ -17,20 +17,29 @@ const appPlace = (h: HostStore, t: TerminalView) => `${appName(t, h.presets.valu
 function AlertCard({ t, kind, p }: { t: TerminalView; kind: 'blocked' | 'error'; p: ListProps }) {
   const h = useHost()
   const phone = p.variant === 'phone'
+  const m = useTermMenu(t, p)
   const sel = p.selected === t.address
+  const cls = `qcard qcard-${kind}` + (sel ? ' is-selected' : '')
   return (
-    <a class={`qcard qcard-${kind}` + (sel ? ' is-selected' : '')} href={termHref(h, t, p)} aria-current={sel ? 'true' : undefined}>
-      <span class="qcard-top">
-        <Chip info={chip(t)} big={phone} />
-        {phone && <span class="qcard-app">{appName(t, h.presets.value)}</span>}
-        <Since t={t} />
-        {phone ? <Icon name="chevron-right" size={18} class="qcard-go" /> : sel && <span class="qcard-seeing">보는 중</span>}
-      </span>
-      <span class="qcard-title">{titleOf(t, h.presets.value)}</span>
-      <span class="qcard-sub">{phone ? place(t, h.folders.value) : appPlace(h, t)}</span>
-      <span class="qcard-msg">{askText(t, kind)}</span>
-      {phone && kind === 'blocked' && <span class="qcard-foot">열어서 키로 응답</span>}
-    </a>
+    <>
+      {m.field ? (
+        <div class={cls + ' is-renaming'}>{m.field}</div>
+      ) : (
+        <a class={cls} href={termHref(h, t, p)} aria-current={sel ? 'true' : undefined} onContextMenu={m.onContextMenu}>
+          <span class="qcard-top">
+            <Chip info={chip(t)} big={phone} />
+            {phone && <span class="qcard-app">{appName(t, h.presets.value)}</span>}
+            <Since t={t} />
+            {phone ? <Icon name="chevron-right" size={18} class="qcard-go" /> : sel && <span class="qcard-seeing">보는 중</span>}
+          </span>
+          <span class="qcard-title">{titleOf(t, h.presets.value)}</span>
+          <span class="qcard-sub">{phone ? place(t, h.folders.value) : appPlace(h, t)}</span>
+          <span class="qcard-msg">{askText(t, kind)}</span>
+          {phone && kind === 'blocked' && <span class="qcard-foot">열어서 키로 응답</span>}
+        </a>
+      )}
+      {m.confirm}
+    </>
   )
 }
 
@@ -38,24 +47,33 @@ function WorkCard({ t, p }: { t: TerminalView; p: ListProps }) {
   const h = useHost()
   const sel = p.selected === t.address
   const progress = t.status?.progress
+  const m = useTermMenu(t, p)
+  const cls = 'qcard qwork' + (sel ? ' is-selected' : '')
   return (
-    <a class={'qcard qwork' + (sel ? ' is-selected' : '')} href={termHref(h, t, p)} aria-current={sel ? 'true' : undefined}>
-      <span class="qwork-top">
-        <span class="qrow-main">
-          <span class="qrow-title">{titleOf(t, h.presets.value)}</span>
-          <span class="qrow-sub">{appPlace(h, t)}</span>
-        </span>
-        <span class="qrow-state">
-          <Since t={t} />
-          <Chip info={chip(t)} />
-        </span>
-      </span>
-      {progress != null && (
-        <span class="bar" aria-hidden="true">
-          <span style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
-        </span>
+    <>
+      {m.field ? (
+        <div class={cls + ' is-renaming'}>{m.field}</div>
+      ) : (
+        <a class={cls} href={termHref(h, t, p)} aria-current={sel ? 'true' : undefined} onContextMenu={m.onContextMenu}>
+          <span class="qwork-top">
+            <span class="qrow-main">
+              <span class="qrow-title">{titleOf(t, h.presets.value)}</span>
+              <span class="qrow-sub">{appPlace(h, t)}</span>
+            </span>
+            <span class="qrow-state">
+              <Since t={t} />
+              <Chip info={chip(t)} />
+            </span>
+          </span>
+          {progress != null && (
+            <span class="bar" aria-hidden="true">
+              <span style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
+            </span>
+          )}
+        </a>
       )}
-    </a>
+      {m.confirm}
+    </>
   )
 }
 

@@ -9,6 +9,7 @@ import { folders, presets, ready, resetStore, terminals } from '../lib/store'
 import type { TerminalView } from '../lib/types'
 import { FolderList } from './Folders'
 import { QueueList } from './Queue'
+import { vscodeHref } from './rows'
 
 const NOW = 10 * 3_600_000
 const MIN = 60_000
@@ -267,7 +268,7 @@ describe('a session row\'s context menu (spec §3 #242)', () => {
     load([term({ address: 't1', display_title: '알림 정리', status: status('working') })])
     const m = open(/알림 정리/)
     expect(m.getAttribute('aria-label')).toBe('알림 정리')
-    expect(names(m)).toEqual(['열기', '새 창에서 열기', '이름 바꾸기', '작업 폴더 경로 복사', '중단', '종료'])
+    expect(names(m)).toEqual(['열기', '새 창에서 열기', 'VS Code에서 열기', '이름 바꾸기', '작업 폴더 경로 복사', '중단', '종료'])
     fireEvent.click(screen.getByRole('menuitem', { name: '종료' }))
     fireEvent.click(screen.getByRole('button', { name: '종료' }))
     await vi.waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.url === '/api/terminals/t1/kill')).toBe(true))
@@ -283,5 +284,52 @@ describe('a session row\'s context menu (spec §3 #242)', () => {
     fireEvent.keyDown(field, { key: 'Enter' })
     await vi.waitFor(() => expect(calls).toContainEqual({ method: 'PATCH', url: '/api/terminals/t1', body: { title: '새 이름' } }))
     expect(screen.queryByRole('textbox', { name: '세션 이름' })).toBeNull()
+  })
+
+  it('opens on the working and alert cards of the queue too', () => {
+    load([
+      term({ address: 't1', display_title: '빌드', status: status('working') }),
+      term({ address: 't2', display_title: '승인', status: status('blocked', { kind: 'permission' }) }),
+    ])
+    render(
+      <>
+        <QueueList variant="pc" />
+        <ContextMenuHost />
+      </>,
+    )
+    for (const name of [/빌드/, /승인/]) {
+      fireEvent.contextMenu(screen.getByRole('link', { name }), { button: 2, clientX: 10, clientY: 10 })
+      expect(names(screen.getByRole('menu'))).toContain('VS Code에서 열기')
+      act(() => closeContext())
+    }
+  })
+
+  it('opens the working folder in VS Code on this device', () => {
+    const opened = vi.spyOn(window, 'open').mockReturnValue(null)
+    load([term({ address: 't1', display_title: '알림 정리', cwd: '/Users/me/dev/내 앱' })])
+    open(/알림 정리/)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'VS Code에서 열기' }))
+    expect(opened).toHaveBeenCalledWith('vscode://file/Users/me/dev/%EB%82%B4%20%EC%95%B1', '_self')
+  })
+
+  it("leaves VS Code out for another host's session, whose folder is not on this computer", () => {
+    const s = withHost()
+    s.folders.value = [folder()]
+    s.terminals.value = new Map([['t1', term({ display_title: '알림 정리' })]])
+    s.ready.value = true
+    render(
+      <>
+        {inHost(s, <FolderList variant="pc" />)}
+        <ContextMenuHost />
+      </>,
+    )
+    fireEvent.contextMenu(screen.getByRole('link', { name: /알림 정리/ }), { button: 2, clientX: 10, clientY: 10 })
+    expect(names(screen.getByRole('menu'))).not.toContain('VS Code에서 열기')
+  })
+})
+
+describe('vscodeHref', () => {
+  it('writes a Windows path with forward slashes, as VS Code documents it, and escapes what ends a path', () => {
+    expect(vscodeHref('C:\\Users\\me\\a#b')).toBe('vscode://file/C:/Users/me/a%23b')
   })
 })

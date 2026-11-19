@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -109,4 +110,86 @@ func (s *Server) resumeClaude(ctx context.Context, t hc.Terminal) {
 		return
 	}
 	s.log.Info("claude resumed", "terminal", t.Address, "session", t.Labels[core.LabelClaudeSession])
+}
+
+// Claude Code (2.1.328) notes each fullscreen start, and counts one whose
+// process is gone within 10 s of its first frame, without exiting by
+// itself, as a failed start: after two it turns fullscreen off on the
+// machine for that version (fullscreenAutoDisabled in ~/.claude.json), and
+// Mori does not cover the classic screen (spec §3 #217). A kill is such an
+// end, as the core ends the program from outside, so a kill first asks
+// Claude Code to exit with two Ctrl+C (spec §3 #258).
+//
+// On Windows, Claude Code killed 1.5 s after it started took its note away
+// within 0.5 s of the keys and was gone after 2.0 to 2.5 s; one running a
+// while left in 0.7 s.
+const (
+	claudeExitGap  = 150 * time.Millisecond // between the two Ctrl+C
+	claudeExitWait = 3 * time.Second        // for it to go, once they are pressed
+	claudeExitMax  = 7 * time.Second        // all of it, the keys held by the core's quiet rule included
+	claudeExitPoll = 100 * time.Millisecond
+)
+
+// shellWaits says whether t's own program, a shell, has the foreground. On
+// Windows the core names the shell even while a program runs in it.
+func shellWaits(t hc.Terminal) bool {
+	return t.Foreground != nil && t.Pid != nil && t.Foreground.Pid == *t.Pid
+}
+
+// claudeMayRun says whether Claude Code may run in t: its program, the
+// foreground, or what it reported last. A report outlives the program that
+// made it, so a shell seen waiting at its prompt has none running, but on
+// Windows the core cannot tell.
+func claudeMayRun(t hc.Terminal) bool {
+	if t.State != "live" {
+		return false
+	}
+	if isClaudeArgv(t.Argv) {
+		return true
+	}
+	if fg := t.Foreground; fg != nil && !shellWaits(t) &&
+		(isClaudeArgv([]string{fg.Name}) || isClaudeArgv(fg.Argv) || len(fg.Argv) > 1 && isClaudeArgv(fg.Argv[1:])) {
+		return true
+	}
+	if t.Status == nil || t.Status.App != "claude-code" {
+		return false
+	}
+	return runtime.GOOS == "windows" || !shellWaits(t)
+}
+
+// endClaude asks Claude Code in t to exit by itself, and waits a little for
+// it to: until the terminal ends or, where the core can tell, its shell has
+// the foreground again. On Windows a shell's Claude Code cannot be seen to
+// go, so the wait runs out. What is left, the kill ends.
+func (s *Server) endClaude(ctx context.Context, t hc.Terminal) {
+	if !claudeMayRun(t) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, claudeExitMax)
+	defer cancel()
+	press := func() bool {
+		return s.d.Core.Call(ctx, "terminal.keys", map[string]any{"terminal": t.Address, "keys": []string{"ctrl+c"}}, nil) == nil
+	}
+	pause := func(d time.Duration) bool {
+		select {
+		case <-time.After(d):
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
+	if !press() || !pause(claudeExitGap) || !press() {
+		return
+	}
+	// a shell that had Claude Code in the foreground has it back once it went
+	watch := !isClaudeArgv(t.Argv) && !shellWaits(t)
+	gone := false
+	for until := time.Now().Add(claudeExitWait); !gone && time.Now().Before(until) && pause(claudeExitPoll); {
+		var now hc.Terminal
+		if s.d.Core.Call(ctx, "terminal.get", map[string]any{"terminal": t.Address}, &now) != nil {
+			break
+		}
+		gone = now.State != "live" || watch && shellWaits(now)
+	}
+	s.log.Info("claude asked to exit", "terminal", t.Address, "seen_gone", gone)
 }

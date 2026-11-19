@@ -3,12 +3,12 @@ package server
 import (
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -141,7 +141,12 @@ func TestClaudeResume(t *testing.T) {
 		e.json("GET", term, nil, 200, &v)
 		return v
 	}
-	if err := syscall.Kill(*get().Pid, syscall.SIGKILL); err != nil {
+	// SIGKILL on Unix; os.Process, so the package also builds on Windows
+	p, err := os.FindProcess(*get().Pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Kill(); err != nil {
 		t.Fatal(err)
 	}
 	var shell TerminalView
@@ -173,4 +178,107 @@ func TestClaudeResume(t *testing.T) {
 	if n := len(lines()); n != 2 {
 		t.Fatal("sent again:", lines())
 	}
+}
+
+func TestClaudeMayRun(t *testing.T) {
+	pid := 42
+	shell := func(f func(*hc.Terminal)) hc.Terminal {
+		t := hc.Terminal{Address: "t1", State: "live", Argv: []string{"/bin/zsh", "-l"}, Pid: &pid,
+			Foreground: &hc.Foreground{Pid: pid, Name: "zsh"}}
+		if f != nil {
+			f(&t)
+		}
+		return t
+	}
+	report := func(t *hc.Terminal) { t.Status = &hc.Status{App: "claude-code", State: "idle"} }
+	// in the shell's foreground: name, then argv
+	runs := func(argv ...string) func(*hc.Terminal) {
+		return func(t *hc.Terminal) { t.Foreground = &hc.Foreground{Pid: 99, Name: argv[0], Argv: argv[1:]} }
+	}
+	for name, c := range map[string]struct {
+		f    func(*hc.Terminal)
+		want bool
+	}{
+		"a shell":            {nil, false},
+		"its program":        {func(t *hc.Terminal) { t.Argv = []string{"claude", "--resume"} }, true},
+		"Windows' wrapper":   {func(t *hc.Terminal) { t.Argv = []string{"claude"}; t.Foreground.Name = "cmd.exe" }, true},
+		"in the foreground":  {runs("claude"), true},
+		"under node":         {runs("node", "node", "/x/bin/claude"), true},
+		"something else":     {runs("vim"), false},
+		"its report":         {func(t *hc.Terminal) { runs("2.1.328")(t); report(t) }, true},
+		"another app's":      {func(t *hc.Terminal) { t.Status = &hc.Status{App: "codex"} }, false},
+		"finished":           {func(t *hc.Terminal) { t.Argv = []string{"claude"}; t.State = "finished" }, false},
+		"no foreground seen": {func(t *hc.Terminal) { report(t); t.Foreground = nil }, true},
+		// a report outlives its program: at the prompt none runs, but on
+		// Windows the core names the shell even while one does
+		"a report at the prompt": {report, runtime.GOOS == "windows"},
+	} {
+		if got := claudeMayRun(shell(c.f)); got != c.want {
+			t.Errorf("%s: %v", name, got)
+		}
+	}
+}
+
+// TestKillAsksClaudeToExit: Claude Code killed from outside soon after it
+// starts counts against fullscreen, so a kill first has it exit by itself
+// (spec §3 #258). A stand-in in a shell, as a resumed Claude Code runs:
+// it reports as Claude Code does, and exits on the second Ctrl+C.
+func TestKillAsksClaudeToExit(t *testing.T) {
+	py, sh := "python3", []string{"/bin/sh"}
+	if runtime.GOOS == "windows" {
+		py, sh = "python", []string{"pwsh.exe", "-NoLogo", "-NoProfile"}
+		if _, err := exec.LookPath("pwsh.exe"); err != nil {
+			sh[0] = "powershell.exe"
+		}
+	}
+	if p, err := exec.LookPath(py); err != nil || exec.Command(p, "-c", "import signal").Run() != nil {
+		t.Skip("no python to stand in for Claude Code")
+	}
+	c := hctest.Start(t)
+	e := newTestEnv(t, withCore(t, c))
+	e.pair()
+	dir := t.TempDir()
+	f := e.addFolder(dir)
+	e.addPreset(store.Preset{ID: "sh", Name: "sh", Argv: sh})
+	out := filepath.Join(dir, "out")
+	fake := filepath.Join(dir, "fake.py")
+	writeFile(t, fake, `import os, signal, sys, time
+def note(s):
+    with open(sys.argv[1], 'a') as f:
+        f.write(s + '\n')
+n = 0
+def hit(*_):
+    global n
+    n += 1
+    if n == 2:
+        note('exited')
+        os._exit(0)
+signal.signal(signal.SIGINT, hit)
+sys.stdout.write('\x1b]7501;app=claude-code:state=idle\x07')
+sys.stdout.flush()
+note('up')
+while True:
+    time.sleep(0.05)
+`)
+	var tv TerminalView
+	e.json("POST", "/api/terminals", map[string]any{"folder_id": f.ID, "preset": "sh", "cols": 80, "rows": 24}, 201, &tv)
+	term := "/api/terminals/" + url.PathEscape(tv.Address)
+	get := func() TerminalView {
+		var v TerminalView
+		e.json("GET", term, nil, 200, &v)
+		return v
+	}
+	e.eventually(func() bool { v := get(); return v.Foreground != nil && v.Foreground.Pid == *v.Pid })
+	e.json("POST", term+"/send", map[string]any{"text": shellLine(sh[0], []string{py, "-u", fake, out})}, 200, nil)
+	noted := func() string { b, _ := os.ReadFile(out); return strings.ReplaceAll(string(b), "\r", "") }
+	e.eventually(func() bool {
+		v := get()
+		return noted() == "up\n" && v.Status != nil && v.Status.App == "claude-code"
+	})
+
+	e.json("POST", term+"/kill", nil, 200, nil)
+	if got := noted(); got != "up\nexited\n" {
+		t.Fatalf("killed before it exited by itself: %q", got)
+	}
+	e.eventually(func() bool { return get().State == "finished" })
 }

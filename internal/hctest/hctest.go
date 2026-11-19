@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -46,10 +47,14 @@ func Start(t testing.TB) *Core {
 	c.Env = append(procutil.WithoutEnv(os.Environ(),
 		"HC_TERMINAL_ID", "HC_SESSION", "HC_SOCKET", "XDG_STATE_HOME", "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR"),
 		"HC_SESSION="+c.Session,
-		"HC_SOCKET="+filepath.Join(dir, "c.sock"),
 		"XDG_STATE_HOME="+filepath.Join(dir, "state"),
 		"XDG_CONFIG_HOME="+filepath.Join(dir, "config"),
 		"XDG_RUNTIME_DIR="+filepath.Join(dir, "run"))
+	// On Windows the core listens on a named pipe named for the session; a
+	// file path in HC_SOCKET keeps it from starting (hc 0.1.19).
+	if runtime.GOOS != "windows" {
+		c.Env = append(c.Env, "HC_SOCKET="+filepath.Join(dir, "c.sock"))
+	}
 	stopEnv := slices.Clone(c.Env) // a test changing c.Env must not aim the stop elsewhere
 	t.Cleanup(func() {
 		cmd := exec.Command(c.HC, "server", "stop")

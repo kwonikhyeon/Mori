@@ -355,9 +355,16 @@ func (s *Server) handleInterrupt(w http.ResponseWriter, r *http.Request) {
 	s.relay(w, r, "terminal.interrupt", params)
 }
 
+// handleKill ends the program; Claude Code is first asked to exit by
+// itself (spec §3 #258).
 func (s *Server) handleKill(w http.ResponseWriter, r *http.Request) {
+	addr := terminalParam(r)
+	var before hc.Terminal
+	if err := s.d.Core.Call(r.Context(), "terminal.get", map[string]any{"terminal": addr}, &before); err == nil {
+		s.endClaude(r.Context(), before)
+	}
 	var t hc.Terminal
-	if err := s.d.Core.Call(r.Context(), "terminal.kill", map[string]any{"terminal": terminalParam(r)}, &t); err != nil {
+	if err := s.d.Core.Call(r.Context(), "terminal.kill", map[string]any{"terminal": addr}, &t); err != nil {
 		writeError(w, err)
 		return
 	}
